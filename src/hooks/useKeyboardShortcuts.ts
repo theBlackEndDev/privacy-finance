@@ -1,0 +1,57 @@
+import { useEffect } from 'react';
+import { View } from '../types';
+
+const VIEW_KEYS: Record<string, View> = {
+  '1': 'dashboard',
+  '2': 'accounts',
+  '3': 'transactions',
+  '4': 'categories',
+  '5': 'import',
+};
+
+interface UseKeyboardShortcutsOptions {
+  navigate: (view: View) => void;
+  onFocusQuickEntry?: () => void;
+  onFocusSearch?: () => void;
+}
+
+export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearch }: UseKeyboardShortcutsOptions) {
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      if (e.key === 'Escape') {
+        // Let individual components handle Escape (modals, etc.)
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+1-5: navigate views
+        if (VIEW_KEYS[e.key]) {
+          e.preventDefault();
+          navigate(VIEW_KEYS[e.key]);
+          return;
+        }
+        // Ctrl+N: focus quick-entry
+        if (e.key === 'n' && onFocusQuickEntry) {
+          e.preventDefault();
+          onFocusQuickEntry();
+          return;
+        }
+        // Ctrl+F: focus search
+        if (e.key === 'f' && onFocusSearch) {
+          e.preventDefault();
+          onFocusSearch();
+          return;
+        }
+      }
+
+      // Guard remaining shortcuts from firing in inputs
+      if (inInput) return;
+    }
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [navigate, onFocusQuickEntry, onFocusSearch]);
+}

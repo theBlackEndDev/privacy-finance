@@ -1,9 +1,46 @@
-function App() {
+import { AppProvider, useApp } from './context/AppContext';
+import { AccountProvider } from './context/AccountContext';
+import { CategoryProvider } from './context/CategoryContext';
+import { MainLayout } from './components/layout/MainLayout';
+import { AccountsPage } from './views/AccountsPage';
+import { CategoriesPage } from './views/CategoriesPage';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+
+// Placeholder views for phases not yet built
+function PlaceholderView({ name }: { name: string }) {
   return (
-    <div style={{ color: '#e8eaed', background: '#0f1117', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p>PrivacyFinance — loading…</p>
+    <div style={{ color: 'var(--text-secondary)', paddingTop: 48, textAlign: 'center' }}>
+      <p style={{ fontSize: 18, fontWeight: 600 }}>{name}</p>
+      <p style={{ fontSize: 14, marginTop: 8, color: 'var(--text-muted)' }}>Coming in a future phase</p>
     </div>
   );
 }
 
-export default App;
+function AppShell() {
+  const { currentView, navigate } = useApp();
+  useKeyboardShortcuts({ navigate });
+
+  const view = (() => {
+    switch (currentView) {
+      case 'accounts':     return <AccountsPage />;
+      case 'categories':   return <CategoriesPage />;
+      case 'dashboard':    return <PlaceholderView name="Dashboard" />;
+      case 'transactions': return <PlaceholderView name="Transactions" />;
+      case 'import':       return <PlaceholderView name="Import" />;
+    }
+  })();
+
+  return <MainLayout>{view}</MainLayout>;
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AccountProvider>
+        <CategoryProvider>
+          <AppShell />
+        </CategoryProvider>
+      </AccountProvider>
+    </AppProvider>
+  );
+}

@@ -1,0 +1,22 @@
+import { useApp } from '../../context/AppContext';
+import { View } from '../../types';
+import styles from './Header.module.css';
+
+const VIEW_TITLES: Record<View, string> = {
+  dashboard:    'Dashboard',
+  accounts:     'Accounts',
+  transactions: 'Transactions',
+  categories:   'Categories',
+  import:       'Import',
+};
+
+export function Header() {
+  const { currentView } = useApp();
+
+  return (
+    <header className={styles.header}>
+      <span className={styles.title}>{VIEW_TITLES[currentView]}</span>
+      <div className={styles.right} />
+    </header>
+  );
+}
