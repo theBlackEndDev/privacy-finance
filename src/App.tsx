@@ -5,6 +5,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { AccountsPage } from './views/AccountsPage';
 import { CategoriesPage } from './views/CategoriesPage';
 import { TransactionsPage } from './views/TransactionsPage';
+import { DashboardPage } from './views/DashboardPage';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 // Placeholder views for phases not yet built
@@ -25,7 +26,7 @@ function AppShell() {
     switch (currentView) {
       case 'accounts':     return <AccountsPage />;
       case 'categories':   return <CategoriesPage />;
-      case 'dashboard':    return <PlaceholderView name="Dashboard" />;
+      case 'dashboard':    return <DashboardPage />;
       case 'transactions': return <TransactionsPage />;
       case 'import':       return <PlaceholderView name="Import" />;
     }

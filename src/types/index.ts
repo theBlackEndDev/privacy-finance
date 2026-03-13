@@ -127,6 +127,36 @@ export interface CreateTransferInput {
   description?: string;
 }
 
+// ── Dashboard ─────────────────────────────────────────────────────
+
+export interface CategorySummary {
+  categoryId: string | null;
+  categoryName: string;
+  categoryColor: string;
+  total: number; // cents (negative for expenses)
+}
+
+export interface MonthSummary {
+  month: string; // YYYY-MM
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface AccountBalance {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  balance: number; // cents
+}
+
+export interface DashboardData {
+  income: number;
+  expense: number;
+  net: number;
+  byCategory: CategorySummary[];
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import';
