@@ -38,6 +38,13 @@ pub fn run() {
             commands::dashboard::get_dashboard_data,
             commands::dashboard::get_monthly_trend,
             commands::dashboard::get_account_balances,
+            commands::import::preview_csv,
+            commands::import::import_csv,
+            commands::import::rollback_import,
+            commands::import::get_import_batches,
+            commands::import::get_import_profiles,
+            commands::import::save_import_profile,
+            commands::import::delete_import_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
