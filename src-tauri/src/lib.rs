@@ -45,6 +45,8 @@ pub fn run() {
             commands::import::get_import_profiles,
             commands::import::save_import_profile,
             commands::import::delete_import_profile,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

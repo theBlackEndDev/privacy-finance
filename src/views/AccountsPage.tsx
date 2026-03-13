@@ -4,12 +4,14 @@ import { accountsApi } from '../api/accounts';
 import { AccountList } from '../components/accounts/AccountList';
 import { AccountForm } from '../components/accounts/AccountForm';
 import { Spinner } from '../components/ui/Spinner';
+import { useToast } from '../components/ui/Toast';
 
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Account | undefined>();
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -25,8 +27,10 @@ export function AccountsPage() {
   async function handleSave(input: CreateAccountInput | UpdateAccountInput) {
     if (editing) {
       await accountsApi.update(editing.id, input as UpdateAccountInput);
+      toast('Account updated');
     } else {
       await accountsApi.create(input as CreateAccountInput);
+      toast('Account created');
     }
     await load();
   }
@@ -36,8 +40,9 @@ export function AccountsPage() {
     try {
       await accountsApi.delete(account.id);
       await load();
+      toast('Account deleted');
     } catch (err) {
-      alert(String(err));
+      toast(String(err), 'error');
     }
   }
 

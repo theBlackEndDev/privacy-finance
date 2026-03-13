@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAccounts } from '../../context/AccountContext';
 import { View } from '../../types';
 import { cx } from '../../utils/classNames';
+import { SettingsModal } from './SettingsModal';
 import styles from './Sidebar.module.css';
 
 const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
@@ -15,6 +17,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
 export function Sidebar() {
   const { currentView, navigate, setActiveAccountId } = useApp();
   const { accounts } = useAccounts();
+  const [showSettings, setShowSettings] = useState(false);
 
   const activeAccounts = accounts.filter((a) => !a.isArchived);
 
@@ -24,40 +27,49 @@ export function Sidebar() {
   }
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.logo}>
-        Privacy<span className={styles.logoAccent}>Finance</span>
-      </div>
+    <>
+      <aside className={styles.sidebar}>
+        <div className={styles.logo}>
+          Privacy<span className={styles.logoAccent}>Finance</span>
+        </div>
 
-      <nav className={styles.nav}>
-        {NAV_ITEMS.map(({ view, label, icon }) => (
-          <button
-            key={view}
-            className={cx(styles.navItem, currentView === view && styles.navItemActive)}
-            onClick={() => navigate(view)}
-          >
-            <span className={styles.navIcon}>{icon}</span>
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {activeAccounts.length > 0 && (
-        <div className={styles.accountsSection}>
-          <div className={styles.sectionLabel}>Accounts</div>
-          {activeAccounts.map((account) => (
+        <nav className={styles.nav}>
+          {NAV_ITEMS.map(({ view, label, icon }) => (
             <button
-              key={account.id}
-              className={styles.accountItem}
-              onClick={() => handleAccountClick(account.id)}
-              title={account.name}
+              key={view}
+              className={cx(styles.navItem, currentView === view && styles.navItemActive)}
+              onClick={() => navigate(view)}
             >
-              <span className={styles.accountDot} />
-              <span className={styles.accountName}>{account.name}</span>
+              <span className={styles.navIcon}>{icon}</span>
+              {label}
             </button>
           ))}
-        </div>
-      )}
-    </aside>
+        </nav>
+
+        {activeAccounts.length > 0 && (
+          <div className={styles.accountsSection}>
+            <div className={styles.sectionLabel}>Accounts</div>
+            {activeAccounts.map((account) => (
+              <button
+                key={account.id}
+                className={styles.accountItem}
+                onClick={() => handleAccountClick(account.id)}
+                title={account.name}
+              >
+                <span className={styles.accountDot} />
+                <span className={styles.accountName}>{account.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button className={styles.settingsBtn} onClick={() => setShowSettings(true)}>
+          <span className={styles.navIcon}>⚙</span>
+          Settings
+        </button>
+      </aside>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+    </>
   );
 }

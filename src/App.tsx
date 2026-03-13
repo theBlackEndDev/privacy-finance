@@ -7,6 +7,7 @@ import { CategoriesPage } from './views/CategoriesPage';
 import { TransactionsPage } from './views/TransactionsPage';
 import { DashboardPage } from './views/DashboardPage';
 import { ImportPage } from './views/ImportPage';
+import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 function AppShell() {
@@ -28,12 +29,14 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AccountProvider>
-        <CategoryProvider>
-          <AppShell />
-        </CategoryProvider>
-      </AccountProvider>
-    </AppProvider>
+    <ToastProvider>
+      <AppProvider>
+        <AccountProvider>
+          <CategoryProvider>
+            <AppShell />
+          </CategoryProvider>
+        </AccountProvider>
+      </AppProvider>
+    </ToastProvider>
   );
 }
