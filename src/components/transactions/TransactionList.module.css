@@ -1,0 +1,44 @@
+.wrapper {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.thead {
+  display: grid;
+  grid-template-columns: 90px 1fr 140px 90px 90px 80px;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.thAmount { text-align: right; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pageButtons {
+  display: flex;
+  gap: 6px;
+}
