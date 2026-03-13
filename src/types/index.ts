@@ -60,6 +60,73 @@ export interface UpdateCategoryInput {
   isArchived?: boolean;
 }
 
+// ── Transactions ──────────────────────────────────────────────────
+
+export interface Transaction {
+  id: string;
+  accountId: string;
+  date: string;           // YYYY-MM-DD
+  amount: number;         // cents, always positive
+  kind: 'income' | 'expense' | 'transfer';
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryColor: string | null;
+  payee: string;
+  description: string;
+  isCleared: boolean;
+  transferGroupId: string | null;
+  importBatchId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTransactionInput {
+  accountId: string;
+  date: string;
+  amount: number;
+  kind: Transaction['kind'];
+  categoryId?: string | null;
+  payee?: string;
+  description?: string;
+  isCleared?: boolean;
+}
+
+export interface UpdateTransactionInput {
+  date?: string;
+  amount?: number;
+  kind?: Transaction['kind'];
+  categoryId?: string | null;
+  payee?: string;
+  description?: string;
+  isCleared?: boolean;
+}
+
+export interface TransactionFilters {
+  accountId?: string;
+  kind?: string;
+  categoryId?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface TransactionPage {
+  items: Transaction[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateTransferInput {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  date: string;
+  description?: string;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import';
