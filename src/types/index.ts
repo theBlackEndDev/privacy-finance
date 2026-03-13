@@ -157,6 +157,57 @@ export interface DashboardData {
   byCategory: CategorySummary[];
 }
 
+// ── Import ────────────────────────────────────────────────────────
+
+export interface CsvPreview {
+  headers: string[];
+  rows: string[][];
+  delimiter: string;
+}
+
+export interface ColumnMapping {
+  csvColumn: string;
+  field: string; // 'date' | 'payee' | 'description' | 'amount' | 'debit' | 'credit'
+}
+
+export interface ImportInput {
+  filePath: string;
+  accountId: string;
+  mappings: ColumnMapping[];
+  dateFormat: string;
+  amountFormat: string; // 'single' | 'debit_credit'
+  profileId?: string | null;
+}
+
+export interface ImportRowError {
+  row: number;
+  message: string;
+}
+
+export interface ImportResult {
+  batchId: string;
+  imported: number;
+  duplicates: number;
+  errors: ImportRowError[];
+}
+
+export interface ImportBatch {
+  id: string;
+  filename: string;
+  fileHash: string;
+  accountId: string;
+  profileId: string | null;
+  rowCount: number;
+  createdAt: string;
+}
+
+export interface ImportProfile {
+  id: string;
+  name: string;
+  mapping: string; // JSON string
+  createdAt: string;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import';
