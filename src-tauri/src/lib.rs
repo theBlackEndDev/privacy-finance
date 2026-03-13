@@ -18,7 +18,17 @@ pub fn run() {
             app.manage(state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::accounts::get_accounts,
+            commands::accounts::get_account,
+            commands::accounts::create_account,
+            commands::accounts::update_account,
+            commands::accounts::delete_account,
+            commands::categories::get_categories,
+            commands::categories::create_category,
+            commands::categories::update_category,
+            commands::categories::delete_category,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
