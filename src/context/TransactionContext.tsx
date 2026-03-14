@@ -14,9 +14,17 @@ const TransactionContext = createContext<TransactionContextValue | null>(null);
 
 const DEFAULT_FILTERS: TransactionFilters = { page: 0, pageSize: 50 };
 
-export function TransactionProvider({ children }: { children: ReactNode }) {
+interface TransactionProviderProps {
+  children: ReactNode;
+  initialAccountId?: string | null;
+}
+
+export function TransactionProvider({ children, initialAccountId }: TransactionProviderProps) {
   const [page, setPage] = useState<TransactionPage | null>(null);
-  const [filters, setFiltersState] = useState<TransactionFilters>(DEFAULT_FILTERS);
+  const [filters, setFiltersState] = useState<TransactionFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    accountId: initialAccountId ?? undefined,
+  }));
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {

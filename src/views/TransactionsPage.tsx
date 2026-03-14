@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Transaction } from '../types';
 import { useAccounts } from '../context/AccountContext';
 import { useCategories } from '../context/CategoryContext';
@@ -17,6 +17,11 @@ function TransactionsInner() {
   const { categories } = useCategories();
   const { page, filters, loading, setFilters, refresh } = useTransactions();
   const { activeAccountId } = useApp();
+
+  // Sync sidebar account selection into filters
+  useEffect(() => {
+    setFilters({ page: 0, pageSize: 50, accountId: activeAccountId ?? undefined });
+  }, [activeAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
   const quickEntryRef = useRef<HTMLInputElement | null>(null);
@@ -84,8 +89,9 @@ function TransactionsInner() {
 }
 
 export function TransactionsPage() {
+  const { activeAccountId } = useApp();
   return (
-    <TransactionProvider>
+    <TransactionProvider initialAccountId={activeAccountId}>
       <TransactionsInner />
     </TransactionProvider>
   );

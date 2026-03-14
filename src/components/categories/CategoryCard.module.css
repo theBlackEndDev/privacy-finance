@@ -22,13 +22,18 @@
 
 .name {
   flex: 1;
+  min-width: 0;
   font-size: 14px;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actions {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .archived {
