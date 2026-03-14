@@ -128,7 +128,7 @@ fn insert_tx(
         "INSERT INTO transactions
          (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, created_at, updated_at)
          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
-        rusqlite::params![id, account_id, date, amount, kind, category_id, payee, description, cleared as i64, now],
+        rusqlite::params![id, account_id, date, amount.abs(), kind, category_id, payee, description, cleared as i64, now],
     )?;
     Ok(())
 }
