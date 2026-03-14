@@ -91,72 +91,203 @@ CREATE INDEX IF NOT EXISTS idx_transactions_transfer_group ON transactions(trans
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_dedupe ON transactions(account_id, import_row_hash);
 ";
 
+fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO categories (id, name, color, icon, type, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 'folder', ?4, ?5, ?6, ?6)",
+        rusqlite::params![id, name, color, kind, sort, now],
+    )?;
+    Ok(id)
+}
+
+fn insert_account(conn: &Connection, name: &str, kind: &str, opening_balance: i64, sort: i64, now: &str) -> AppResult<String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO accounts (id, name, type, currency_code, opening_balance, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, 'USD', ?4, ?5, ?6, ?6)",
+        rusqlite::params![id, name, kind, opening_balance, sort, now],
+    )?;
+    Ok(id)
+}
+
+fn insert_tx(
+    conn: &Connection,
+    account_id: &str,
+    date: &str,
+    amount: i64,
+    kind: &str,
+    category_id: Option<&str>,
+    payee: &str,
+    description: &str,
+    cleared: bool,
+    now: &str,
+) -> AppResult<()> {
+    let id = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO transactions
+         (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
+        rusqlite::params![id, account_id, date, amount, kind, category_id, payee, description, cleared as i64, now],
+    )?;
+    Ok(())
+}
+
+fn insert_transfer(conn: &Connection, from_id: &str, to_id: &str, amount: i64, date: &str, desc: &str, now: &str) -> AppResult<()> {
+    let group_id = uuid::Uuid::new_v4().to_string();
+    let id1 = uuid::Uuid::new_v4().to_string();
+    let id2 = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO transactions (id, account_id, date, amount, kind, payee, description, is_cleared, transfer_group_id, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,'transfer','Transfer',?5,1,?6,?7,?7)",
+        rusqlite::params![id1, from_id, date, -amount, desc, group_id, now],
+    )?;
+    conn.execute(
+        "INSERT INTO transactions (id, account_id, date, amount, kind, payee, description, is_cleared, transfer_group_id, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,'transfer','Transfer',?5,1,?6,?7,?7)",
+        rusqlite::params![id2, to_id, date, amount, desc, group_id, now],
+    )?;
+    Ok(())
+}
+
 fn seed_defaults(conn: &Connection) -> AppResult<()> {
     // Only seed if categories table is empty
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM categories",
-        [],
-        |row| row.get(0),
-    )?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))?;
     if count > 0 {
         return Ok(());
     }
 
     let now = now_utc();
 
-    // Income categories
-    let income_cats = [
-        ("Salary",       "#22c55e"),
-        ("Freelance",    "#3b82f6"),
-        ("Investments",  "#8b5cf6"),
-        ("Other Income", "#06b6d4"),
-    ];
-    for (i, (name, color)) in income_cats.iter().enumerate() {
-        let id = uuid::Uuid::new_v4().to_string();
-        conn.execute(
-            "INSERT INTO categories (id, name, color, icon, type, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, 'folder', 'income', ?4, ?5, ?6)",
-            rusqlite::params![id, name, color, i as i64, now, now],
-        )?;
-    }
+    // ── Categories ───────────────────────────────────────────────────────────
 
-    // Expense categories
-    let expense_cats = [
-        ("Housing",        "#ef4444"),
-        ("Food",           "#f97316"),
-        ("Transportation", "#eab308"),
-        ("Utilities",      "#14b8a6"),
-        ("Healthcare",     "#ec4899"),
-        ("Entertainment",  "#8b5cf6"),
-        ("Shopping",       "#f43f5e"),
-        ("Education",      "#6366f1"),
-        ("Subscriptions",  "#a855f7"),
-        ("Personal",       "#0ea5e9"),
-        ("Other",          "#6b7280"),
-    ];
-    for (i, (name, color)) in expense_cats.iter().enumerate() {
-        let id = uuid::Uuid::new_v4().to_string();
-        conn.execute(
-            "INSERT INTO categories (id, name, color, icon, type, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, 'folder', 'expense', ?4, ?5, ?6)",
-            rusqlite::params![id, name, color, i as i64, now, now],
-        )?;
-    }
+    let cat_salary      = insert_category(conn, "Salary",        "#22c55e", "income",  0, &now)?;
+    let cat_freelance   = insert_category(conn, "Freelance",     "#3b82f6", "income",  1, &now)?;
+    let cat_investments = insert_category(conn, "Investments",   "#8b5cf6", "income",  2, &now)?;
+    let _cat_oi         = insert_category(conn, "Other Income",  "#06b6d4", "income",  3, &now)?;
 
-    // Default account
-    let account_count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM accounts",
-        [],
-        |row| row.get(0),
-    )?;
-    if account_count == 0 {
-        let id = uuid::Uuid::new_v4().to_string();
-        conn.execute(
-            "INSERT INTO accounts (id, name, type, currency_code, opening_balance, sort_order, created_at, updated_at)
-             VALUES (?1, 'Primary Checking', 'checking', 'USD', 0, 0, ?2, ?3)",
-            rusqlite::params![id, now, now],
-        )?;
-    }
+    let cat_housing     = insert_category(conn, "Housing",        "#ef4444", "expense",  0, &now)?;
+    let cat_food        = insert_category(conn, "Food",           "#f97316", "expense",  1, &now)?;
+    let cat_transport   = insert_category(conn, "Transportation", "#eab308", "expense",  2, &now)?;
+    let cat_utilities   = insert_category(conn, "Utilities",      "#14b8a6", "expense",  3, &now)?;
+    let cat_health      = insert_category(conn, "Healthcare",     "#ec4899", "expense",  4, &now)?;
+    let cat_entertain   = insert_category(conn, "Entertainment",  "#8b5cf6", "expense",  5, &now)?;
+    let cat_shopping    = insert_category(conn, "Shopping",       "#f43f5e", "expense",  6, &now)?;
+    let _cat_education  = insert_category(conn, "Education",      "#6366f1", "expense",  7, &now)?;
+    let cat_subs        = insert_category(conn, "Subscriptions",  "#a855f7", "expense",  8, &now)?;
+    let cat_personal    = insert_category(conn, "Personal",       "#0ea5e9", "expense",  9, &now)?;
+    let _cat_other      = insert_category(conn, "Other",          "#6b7280", "expense", 10, &now)?;
+
+    // ── Accounts ─────────────────────────────────────────────────────────────
+
+    let checking = insert_account(conn, "Primary Checking", "checking",    250_000, 0, &now)?; // $2,500 opening
+    let savings  = insert_account(conn, "High-Yield Savings", "savings",  1_200_000, 1, &now)?; // $12,000
+    let cc       = insert_account(conn, "Visa Rewards Card", "credit_card", 0,      2, &now)?;
+
+    // ── Transactions — 3 months of realistic data ─────────────────────────────
+    // Month -2 (two months ago)
+
+    // Salaries
+    insert_tx(conn, &checking, "2026-01-15", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Jan", true, &now)?;
+    insert_tx(conn, &checking, "2026-01-31", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Jan", true, &now)?;
+    insert_tx(conn, &checking, "2026-02-14", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Feb", true, &now)?;
+    insert_tx(conn, &checking, "2026-02-28", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Feb", true, &now)?;
+    insert_tx(conn, &checking, "2026-03-14", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Mar", true, &now)?;
+    insert_tx(conn, &checking, "2026-03-31", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Mar", false, &now)?;
+
+    // Freelance
+    insert_tx(conn, &checking, "2026-01-20", 120_000, "income", Some(&cat_freelance), "Studio Nine", "Logo design project", true, &now)?;
+    insert_tx(conn, &checking, "2026-03-05", 85_000, "income", Some(&cat_freelance), "Apex Media", "Website audit", true, &now)?;
+
+    // Investment dividends
+    insert_tx(conn, &savings, "2026-01-31", 18_400, "income", Some(&cat_investments), "Vanguard", "Dividend Q4", true, &now)?;
+    insert_tx(conn, &savings, "2026-02-29", 21_200, "income", Some(&cat_investments), "Vanguard", "Dividend", true, &now)?;
+    insert_tx(conn, &savings, "2026-03-31", 19_700, "income", Some(&cat_investments), "Vanguard", "Dividend", false, &now)?;
+
+    // Housing — rent on checking
+    insert_tx(conn, &checking, "2026-01-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent — January", true, &now)?;
+    insert_tx(conn, &checking, "2026-02-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent — February", true, &now)?;
+    insert_tx(conn, &checking, "2026-03-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent — March", true, &now)?;
+
+    // Utilities on CC
+    insert_tx(conn, &cc, "2026-01-08", -9_400, "expense", Some(&cat_utilities), "City Power & Gas", "Electric + gas", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-10", -7_200, "expense", Some(&cat_utilities), "StreamNet ISP", "Internet", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-08", -9_800, "expense", Some(&cat_utilities), "City Power & Gas", "Electric + gas", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-10", -7_200, "expense", Some(&cat_utilities), "StreamNet ISP", "Internet", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-08", -8_900, "expense", Some(&cat_utilities), "City Power & Gas", "Electric + gas", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-10", -7_200, "expense", Some(&cat_utilities), "StreamNet ISP", "Internet", false, &now)?;
+
+    // Food / Groceries on CC
+    insert_tx(conn, &cc, "2026-01-03", -12_400, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-09", -4_200, "expense", Some(&cat_food), "Blue Bottle Coffee", "Coffee & pastries", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-14", -13_100, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-18", -8_700, "expense", Some(&cat_food), "Chipotle", "Team lunch", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-21", -11_900, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-25", -3_500, "expense", Some(&cat_food), "Starbucks", "Coffee runs", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-28", -14_200, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-04", -12_800, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-11", -11_600, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-14", -9_800, "expense", Some(&cat_food), "Nobu", "Valentine's dinner", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-18", -13_400, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-25", -12_100, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-04", -13_700, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-11", -11_200, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-15", -6_400, "expense", Some(&cat_food), "The French Laundry", "Birthday dinner", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-18", -12_900, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", false, &now)?;
+
+    // Transportation on CC
+    insert_tx(conn, &cc, "2026-01-05", -6_200, "expense", Some(&cat_transport), "Uber", "Rides", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-15", -5_500, "expense", Some(&cat_transport), "Shell", "Gas", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-05", -7_100, "expense", Some(&cat_transport), "Uber", "Rides", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-20", -5_500, "expense", Some(&cat_transport), "Shell", "Gas", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-05", -6_800, "expense", Some(&cat_transport), "Uber", "Rides", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-20", -5_500, "expense", Some(&cat_transport), "Chevron", "Gas", false, &now)?;
+
+    // Subscriptions on CC
+    insert_tx(conn, &cc, "2026-01-02", -1_599, "expense", Some(&cat_subs), "Netflix", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-02", -1_099, "expense", Some(&cat_subs), "Spotify", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-02", -2_999, "expense", Some(&cat_subs), "iCloud+", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-05", -1_400, "expense", Some(&cat_subs), "New York Times", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-02", -1_599, "expense", Some(&cat_subs), "Netflix", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-02", -1_099, "expense", Some(&cat_subs), "Spotify", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-02", -2_999, "expense", Some(&cat_subs), "iCloud+", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-05", -1_400, "expense", Some(&cat_subs), "New York Times", "Monthly", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-02", -1_599, "expense", Some(&cat_subs), "Netflix", "Monthly", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-02", -1_099, "expense", Some(&cat_subs), "Spotify", "Monthly", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-02", -2_999, "expense", Some(&cat_subs), "iCloud+", "Monthly", false, &now)?;
+    insert_tx(conn, &cc, "2026-03-05", -1_400, "expense", Some(&cat_subs), "New York Times", "Monthly", false, &now)?;
+
+    // Entertainment on CC
+    insert_tx(conn, &cc, "2026-01-12", -8_000, "expense", Some(&cat_entertain), "AMC Theatres", "Movie night", true, &now)?;
+    insert_tx(conn, &cc, "2026-01-22", -15_000, "expense", Some(&cat_entertain), "Ticketmaster", "Jazz concert tickets", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-08", -7_500, "expense", Some(&cat_entertain), "AMC Theatres", "Movie night", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-22", -22_000, "expense", Some(&cat_entertain), "Ticketmaster", "NBA tickets", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-14", -9_000, "expense", Some(&cat_entertain), "AMC Theatres", "Movie night x2", false, &now)?;
+
+    // Shopping on CC
+    insert_tx(conn, &cc, "2026-01-17", -24_900, "expense", Some(&cat_shopping), "Amazon", "Home supplies", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-10", -18_500, "expense", Some(&cat_shopping), "Target", "Household items", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-16", -34_000, "expense", Some(&cat_shopping), "Apple Store", "AirPods Pro", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-07", -22_300, "expense", Some(&cat_shopping), "Amazon", "Misc household", false, &now)?;
+
+    // Healthcare
+    insert_tx(conn, &cc, "2026-01-24", -15_000, "expense", Some(&cat_health), "Dr. Martinez", "Dental cleaning", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-12", -4_200, "expense", Some(&cat_health), "CVS Pharmacy", "Prescriptions", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-22", -20_000, "expense", Some(&cat_health), "Dr. Chen", "Annual physical", false, &now)?;
+
+    // Personal
+    insert_tx(conn, &cc, "2026-01-19", -8_500, "expense", Some(&cat_personal), "Great Clips", "Haircut", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-19", -8_500, "expense", Some(&cat_personal), "Great Clips", "Haircut", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-19", -8_500, "expense", Some(&cat_personal), "Great Clips", "Haircut", false, &now)?;
+
+    // CC payments (transfer checking → CC)
+    insert_transfer(conn, &checking, &cc, 180_000, "2026-02-05", "CC payment — January", &now)?;
+    insert_transfer(conn, &checking, &cc, 195_000, "2026-03-05", "CC payment — February", &now)?;
+
+    // Savings transfers
+    insert_transfer(conn, &checking, &savings, 50_000, "2026-01-31", "Monthly savings transfer", &now)?;
+    insert_transfer(conn, &checking, &savings, 50_000, "2026-02-28", "Monthly savings transfer", &now)?;
+    insert_transfer(conn, &checking, &savings, 50_000, "2026-03-31", "Monthly savings transfer", &now)?;
 
     Ok(())
 }

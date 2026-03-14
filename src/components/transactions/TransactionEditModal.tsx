@@ -4,6 +4,7 @@ import { transactionsApi } from '../../api/transactions';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { useToast } from '../ui/Toast';
 import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
 import styles from './TransactionEditModal.module.css';
 
@@ -24,6 +25,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   const [isCleared, setIsCleared] = useState(t.isCleared);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
 
   const filteredCategories = categories.filter(
     (c) => kind === 'income' ? c.type === 'income' : c.type === 'expense'
@@ -38,6 +40,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
         categoryId: categoryId || null, description, isCleared,
       };
       await transactionsApi.update(t.id, input);
+      toast('Transaction updated');
       onSaved();
       onClose();
     } catch (err) {
@@ -51,6 +54,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
     if (!confirm('Delete this transaction? This cannot be undone.')) return;
     try {
       await transactionsApi.delete(t.id);
+      toast('Transaction deleted');
       onSaved();
       onClose();
     } catch (err) {

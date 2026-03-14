@@ -110,8 +110,10 @@ mod tests {
         insert_txn(&conn, &acct, 2000, "income");
         insert_txn(&conn, &acct, 3000, "expense");
 
+        // Count only the test payee rows to isolate from seed data
         let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM transactions WHERE kind='expense'", [], |r| r.get(0)
+            "SELECT COUNT(*) FROM transactions WHERE kind='expense' AND payee='Test Payee'",
+            [], |r| r.get(0)
         ).unwrap();
         assert_eq!(count, 2);
     }
@@ -120,13 +122,17 @@ mod tests {
     fn filter_by_account() {
         let conn = setup();
         let acct = seed_account(&conn);
+        let before: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM transactions WHERE account_id = ?1", [&acct], |r| r.get(0)
+        ).unwrap();
+
         insert_txn(&conn, &acct, 1000, "expense");
         insert_txn(&conn, &acct, 2000, "expense");
 
-        let count: i64 = conn.query_row(
+        let after: i64 = conn.query_row(
             "SELECT COUNT(*) FROM transactions WHERE account_id = ?1", [&acct], |r| r.get(0)
         ).unwrap();
-        assert_eq!(count, 2);
+        assert_eq!(after - before, 2);
     }
 
     #[test]
@@ -135,8 +141,8 @@ mod tests {
         let acct = seed_account(&conn);
         let now = now_utc();
 
-        // Insert transactions on different dates
-        for (date, amount) in [("2026-01-01", 100i64), ("2026-02-01", 200), ("2026-03-01", 300)] {
+        // Use dates well outside the 2026-01..2026-03 seed range
+        for (date, amount) in [("2027-01-01", 100i64), ("2027-02-01", 200), ("2027-03-01", 300)] {
             let id = Uuid::new_v4().to_string();
             conn.execute(
                 "INSERT INTO transactions (id, account_id, date, amount, kind, created_at, updated_at)
@@ -146,7 +152,7 @@ mod tests {
         }
 
         let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM transactions WHERE date >= '2026-01-15' AND date <= '2026-02-28'",
+            "SELECT COUNT(*) FROM transactions WHERE date >= '2027-01-15' AND date <= '2027-02-28'",
             [], |r| r.get(0)
         ).unwrap();
         assert_eq!(count, 1, "only Feb transaction in range");

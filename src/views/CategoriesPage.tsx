@@ -4,12 +4,14 @@ import { categoriesApi } from '../api/categories';
 import { CategoryList } from '../components/categories/CategoryList';
 import { CategoryForm } from '../components/categories/CategoryForm';
 import { Spinner } from '../components/ui/Spinner';
+import { useToast } from '../components/ui/Toast';
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Category | undefined>();
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -25,8 +27,10 @@ export function CategoriesPage() {
   async function handleSave(input: CreateCategoryInput | UpdateCategoryInput) {
     if (editing) {
       await categoriesApi.update(editing.id, input as UpdateCategoryInput);
+      toast('Category updated');
     } else {
       await categoriesApi.create(input as CreateCategoryInput);
+      toast('Category created');
     }
     await load();
   }
@@ -36,8 +40,9 @@ export function CategoriesPage() {
     try {
       await categoriesApi.delete(category.id);
       await load();
+      toast('Category deleted');
     } catch (err) {
-      alert(String(err));
+      toast(String(err), 'error');
     }
   }
 
