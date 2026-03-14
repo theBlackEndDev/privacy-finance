@@ -13,15 +13,15 @@ pub fn get_dashboard_data(month: String, state: State<'_, DbState>) -> AppResult
 
     let mut stmt = conn.prepare(
         "SELECT
-            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
-            COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expense
+            COALESCE(SUM(CASE WHEN kind = 'income' THEN amount ELSE 0 END), 0) AS income,
+            COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END), 0) AS expense
          FROM transactions
          WHERE date LIKE ?1
            AND kind != 'transfer'",
     )?;
     let (income, expense): (i64, i64) =
         stmt.query_row([&pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
-    let net = income + expense;
+    let net = income - expense;
 
     let mut cat_stmt = conn.prepare(
         "SELECT
@@ -32,8 +32,7 @@ pub fn get_dashboard_data(month: String, state: State<'_, DbState>) -> AppResult
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id
          WHERE t.date LIKE ?1
-           AND t.amount < 0
-           AND t.kind != 'transfer'
+           AND t.kind = 'expense'
          GROUP BY t.category_id
          ORDER BY total ASC",
     )?;
@@ -65,9 +64,9 @@ pub fn get_monthly_trend(months: u32, state: State<'_, DbState>) -> AppResult<Ve
     let mut stmt = conn.prepare(
         "SELECT
             strftime('%Y-%m', date) AS month,
-            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
-            COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END), 0) AS expense,
-            COALESCE(SUM(amount), 0) AS net
+            COALESCE(SUM(CASE WHEN kind = 'income' THEN amount ELSE 0 END), 0) AS income,
+            COALESCE(SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END), 0) AS expense,
+            COALESCE(SUM(CASE WHEN kind = 'income' THEN amount WHEN kind = 'expense' THEN -amount ELSE 0 END), 0) AS net
          FROM transactions
          WHERE kind != 'transfer'
          GROUP BY month
@@ -100,7 +99,13 @@ pub fn get_account_balances(state: State<'_, DbState>) -> AppResult<Vec<AccountB
             a.id,
             a.name,
             a.type,
-            a.opening_balance + COALESCE(SUM(t.amount), 0) AS balance
+            a.opening_balance + COALESCE(SUM(
+                CASE
+                    WHEN t.kind = 'income' THEN t.amount
+                    WHEN t.kind = 'expense' THEN -t.amount
+                    ELSE t.amount  -- transfers are already signed
+                END
+            ), 0) AS balance
          FROM accounts a
          LEFT JOIN transactions t ON t.account_id = a.id
          GROUP BY a.id

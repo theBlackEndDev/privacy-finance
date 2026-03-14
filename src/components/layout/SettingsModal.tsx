@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { settingsApi } from '../../api/settings';
 import { useToast } from '../ui/Toast';
+import { useApp } from '../../context/AppContext';
 
 interface Props {
   onClose: () => void;
@@ -24,6 +25,7 @@ export function SettingsModal({ onClose }: Props) {
   const [dateFormat, setDateFormat] = useState('MMM D');
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const { theme, setTheme } = useApp();
 
   useEffect(() => {
     settingsApi.get('currency_symbol').then(v => { if (v) setCurrencySymbol(v); });
@@ -84,6 +86,33 @@ export function SettingsModal({ onClose }: Props) {
             <option value="DD/MM/YYYY">05/01/2024</option>
             <option value="YYYY-MM-DD">2024-01-05</option>
           </select>
+        </div>
+
+        {/* Theme */}
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 500 }}>Appearance</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['dark', 'light'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  borderRadius: 6,
+                  border: `1px solid ${theme === t ? 'var(--color-accent)' : 'var(--border-color)'}`,
+                  background: theme === t ? 'var(--color-accent)' : 'var(--bg-input)',
+                  color: theme === t ? '#fff' : 'var(--text-secondary)',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontWeight: theme === t ? 600 : 400,
+                  transition: 'var(--transition-fast)',
+                }}
+              >
+                {t === 'dark' ? '🌙 Dark' : '☀️ Light'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Keyboard shortcuts reference */}

@@ -5,6 +5,17 @@ use crate::helpers::timestamps::now_utc;
 pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(SCHEMA)?;
     seed_defaults(conn)?;
+    fix_negative_expense_amounts(conn)?;
+    Ok(())
+}
+
+/// One-time idempotent fix: older seed data stored expense amounts as negative.
+/// Normalize all expense amounts to positive so the frontend's sign prefix works correctly.
+fn fix_negative_expense_amounts(conn: &Connection) -> AppResult<()> {
+    conn.execute(
+        "UPDATE transactions SET amount = ABS(amount) WHERE kind = 'expense' AND amount < 0",
+        [],
+    )?;
     Ok(())
 }
 
@@ -128,7 +139,7 @@ fn insert_tx(
         "INSERT INTO transactions
          (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, created_at, updated_at)
          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
-        rusqlite::params![id, account_id, date, amount, kind, category_id, payee, description, cleared as i64, now],
+        rusqlite::params![id, account_id, date, amount.abs(), kind, category_id, payee, description, cleared as i64, now],
     )?;
     Ok(())
 }
