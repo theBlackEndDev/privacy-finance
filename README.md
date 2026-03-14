@@ -265,6 +265,9 @@ cargo test
 
 ## Post-MVP Roadmap
 
+**Dashboard**
+- Spending pie chart slices are clickable — navigates to Transactions filtered by that category and the selected month
+
 **Import**
 - Fuzzy duplicate detection — flag rows where amount + payee match an existing transaction within ±3 days and let the user decide before committing
 - FTS5 full-text search on payee/description (current LIKE query doesn't scale past ~50k rows)
