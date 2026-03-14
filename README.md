@@ -263,12 +263,26 @@ cargo test
 
 ---
 
-## What's Not in MVP
+## Post-MVP Roadmap
 
-- Multi-currency
-- Recurring transactions
-- Budget / envelope system
-- Data export (CSV/JSON/PDF)
-- Backup/restore UI
-- Light theme
-- Full undo/redo (only import batch rollback supported)
+**Import**
+- Fuzzy duplicate detection — flag rows where amount + payee match an existing transaction within ±3 days and let the user decide before committing
+- FTS5 full-text search on payee/description (current LIKE query doesn't scale past ~50k rows)
+
+**Transactions**
+- Recurring transactions (scheduled repeating entries)
+- Full undo/redo across sessions (currently only import batch rollback is supported)
+- Split transactions (one transaction split across multiple categories)
+
+**Budgets**
+- Monthly budget / envelope system per category
+- Budget vs. actual variance on the dashboard
+
+**Data**
+- Data export — CSV, JSON, PDF statement
+- Backup/restore UI (manual DB file copy with guided dialog)
+- Multi-currency support with exchange rates
+
+**Other**
+- Complex ARIA combobox dropdowns (currently using native `<select>`)
+- Mobile / responsive layout
