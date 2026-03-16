@@ -10,6 +10,8 @@ pub mod export;
 pub mod backup;
 pub mod budget;
 pub mod rules;
+pub mod splits;
+pub mod tags;
 mod tests;
 mod transaction_tests;
 mod import_tests;

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use super::tag::TagBrief;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,10 +15,13 @@ pub struct Transaction {
     pub payee: String,
     pub description: String,
     pub is_cleared: bool,
+    pub is_split: bool,
     pub transfer_group_id: Option<String>,
     pub import_batch_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub tags: Vec<TagBrief>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,6 +55,7 @@ pub struct TransactionFilters {
     pub account_id: Option<String>,
     pub kind: Option<String>,
     pub category_id: Option<String>,
+    pub tag_id: Option<String>,
     pub search: Option<String>,
     pub date_from: Option<String>,
     pub date_to: Option<String>,

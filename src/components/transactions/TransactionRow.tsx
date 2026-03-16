@@ -2,6 +2,7 @@ import { Transaction } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
 import { cx } from '../../utils/classNames';
+import { TagBadge } from '../tags/TagBadge';
 import styles from './TransactionRow.module.css';
 
 interface TransactionRowProps {
@@ -21,8 +22,18 @@ export function TransactionRow({ transaction: t, onClick }: TransactionRowProps)
       <span className={styles.date}>{formatDate(t.date)}</span>
 
       <div>
-        <div className={styles.payee}>{t.payee || '—'}</div>
+        <div className={styles.payee}>
+          {t.payee || '—'}
+          {t.isSplit && <span className={styles.splitBadge}>Split</span>}
+        </div>
         {t.description && <div className={styles.description}>{t.description}</div>}
+        {t.tags && t.tags.length > 0 && (
+          <div className={styles.tags}>
+            {t.tags.map((tag) => (
+              <TagBadge key={tag.id} tag={tag} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className={styles.category}>

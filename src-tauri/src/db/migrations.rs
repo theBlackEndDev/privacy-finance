@@ -7,6 +7,19 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     seed_defaults(conn)?;
     fix_negative_expense_amounts(conn)?;
     populate_fts(conn)?;
+    add_is_split_column(conn)?;
+    Ok(())
+}
+
+/// Idempotent: add is_split column to transactions if it doesn't exist.
+fn add_is_split_column(conn: &Connection) -> AppResult<()> {
+    let has_column: bool = conn
+        .prepare("PRAGMA table_info(transactions)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|name| name.as_deref() == Ok("is_split"));
+    if !has_column {
+        conn.execute_batch("ALTER TABLE transactions ADD COLUMN is_split INTEGER NOT NULL DEFAULT 0")?;
+    }
     Ok(())
 }
 
@@ -227,6 +240,43 @@ CREATE TABLE IF NOT EXISTS categorization_rules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rules_active_priority ON categorization_rules(is_active, priority);
+
+-- Phase 16: Split Transactions + Tags
+
+-- Add is_split flag to transactions (SQLite ALTER TABLE ADD COLUMN)
+-- Cannot use IF NOT EXISTS with ALTER TABLE, so we create a trigger-safe approach:
+-- We'll handle this in Rust code instead.
+
+CREATE TABLE IF NOT EXISTS transaction_splits (
+    id              TEXT PRIMARY KEY,
+    transaction_id  TEXT NOT NULL,
+    category_id     TEXT NOT NULL,
+    amount          INTEGER NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_splits_transaction_id ON transaction_splits(transaction_id);
+
+CREATE TABLE IF NOT EXISTS tags (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    color       TEXT,
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS transaction_tags (
+    transaction_id  TEXT NOT NULL,
+    tag_id          TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    PRIMARY KEY (transaction_id, tag_id),
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag_id ON transaction_tags(tag_id);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {

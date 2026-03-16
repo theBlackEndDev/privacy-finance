@@ -74,10 +74,12 @@ export interface Transaction {
   payee: string;
   description: string;
   isCleared: boolean;
+  isSplit: boolean;
   transferGroupId: string | null;
   importBatchId: string | null;
   createdAt: string;
   updatedAt: string;
+  tags: TagBrief[];
 }
 
 export interface CreateTransactionInput {
@@ -105,6 +107,7 @@ export interface TransactionFilters {
   accountId?: string;
   kind?: string;
   categoryId?: string;
+  tagId?: string;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -385,6 +388,45 @@ export interface RuleTestResult {
   description: string;
   amount: number;
   matchedFieldValue: string;
+}
+
+// ── Splits ────────────────────────────────────────────────────────
+
+export interface TransactionSplit {
+  id: string;
+  transactionId: string;
+  categoryId: string;
+  categoryName: string | null;
+  categoryColor: string | null;
+  amount: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface CreateSplitInput {
+  categoryId: string;
+  amount: number;
+  description: string;
+}
+
+// ── Tags ──────────────────────────────────────────────────────────
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string | null;
+  createdAt: string;
+}
+
+export interface CreateTagInput {
+  name: string;
+  color?: string | null;
+}
+
+export interface TagBrief {
+  id: string;
+  name: string;
+  color: string | null;
 }
 
 // ── Views ─────────────────────────────────────────────────────────
