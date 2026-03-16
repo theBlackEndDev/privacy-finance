@@ -271,6 +271,17 @@ export interface GenerateResult {
   itemsProcessed: number;
 }
 
+// ── Search ────────────────────────────────────────────────────────
+
+export interface SearchResult extends Transaction {
+  snippet: string;
+}
+
+export interface SearchSuggestion {
+  text: string;
+  field: string;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring';

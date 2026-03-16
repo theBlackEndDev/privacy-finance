@@ -55,6 +55,10 @@ pub fn run() {
             commands::recurring::toggle_recurring_active,
             commands::recurring::check_due_recurring,
             commands::recurring::generate_recurring_transactions,
+            commands::search::search_transactions,
+            commands::search::search_transactions_full,
+            commands::search::search_suggest,
+            commands::search::rebuild_fts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

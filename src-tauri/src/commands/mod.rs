@@ -5,6 +5,7 @@ pub mod dashboard;
 pub mod import;
 pub mod settings;
 pub mod recurring;
+pub mod search;
 mod tests;
 mod transaction_tests;
 mod import_tests;

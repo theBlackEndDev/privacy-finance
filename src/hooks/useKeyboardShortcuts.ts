@@ -41,9 +41,13 @@ export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearc
           return;
         }
         // Ctrl+F: focus search
-        if (e.key === 'f' && onFocusSearch) {
+        if (e.key === 'f') {
           e.preventDefault();
-          onFocusSearch();
+          if (onFocusSearch) {
+            onFocusSearch();
+          } else {
+            window.dispatchEvent(new CustomEvent('focus-search'));
+          }
           return;
         }
       }
