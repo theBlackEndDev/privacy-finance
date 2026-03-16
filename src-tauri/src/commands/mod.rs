@@ -6,6 +6,8 @@ pub mod import;
 pub mod settings;
 pub mod recurring;
 pub mod search;
+pub mod export;
+pub mod backup;
 mod tests;
 mod transaction_tests;
 mod import_tests;

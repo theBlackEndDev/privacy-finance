@@ -9,6 +9,7 @@ import { TransferForm } from '../components/transactions/TransferForm';
 import { TransactionFiltersBar } from '../components/transactions/TransactionFilters';
 import { TransactionList } from '../components/transactions/TransactionList';
 import { TransactionEditModal } from '../components/transactions/TransactionEditModal';
+import { ExportModal } from '../components/export/ExportModal';
 import { Button } from '../components/ui/Button';
 import { Spinner } from '../components/ui/Spinner';
 
@@ -24,6 +25,7 @@ function TransactionsInner() {
   }, [activeAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const quickEntryRef = useRef<HTMLInputElement | null>(null);
 
   function handlePageChange(p: number) {
@@ -51,6 +53,7 @@ function TransactionsInner() {
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-sidebar)' }}>
+          <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>Export</Button>
           <Button variant="ghost" size="sm" onClick={() => setShowTransfer(true)}>⇅ Transfer</Button>
         </div>
       </div>
@@ -83,6 +86,11 @@ function TransactionsInner() {
           onSaved={refresh}
           onClose={() => setShowTransfer(false)}
         />
+      )}
+
+      {/* Export modal */}
+      {showExport && (
+        <ExportModal onClose={() => setShowExport(false)} />
       )}
     </div>
   );

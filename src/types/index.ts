@@ -282,6 +282,26 @@ export interface SearchSuggestion {
   field: string;
 }
 
+// ── Export + Backup ──────────────────────────────────────────────
+
+export type ExportFormat = 'csv' | 'json' | 'full-json';
+
+export interface ExportFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  accountId?: string;
+}
+
+export interface BackupInfo {
+  fileSizeBytes: number;
+  accountCount: number;
+  categoryCount: number;
+  transactionCount: number;
+  recurringCount: number;
+  dateRangeFrom: string | null;
+  dateRangeTo: string | null;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring';
