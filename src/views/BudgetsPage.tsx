@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BudgetCategoryRow, BudgetSummary, BudgetWithItems } from '../types';
+import { BudgetCategoryRow, BudgetSummary } from '../types';
 import { budgetApi } from '../api/budgets';
 import { useToast } from '../components/ui/Toast';
 import { Spinner } from '../components/ui/Spinner';
@@ -23,17 +23,21 @@ export function BudgetsPage() {
   const loadBudget = useCallback(async (y: number, m: number) => {
     setLoading(true);
     try {
-      let data: BudgetWithItems | null = await budgetApi.get(y, m);
+      let [data, sum] = await Promise.all([
+        budgetApi.get(y, m),
+        budgetApi.getSummary(y, m),
+      ]);
 
       // Auto-create budget if none exists for this month
       if (!data) {
         await budgetApi.create(y, m);
-        data = await budgetApi.get(y, m);
+        [data, sum] = await Promise.all([
+          budgetApi.get(y, m),
+          budgetApi.getSummary(y, m),
+        ]);
       }
 
       setItems(data?.items ?? []);
-
-      const sum = await budgetApi.getSummary(y, m);
       setSummary(sum);
     } catch (err) {
       toast(`Failed to load budget: ${err}`, 'error');

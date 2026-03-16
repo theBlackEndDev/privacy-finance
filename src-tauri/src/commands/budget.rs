@@ -6,6 +6,27 @@ use crate::models::budget::{
 };
 use tauri::State;
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+fn prev_year_month(year: i32, month: i32) -> (i32, i32) {
+    if month == 1 { (year - 1, 12) } else { (year, month - 1) }
+}
+
+fn month_like_pattern(year: i32, month: i32) -> String {
+    format!("{:04}-{:02}%", year, month)
+}
+
+fn row_to_budget(row: &rusqlite::Row) -> rusqlite::Result<Budget> {
+    Ok(Budget {
+        id: row.get(0)?,
+        year: row.get(1)?,
+        month: row.get(2)?,
+        notes: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
+}
+
 /// Create zero-budgeted items for all active expense categories in a budget.
 fn seed_budget_items(conn: &rusqlite::Connection, budget_id: &str, now: &str) -> AppResult<()> {
     let mut cat_stmt = conn.prepare(
@@ -25,6 +46,8 @@ fn seed_budget_items(conn: &rusqlite::Connection, budget_id: &str, now: &str) ->
     }
     Ok(())
 }
+
+// ── Commands ─────────────────────────────────────────────────────────
 
 /// Create a budget for the given year/month.
 /// Auto-creates budget_items for all active expense categories with budgeted = 0.
@@ -68,16 +91,7 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
             "SELECT id, year, month, notes, created_at, updated_at
              FROM budgets WHERE year = ?1 AND month = ?2",
             rusqlite::params![year, month],
-            |row| {
-                Ok(Budget {
-                    id: row.get(0)?,
-                    year: row.get(1)?,
-                    month: row.get(2)?,
-                    notes: row.get(3)?,
-                    created_at: row.get(4)?,
-                    updated_at: row.get(5)?,
-                })
-            },
+            row_to_budget,
         )
         .ok();
 
@@ -85,8 +99,6 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
         Some(b) => b,
         None => return Ok(None),
     };
-
-    let date_prefix = format!("{:04}-{:02}", year, month);
 
     let mut stmt = conn.prepare(
         "SELECT
@@ -96,21 +108,21 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
             c.color,
             bi.budgeted,
             bi.rollover,
-            COALESCE((
-                SELECT SUM(t.amount)
-                FROM transactions t
-                WHERE t.category_id = bi.category_id
-                  AND t.kind = 'expense'
-                  AND t.date LIKE ?1
-            ), 0) AS spent
+            COALESCE(t_sum.spent, 0) AS spent
          FROM budget_items bi
          JOIN categories c ON c.id = bi.category_id
+         LEFT JOIN (
+             SELECT category_id, SUM(amount) AS spent
+             FROM transactions
+             WHERE kind = 'expense' AND date LIKE ?1
+             GROUP BY category_id
+         ) t_sum ON t_sum.category_id = bi.category_id
          WHERE bi.budget_id = ?2
          ORDER BY c.sort_order",
     )?;
 
     let items: Vec<BudgetCategoryRow> = stmt
-        .query_map(rusqlite::params![format!("{}%", date_prefix), budget.id], |row| {
+        .query_map(rusqlite::params![month_like_pattern(year, month), budget.id], |row| {
             let budgeted: i64 = row.get(4)?;
             let spent: i64 = row.get(6)?;
             Ok(BudgetCategoryRow {
@@ -139,18 +151,26 @@ pub fn update_budget_item(
     let conn = state.write_conn.lock().unwrap();
     let now = now_utc();
 
-    if let Some(budgeted) = input.budgeted {
-        conn.execute(
-            "UPDATE budget_items SET budgeted = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![budgeted, now, item_id],
-        )?;
-    }
-
-    if let Some(rollover) = input.rollover {
-        conn.execute(
-            "UPDATE budget_items SET rollover = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![rollover as i64, now, item_id],
-        )?;
+    match (input.budgeted, input.rollover) {
+        (Some(b), Some(r)) => {
+            conn.execute(
+                "UPDATE budget_items SET budgeted = ?1, rollover = ?2, updated_at = ?3 WHERE id = ?4",
+                rusqlite::params![b, r as i64, now, item_id],
+            )?;
+        }
+        (Some(b), None) => {
+            conn.execute(
+                "UPDATE budget_items SET budgeted = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![b, now, item_id],
+            )?;
+        }
+        (None, Some(r)) => {
+            conn.execute(
+                "UPDATE budget_items SET rollover = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![r as i64, now, item_id],
+            )?;
+        }
+        (None, None) => {}
     }
 
     Ok(())
@@ -160,11 +180,7 @@ pub fn update_budget_item(
 /// Creates the budget if it doesn't exist, then copies budgeted amounts.
 #[tauri::command]
 pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult<Budget> {
-    let (prev_year, prev_month) = if month == 1 {
-        (year - 1, 12)
-    } else {
-        (year, month - 1)
-    };
+    let (prev_year, prev_month) = prev_year_month(year, month);
 
     let conn = state.write_conn.lock().unwrap();
 
@@ -181,16 +197,6 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
         Some(id) => id,
         None => return Err(AppError::Validation("No budget found for previous month".into())),
     };
-
-    // Get previous month's allocations
-    let mut prev_stmt = conn.prepare(
-        "SELECT category_id, budgeted, rollover FROM budget_items WHERE budget_id = ?1",
-    )?;
-    let prev_items: Vec<(String, i64, i64)> = prev_stmt
-        .query_map([&prev_budget_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })?
-        .collect::<Result<_, _>>()?;
 
     let now = now_utc();
 
@@ -219,28 +225,26 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
         }
     };
 
-    // Copy allocations from previous month
-    for (cat_id, budgeted, rollover) in &prev_items {
-        conn.execute(
-            "UPDATE budget_items SET budgeted = ?1, rollover = ?2, updated_at = ?3
-             WHERE budget_id = ?4 AND category_id = ?5",
-            rusqlite::params![budgeted, rollover, now, budget_id, cat_id],
-        )?;
-    }
+    // Copy allocations from previous month in a single UPDATE...FROM
+    conn.execute(
+        "UPDATE budget_items SET
+            budgeted = src.budgeted,
+            rollover = src.rollover,
+            updated_at = ?1
+         FROM (
+             SELECT category_id, budgeted, rollover
+             FROM budget_items
+             WHERE budget_id = ?2
+         ) AS src
+         WHERE budget_items.budget_id = ?3
+           AND budget_items.category_id = src.category_id",
+        rusqlite::params![now, prev_budget_id, budget_id],
+    )?;
 
     let budget = conn.query_row(
         "SELECT id, year, month, notes, created_at, updated_at FROM budgets WHERE id = ?1",
         [&budget_id],
-        |row| {
-            Ok(Budget {
-                id: row.get(0)?,
-                year: row.get(1)?,
-                month: row.get(2)?,
-                notes: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
-            })
-        },
+        row_to_budget,
     )?;
 
     Ok(budget)
@@ -250,7 +254,7 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
 #[tauri::command]
 pub fn get_budget_summary(year: i32, month: i32, state: State<'_, DbState>) -> AppResult<BudgetSummary> {
     let conn = state.read_conn.lock().unwrap();
-    let date_prefix = format!("{:04}-{:02}", year, month);
+    let like_pattern = month_like_pattern(year, month);
 
     // Total budgeted
     let total_budgeted: i64 = conn
@@ -269,7 +273,7 @@ pub fn get_budget_summary(year: i32, month: i32, state: State<'_, DbState>) -> A
         .query_row(
             "SELECT COALESCE(SUM(amount), 0) FROM transactions
              WHERE kind = 'expense' AND date LIKE ?1",
-            rusqlite::params![format!("{}%", date_prefix)],
+            rusqlite::params![&like_pattern],
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -279,7 +283,7 @@ pub fn get_budget_summary(year: i32, month: i32, state: State<'_, DbState>) -> A
         .query_row(
             "SELECT COALESCE(SUM(amount), 0) FROM transactions
              WHERE kind = 'income' AND date LIKE ?1",
-            rusqlite::params![format!("{}%", date_prefix)],
+            rusqlite::params![&like_pattern],
             |row| row.get(0),
         )
         .unwrap_or(0);
@@ -298,15 +302,10 @@ pub fn get_budget_summary(year: i32, month: i32, state: State<'_, DbState>) -> A
 /// Adds the rollover amount to the current month's budgeted value.
 #[tauri::command]
 pub fn calculate_rollover(year: i32, month: i32, state: State<'_, DbState>) -> AppResult<i32> {
-    let (prev_year, prev_month) = if month == 1 {
-        (year - 1, 12)
-    } else {
-        (year, month - 1)
-    };
+    let (prev_year, prev_month) = prev_year_month(year, month);
 
     let conn = state.write_conn.lock().unwrap();
     let now = now_utc();
-    let prev_date_prefix = format!("{:04}-{:02}", prev_year, prev_month);
 
     // Get previous month's budget items with rollover enabled
     let prev_budget_id: Option<String> = conn
@@ -333,19 +332,19 @@ pub fn calculate_rollover(year: i32, month: i32, state: State<'_, DbState>) -> A
 
     let mut stmt = conn.prepare(
         "SELECT bi.category_id, bi.budgeted,
-                COALESCE((
-                    SELECT SUM(t.amount)
-                    FROM transactions t
-                    WHERE t.category_id = bi.category_id
-                      AND t.kind = 'expense'
-                      AND t.date LIKE ?1
-                ), 0) AS spent
+                COALESCE(t_sum.spent, 0) AS spent
          FROM budget_items bi
+         LEFT JOIN (
+             SELECT category_id, SUM(amount) AS spent
+             FROM transactions
+             WHERE kind = 'expense' AND date LIKE ?1
+             GROUP BY category_id
+         ) t_sum ON t_sum.category_id = bi.category_id
          WHERE bi.budget_id = ?2 AND bi.rollover = 1",
     )?;
 
     let rollovers: Vec<(String, i64)> = stmt
-        .query_map(rusqlite::params![format!("{}%", prev_date_prefix), prev_budget_id], |row| {
+        .query_map(rusqlite::params![month_like_pattern(prev_year, prev_month), prev_budget_id], |row| {
             let budgeted: i64 = row.get(1)?;
             let spent: i64 = row.get(2)?;
             let rollover_amount = budgeted - spent; // positive = surplus, negative = overspent
@@ -670,23 +669,21 @@ mod tests {
             params![uuid::Uuid::new_v4().to_string(), jul_id, transport_id, now],
         ).unwrap();
 
-        // Copy Jun → Jul
-        let mut stmt = conn.prepare(
-            "SELECT category_id, budgeted, rollover FROM budget_items WHERE budget_id = ?1",
+        // Copy Jun → Jul using UPDATE...FROM (matches production code)
+        conn.execute(
+            "UPDATE budget_items SET
+                budgeted = src.budgeted,
+                rollover = src.rollover,
+                updated_at = ?1
+             FROM (
+                 SELECT category_id, budgeted, rollover
+                 FROM budget_items
+                 WHERE budget_id = ?2
+             ) AS src
+             WHERE budget_items.budget_id = ?3
+               AND budget_items.category_id = src.category_id",
+            params![now, jun_id, jul_id],
         ).unwrap();
-        let prev_items: Vec<(String, i64, i64)> = stmt
-            .query_map([&jun_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?)))
-            .unwrap()
-            .collect::<Result<_, _>>()
-            .unwrap();
-
-        for (cat_id, budgeted, rollover) in &prev_items {
-            conn.execute(
-                "UPDATE budget_items SET budgeted = ?1, rollover = ?2, updated_at = ?3
-                 WHERE budget_id = ?4 AND category_id = ?5",
-                params![budgeted, rollover, now, jul_id, cat_id],
-            ).unwrap();
-        }
 
         // Verify July allocations match June
         let jul_food: (i64, i64) = conn.query_row(
