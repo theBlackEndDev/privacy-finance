@@ -208,6 +208,69 @@ export interface ImportProfile {
   createdAt: string;
 }
 
+// ── Recurring Transactions ────────────────────────────────────────
+
+export type Frequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface RecurringTransaction {
+  id: string;
+  accountId: string;
+  payee: string;
+  description: string;
+  amount: number;
+  kind: 'income' | 'expense' | 'transfer';
+  categoryId: string | null;
+  transferToAccountId: string | null;
+  frequency: Frequency;
+  startDate: string;
+  endDate: string | null;
+  nextDate: string;
+  isActive: boolean;
+  autoPost: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRecurringInput {
+  accountId: string;
+  payee?: string;
+  description?: string;
+  amount: number;
+  kind: 'income' | 'expense' | 'transfer';
+  categoryId?: string;
+  transferToAccountId?: string;
+  frequency: Frequency;
+  startDate: string;
+  endDate?: string;
+  autoPost?: boolean;
+}
+
+export interface UpdateRecurringInput {
+  accountId?: string;
+  payee?: string;
+  description?: string;
+  amount?: number;
+  kind?: string;
+  categoryId?: string;
+  transferToAccountId?: string;
+  frequency?: string;
+  startDate?: string;
+  endDate?: string;
+  nextDate?: string;
+  isActive?: boolean;
+  autoPost?: boolean;
+}
+
+export interface DueRecurringItem {
+  recurring: RecurringTransaction;
+  missedCount: number;
+}
+
+export interface GenerateResult {
+  generatedCount: number;
+  itemsProcessed: number;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import';
+export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring';

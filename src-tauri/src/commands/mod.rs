@@ -4,6 +4,7 @@ pub mod transactions;
 pub mod dashboard;
 pub mod import;
 pub mod settings;
+pub mod recurring;
 mod tests;
 mod transaction_tests;
 mod import_tests;

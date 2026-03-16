@@ -47,6 +47,14 @@ pub fn run() {
             commands::import::delete_import_profile,
             commands::settings::get_setting,
             commands::settings::set_setting,
+            commands::recurring::get_all_recurring,
+            commands::recurring::get_recurring,
+            commands::recurring::create_recurring,
+            commands::recurring::update_recurring,
+            commands::recurring::delete_recurring,
+            commands::recurring::toggle_recurring_active,
+            commands::recurring::check_due_recurring,
+            commands::recurring::generate_recurring_transactions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
