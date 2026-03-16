@@ -65,6 +65,12 @@ pub fn run() {
             commands::backup::create_backup,
             commands::backup::restore_backup,
             commands::backup::get_backup_info,
+            commands::budget::create_budget,
+            commands::budget::get_budget,
+            commands::budget::update_budget_item,
+            commands::budget::copy_budget,
+            commands::budget::get_budget_summary,
+            commands::budget::calculate_rollover,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

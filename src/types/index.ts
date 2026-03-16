@@ -302,6 +302,46 @@ export interface BackupInfo {
   dateRangeTo: string | null;
 }
 
+// ── Budgeting ────────────────────────────────────────────────────
+
+export interface Budget {
+  id: string;
+  year: number;
+  month: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BudgetCategoryRow {
+  itemId: string;
+  categoryId: string;
+  categoryName: string;
+  categoryColor: string;
+  budgeted: number;  // cents
+  spent: number;     // cents
+  available: number; // cents (budgeted - spent)
+  rollover: boolean;
+}
+
+export interface BudgetWithItems {
+  budget: Budget;
+  items: BudgetCategoryRow[];
+}
+
+export interface BudgetSummary {
+  totalBudgeted: number;
+  totalSpent: number;
+  totalAvailable: number;
+  totalIncome: number;
+  toBeBudgeted: number;
+}
+
+export interface UpdateBudgetItemInput {
+  budgeted?: number;
+  rollover?: boolean;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring';
+export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets';

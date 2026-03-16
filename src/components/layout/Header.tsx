@@ -10,6 +10,7 @@ const VIEW_TITLES: Record<View, string> = {
   categories:   'Categories',
   import:       'Import',
   recurring:    'Recurring',
+  budgets:      'Budgets',
 };
 
 export function Header() {
