@@ -91,6 +91,12 @@ pub fn run() {
             commands::tags::untag_transaction,
             commands::tags::get_transaction_tags,
             commands::tags::get_transactions_by_tag,
+            commands::reports::get_income_expense_report,
+            commands::reports::get_category_spending_report,
+            commands::reports::get_cash_flow_report,
+            commands::reports::get_net_worth_report,
+            commands::reports::get_tag_spending_report,
+            commands::reports::get_payee_spending_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
