@@ -12,6 +12,7 @@ const VIEW_TITLES: Record<View, string> = {
   recurring:    'Recurring',
   budgets:      'Budgets',
   rules:        'Rules',
+  reports:      'Reports',
 };
 
 export function Header() {

@@ -12,6 +12,7 @@ pub mod budget;
 pub mod rules;
 pub mod splits;
 pub mod tags;
+pub mod reports;
 mod tests;
 mod transaction_tests;
 mod import_tests;

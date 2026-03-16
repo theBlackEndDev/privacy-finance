@@ -15,6 +15,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
   { view: 'recurring',    label: 'Recurring',    icon: '↻' },
   { view: 'budgets',      label: 'Budgets',      icon: '▣' },
   { view: 'rules',        label: 'Rules',        icon: '⚡' },
+  { view: 'reports',      label: 'Reports',      icon: '▤' },
 ];
 
 export function Sidebar() {

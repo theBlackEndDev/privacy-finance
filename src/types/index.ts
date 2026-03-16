@@ -429,6 +429,67 @@ export interface TagBrief {
   color: string | null;
 }
 
+// ── Reports (Phase 17) ──────────────────────────────────────────
+
+export interface ReportDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+export interface IncomeExpenseMonth {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface IncomeExpenseReport {
+  months: IncomeExpenseMonth[];
+  previousIncome: number;
+  previousExpense: number;
+}
+
+export interface CategorySpendingRow {
+  categoryId: string | null;
+  categoryName: string;
+  categoryColor: string;
+  total: number;
+  percentage: number;
+}
+
+export interface CashFlowPoint {
+  date: string;
+  income: number;
+  expense: number;
+  net: number;
+  cumulative: number;
+}
+
+export interface NetWorthAccount {
+  accountId: string;
+  accountName: string;
+  balance: number;
+}
+
+export interface NetWorthPoint {
+  month: string;
+  total: number;
+  accounts: NetWorthAccount[];
+}
+
+export interface TagSpendingRow {
+  tagId: string;
+  tagName: string;
+  tagColor: string | null;
+  total: number;
+}
+
+export interface PayeeSpendingRow {
+  payee: string;
+  total: number;
+  count: number;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules';
+export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports';

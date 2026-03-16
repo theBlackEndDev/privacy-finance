@@ -9,3 +9,4 @@ pub mod budget;
 pub mod rule;
 pub mod split;
 pub mod tag;
+pub mod report;

@@ -9,12 +9,18 @@ export function formatDate(isoDate: string): string {
 }
 
 /**
- * Returns today's date as YYYY-MM-DD.
+ * Format a Date object as YYYY-MM-DD.
  */
-export function todayISO(): string {
-  const d = new Date();
+export function formatDateISO(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * Returns today's date as YYYY-MM-DD.
+ */
+export function todayISO(): string {
+  return formatDateISO(new Date());
 }
