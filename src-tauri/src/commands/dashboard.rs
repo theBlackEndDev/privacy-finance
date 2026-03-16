@@ -23,17 +23,37 @@ pub fn get_dashboard_data(month: String, state: State<'_, DbState>) -> AppResult
         stmt.query_row([&pattern], |row| Ok((row.get(0)?, row.get(1)?)))?;
     let net = income - expense;
 
+    // Use split categories when transaction is split, otherwise use parent category.
+    // UNION: non-split expenses by parent category + split amounts by split category.
     let mut cat_stmt = conn.prepare(
-        "SELECT
-            t.category_id,
-            COALESCE(c.name, 'Uncategorized') AS category_name,
-            COALESCE(c.color, '#6b7280') AS category_color,
-            SUM(t.amount) AS total
-         FROM transactions t
-         LEFT JOIN categories c ON t.category_id = c.id
-         WHERE t.date LIKE ?1
-           AND t.kind = 'expense'
-         GROUP BY t.category_id
+        "SELECT category_id, category_name, category_color, SUM(total) AS total
+         FROM (
+             -- Non-split expenses: use parent category
+             SELECT
+                 t.category_id,
+                 COALESCE(c.name, 'Uncategorized') AS category_name,
+                 COALESCE(c.color, '#6b7280') AS category_color,
+                 t.amount AS total
+             FROM transactions t
+             LEFT JOIN categories c ON t.category_id = c.id
+             WHERE t.date LIKE ?1
+               AND t.kind = 'expense'
+               AND t.is_split = 0
+             UNION ALL
+             -- Split expenses: use each split's category
+             SELECT
+                 ts.category_id,
+                 COALESCE(c.name, 'Uncategorized') AS category_name,
+                 COALESCE(c.color, '#6b7280') AS category_color,
+                 ts.amount AS total
+             FROM transactions t
+             JOIN transaction_splits ts ON t.id = ts.transaction_id
+             LEFT JOIN categories c ON ts.category_id = c.id
+             WHERE t.date LIKE ?1
+               AND t.kind = 'expense'
+               AND t.is_split = 1
+         )
+         GROUP BY category_id
          ORDER BY total ASC",
     )?;
     let by_category: Vec<CategorySummary> = cat_stmt

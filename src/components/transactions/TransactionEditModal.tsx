@@ -1,11 +1,13 @@
 import { useState, FormEvent } from 'react';
-import { Transaction, Category, UpdateTransactionInput } from '../../types';
+import { Transaction, Category, UpdateTransactionInput, TagBrief } from '../../types';
 import { transactionsApi } from '../../api/transactions';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useToast } from '../ui/Toast';
 import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
+import { SplitEditor } from '../splits/SplitEditor';
+import { TagPicker } from '../tags/TagPicker';
 import styles from './TransactionEditModal.module.css';
 
 interface TransactionEditModalProps {
@@ -25,6 +27,8 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   const [isCleared, setIsCleared] = useState(t.isCleared);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showSplit, setShowSplit] = useState(t.isSplit);
+  const [tags, setTags] = useState<TagBrief[]>(t.tags ?? []);
   const toast = useToast();
 
   const filteredCategories = categories.filter(
@@ -102,6 +106,29 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
           <input type="checkbox" checked={isCleared} onChange={(e) => setIsCleared(e.target.checked)} />
           Cleared
         </label>
+
+        {kind === 'expense' && (
+          <div>
+            {!showSplit ? (
+              <Button variant="ghost" type="button" size="sm" onClick={() => setShowSplit(true)}>
+                Split Transaction
+              </Button>
+            ) : (
+              <SplitEditor
+                transactionId={t.id}
+                parentAmount={t.amount}
+                categories={categories}
+                onSaved={onSaved}
+              />
+            )}
+          </div>
+        )}
+
+        <TagPicker
+          selectedTags={tags}
+          onTagsChange={setTags}
+          transactionId={t.id}
+        />
 
         {error && <p style={{ color: 'var(--color-expense)', fontSize: 13 }}>{error}</p>}
 

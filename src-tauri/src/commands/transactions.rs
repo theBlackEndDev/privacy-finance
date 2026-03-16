@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use tauri::State;
 use uuid::Uuid;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::timestamps::now_utc;
+use crate::models::tag::TagBrief;
 use crate::models::transaction::{
     CreateTransactionInput, CreateTransferInput, Transaction, TransactionFilters,
     TransactionPage, UpdateTransactionInput,
@@ -10,7 +12,7 @@ use crate::models::transaction::{
 
 // ── Helper: map a row to Transaction ────────────────────────────────────────
 
-fn row_to_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transaction> {
+pub(crate) fn row_to_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transaction> {
     Ok(Transaction {
         id: row.get(0)?,
         account_id: row.get(1)?,
@@ -21,18 +23,20 @@ fn row_to_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transaction> 
         payee: row.get(6)?,
         description: row.get(7)?,
         is_cleared: row.get::<_, i64>(8)? != 0,
-        transfer_group_id: row.get(9)?,
-        import_batch_id: row.get(10)?,
-        created_at: row.get(11)?,
-        updated_at: row.get(12)?,
-        category_name: row.get(13)?,
-        category_color: row.get(14)?,
+        is_split: row.get::<_, i64>(9)? != 0,
+        transfer_group_id: row.get(10)?,
+        import_batch_id: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+        category_name: row.get(14)?,
+        category_color: row.get(15)?,
+        tags: vec![],
     })
 }
 
 const SELECT: &str = "
     SELECT t.id, t.account_id, t.date, t.amount, t.kind,
-           t.category_id, t.payee, t.description, t.is_cleared,
+           t.category_id, t.payee, t.description, t.is_cleared, t.is_split,
            t.transfer_group_id, t.import_batch_id, t.created_at, t.updated_at,
            c.name AS category_name, c.color AS category_color
     FROM transactions t
@@ -156,6 +160,13 @@ pub fn get_transactions(
         conditions.push(format!("t.category_id = ?{}", params.len() + 1));
         params.push(Box::new(category_id.clone()));
     }
+    if let Some(ref tag_id) = filters.tag_id {
+        conditions.push(format!(
+            "t.id IN (SELECT transaction_id FROM transaction_tags WHERE tag_id = ?{})",
+            params.len() + 1
+        ));
+        params.push(Box::new(tag_id.clone()));
+    }
     if let Some(ref date_from) = filters.date_from {
         conditions.push(format!("t.date >= ?{}", params.len() + 1));
         params.push(Box::new(date_from.clone()));
@@ -200,9 +211,45 @@ pub fn get_transactions(
     let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
     let mut stmt = conn.prepare(&items_sql)?;
-    let items = stmt
+    let mut items: Vec<Transaction> = stmt
         .query_map(param_refs.as_slice(), row_to_transaction)?
         .collect::<Result<Vec<_>, _>>()?;
+
+    // Batch-load tags for all fetched transactions
+    if !items.is_empty() {
+        let ids: Vec<&str> = items.iter().map(|t| t.id.as_str()).collect();
+        let placeholders: Vec<String> = (1..=ids.len()).map(|i| format!("?{i}")).collect();
+        let tag_sql = format!(
+            "SELECT tt.transaction_id, tg.id, tg.name, tg.color
+             FROM transaction_tags tt
+             JOIN tags tg ON tt.tag_id = tg.id
+             WHERE tt.transaction_id IN ({})",
+            placeholders.join(",")
+        );
+        let tag_params: Vec<&dyn rusqlite::ToSql> =
+            ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+        let mut tag_stmt = conn.prepare(&tag_sql)?;
+        let mut tag_map: HashMap<String, Vec<TagBrief>> = HashMap::new();
+        let rows = tag_stmt.query_map(tag_params.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                TagBrief {
+                    id: row.get(1)?,
+                    name: row.get(2)?,
+                    color: row.get(3)?,
+                },
+            ))
+        })?;
+        for row in rows {
+            let (txn_id, tag) = row?;
+            tag_map.entry(txn_id).or_default().push(tag);
+        }
+        for item in &mut items {
+            if let Some(tags) = tag_map.remove(&item.id) {
+                item.tags = tags;
+            }
+        }
+    }
 
     Ok(TransactionPage { items, total, page, page_size })
 }

@@ -79,6 +79,18 @@ pub fn run() {
             commands::rules::match_transaction,
             commands::rules::apply_rules_to_uncategorized,
             commands::rules::test_rule,
+            commands::splits::create_splits,
+            commands::splits::get_splits,
+            commands::splits::update_splits,
+            commands::splits::delete_splits,
+            commands::tags::create_tag,
+            commands::tags::get_all_tags,
+            commands::tags::update_tag,
+            commands::tags::delete_tag,
+            commands::tags::tag_transaction,
+            commands::tags::untag_transaction,
+            commands::tags::get_transaction_tags,
+            commands::tags::get_transactions_by_tag,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
