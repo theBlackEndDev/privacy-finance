@@ -91,6 +91,28 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS recurring_transactions (
+    id                      TEXT PRIMARY KEY,
+    account_id              TEXT NOT NULL,
+    payee                   TEXT NOT NULL DEFAULT '',
+    description             TEXT NOT NULL DEFAULT '',
+    amount                  INTEGER NOT NULL,
+    kind                    TEXT NOT NULL CHECK(kind IN ('income', 'expense', 'transfer')),
+    category_id             TEXT,
+    transfer_to_account_id  TEXT,
+    frequency               TEXT NOT NULL CHECK(frequency IN ('daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly')),
+    start_date              TEXT NOT NULL,
+    end_date                TEXT,
+    next_date               TEXT NOT NULL,
+    is_active               INTEGER NOT NULL DEFAULT 1,
+    auto_post               INTEGER NOT NULL DEFAULT 0,
+    created_at              TEXT NOT NULL,
+    updated_at              TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (transfer_to_account_id) REFERENCES accounts(id) ON DELETE SET NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(account_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);
@@ -100,6 +122,10 @@ CREATE INDEX IF NOT EXISTS idx_transactions_payee ON transactions(payee);
 CREATE INDEX IF NOT EXISTS idx_transactions_import_batch ON transactions(import_batch_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_transfer_group ON transactions(transfer_group_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_dedupe ON transactions(account_id, import_row_hash);
+
+CREATE INDEX IF NOT EXISTS idx_recurring_next_date ON recurring_transactions(next_date);
+CREATE INDEX IF NOT EXISTS idx_recurring_account ON recurring_transactions(account_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_active ON recurring_transactions(is_active);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {

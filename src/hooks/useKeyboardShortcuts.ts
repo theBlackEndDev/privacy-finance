@@ -7,6 +7,7 @@ const VIEW_KEYS: Record<string, View> = {
   '3': 'transactions',
   '4': 'categories',
   '5': 'import',
+  '6': 'recurring',
 };
 
 interface UseKeyboardShortcutsOptions {

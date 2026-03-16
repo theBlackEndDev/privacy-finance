@@ -8,6 +8,7 @@ const VIEW_TITLES: Record<View, string> = {
   transactions: 'Transactions',
   categories:   'Categories',
   import:       'Import',
+  recurring:    'Recurring',
 };
 
 export function Header() {
