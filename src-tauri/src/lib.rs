@@ -71,6 +71,14 @@ pub fn run() {
             commands::budget::copy_budget,
             commands::budget::get_budget_summary,
             commands::budget::calculate_rollover,
+            commands::rules::create_rule,
+            commands::rules::get_all_rules,
+            commands::rules::update_rule,
+            commands::rules::delete_rule,
+            commands::rules::reorder_rules,
+            commands::rules::match_transaction,
+            commands::rules::apply_rules_to_uncategorized,
+            commands::rules::test_rule,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

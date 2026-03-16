@@ -342,6 +342,51 @@ export interface UpdateBudgetItemInput {
   rollover?: boolean;
 }
 
+// ── Categorization Rules ──────────────────────────────────────────
+
+export type MatchField = 'payee' | 'description' | 'amount';
+export type MatchType = 'contains' | 'starts_with' | 'ends_with' | 'exact' | 'regex';
+
+export interface CategorizationRule {
+  id: string;
+  name: string;
+  matchField: MatchField;
+  matchType: MatchType;
+  pattern: string;
+  categoryId: string;
+  priority: number;
+  isActive: boolean;
+  applyCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRuleInput {
+  name: string;
+  matchField: MatchField;
+  matchType: MatchType;
+  pattern: string;
+  categoryId: string;
+}
+
+export interface UpdateRuleInput {
+  name?: string;
+  matchField?: MatchField;
+  matchType?: MatchType;
+  pattern?: string;
+  categoryId?: string;
+  isActive?: boolean;
+}
+
+export interface RuleTestResult {
+  transactionId: string;
+  date: string;
+  payee: string;
+  description: string;
+  amount: number;
+  matchedFieldValue: string;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets';
+export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules';

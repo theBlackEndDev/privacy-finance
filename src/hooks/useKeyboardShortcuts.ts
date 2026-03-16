@@ -9,6 +9,7 @@ const VIEW_KEYS: Record<string, View> = {
   '5': 'import',
   '6': 'recurring',
   '7': 'budgets',
+  '8': 'rules',
 };
 
 interface UseKeyboardShortcutsOptions {
