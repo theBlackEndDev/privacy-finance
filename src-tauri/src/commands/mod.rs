@@ -9,6 +9,7 @@ pub mod search;
 pub mod export;
 pub mod backup;
 pub mod budget;
+pub mod rules;
 mod tests;
 mod transaction_tests;
 mod import_tests;

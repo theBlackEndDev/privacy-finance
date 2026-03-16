@@ -232,6 +232,7 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
     let mut imported = 0usize;
     let mut duplicates = 0usize;
     let mut errors: Vec<ImportRowError> = Vec::new();
+    let mut imported_ids: Vec<String> = Vec::new();
 
     // Collect all valid rows first, then insert in one transaction
     struct Row {
@@ -363,6 +364,7 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
                 duplicates += 1;
             } else {
                 imported += 1;
+                imported_ids.push(row.id.clone());
             }
         }
 
@@ -373,6 +375,13 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
         )?;
 
         conn.execute_batch("COMMIT")?;
+    }
+
+    // Auto-categorize newly imported uncategorized transactions
+    // Done outside the write_conn lock scope above to release it sooner
+    if !imported_ids.is_empty() {
+        let conn = state.write_conn.lock().unwrap();
+        let _ = super::rules::apply_rules_to_transactions(&conn, &imported_ids);
     }
 
     Ok(ImportResult {

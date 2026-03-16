@@ -209,6 +209,24 @@ CREATE TABLE IF NOT EXISTS budget_items (
 CREATE INDEX IF NOT EXISTS idx_budget_items_budget ON budget_items(budget_id);
 CREATE INDEX IF NOT EXISTS idx_budget_items_category ON budget_items(category_id);
 CREATE INDEX IF NOT EXISTS idx_budgets_year_month ON budgets(year, month);
+
+-- Auto-Categorization Rules
+CREATE TABLE IF NOT EXISTS categorization_rules (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    match_field TEXT NOT NULL CHECK(match_field IN ('payee', 'description', 'amount')),
+    match_type  TEXT NOT NULL CHECK(match_type IN ('contains', 'starts_with', 'ends_with', 'exact', 'regex')),
+    pattern     TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    priority    INTEGER NOT NULL DEFAULT 0,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    apply_count INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rules_active_priority ON categorization_rules(is_active, priority);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {
