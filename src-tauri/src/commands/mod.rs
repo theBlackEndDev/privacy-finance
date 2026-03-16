@@ -8,6 +8,7 @@ pub mod recurring;
 pub mod search;
 pub mod export;
 pub mod backup;
+pub mod budget;
 mod tests;
 mod transaction_tests;
 mod import_tests;

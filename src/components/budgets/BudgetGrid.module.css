@@ -1,0 +1,94 @@
+.container {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.toBeBudgeted {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.toBeBudgetedLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.toBeBudgetedAmount {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.positive {
+  color: var(--color-income);
+}
+
+.negative {
+  color: var(--color-expense);
+}
+
+.zero {
+  color: var(--text-muted);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 1fr 120px 100px 100px 40px;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.headerCell {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.headerRight {
+  composes: headerCell;
+  text-align: right;
+}
+
+.headerCenter {
+  composes: headerCell;
+  text-align: center;
+}
+
+.summaryRow {
+  display: grid;
+  grid-template-columns: 1fr 120px 100px 100px 40px;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 2px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.summaryLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.summaryAmount {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}

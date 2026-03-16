@@ -8,6 +8,7 @@ const VIEW_KEYS: Record<string, View> = {
   '4': 'categories',
   '5': 'import',
   '6': 'recurring',
+  '7': 'budgets',
 };
 
 interface UseKeyboardShortcutsOptions {
@@ -32,6 +33,12 @@ export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearc
         if (VIEW_KEYS[e.key]) {
           e.preventDefault();
           navigate(VIEW_KEYS[e.key]);
+          return;
+        }
+        // Ctrl+B: navigate to budgets
+        if (e.key === 'b') {
+          e.preventDefault();
+          navigate('budgets');
           return;
         }
         // Ctrl+N: focus quick-entry

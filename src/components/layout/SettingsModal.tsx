@@ -19,6 +19,8 @@ const KEYBOARD_SHORTCUTS = [
   ['Ctrl+3', 'Transactions'],
   ['Ctrl+4', 'Categories'],
   ['Ctrl+5', 'Import'],
+  ['Ctrl+7', 'Budgets'],
+  ['Ctrl+B', 'Budgets (alt)'],
   ['Ctrl+N', 'Focus new transaction'],
   ['Ctrl+F', 'Focus search'],
   ['Escape', 'Close modal'],

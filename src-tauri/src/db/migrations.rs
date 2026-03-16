@@ -181,6 +181,34 @@ AFTER DELETE ON transactions
 BEGIN
     DELETE FROM transactions_fts WHERE transaction_id = OLD.id;
 END;
+
+-- Envelope Budgeting
+CREATE TABLE IF NOT EXISTS budgets (
+    id          TEXT PRIMARY KEY,
+    year        INTEGER NOT NULL,
+    month       INTEGER NOT NULL CHECK(month BETWEEN 1 AND 12),
+    notes       TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    UNIQUE(year, month)
+);
+
+CREATE TABLE IF NOT EXISTS budget_items (
+    id          TEXT PRIMARY KEY,
+    budget_id   TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    budgeted    INTEGER NOT NULL DEFAULT 0,
+    rollover    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
+    UNIQUE(budget_id, category_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_budget_items_budget ON budget_items(budget_id);
+CREATE INDEX IF NOT EXISTS idx_budget_items_category ON budget_items(category_id);
+CREATE INDEX IF NOT EXISTS idx_budgets_year_month ON budgets(year, month);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {

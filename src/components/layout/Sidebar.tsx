@@ -13,6 +13,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
   { view: 'categories',   label: 'Categories',   icon: '◫' },
   { view: 'import',       label: 'Import',       icon: '↑' },
   { view: 'recurring',    label: 'Recurring',    icon: '↻' },
+  { view: 'budgets',      label: 'Budgets',      icon: '▣' },
 ];
 
 export function Sidebar() {

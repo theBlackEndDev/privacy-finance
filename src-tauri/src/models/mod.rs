@@ -5,3 +5,4 @@ pub mod dashboard;
 pub mod import;
 pub mod recurring;
 pub mod search;
+pub mod budget;

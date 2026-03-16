@@ -8,6 +8,7 @@ import { TransactionsPage } from './views/TransactionsPage';
 import { DashboardPage } from './views/DashboardPage';
 import { ImportPage } from './views/ImportPage';
 import { RecurringPage } from './views/RecurringPage';
+import { BudgetsPage } from './views/BudgetsPage';
 import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
@@ -55,6 +56,7 @@ function AppShell() {
       case 'transactions': return <TransactionsPage />;
       case 'import':       return <ImportPage />;
       case 'recurring':    return <RecurringPage />;
+      case 'budgets':      return <BudgetsPage />;
     }
   })();
 
