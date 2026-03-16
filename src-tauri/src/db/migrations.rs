@@ -6,6 +6,31 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(SCHEMA)?;
     seed_defaults(conn)?;
     fix_negative_expense_amounts(conn)?;
+    populate_fts(conn)?;
+    Ok(())
+}
+
+/// Populate FTS5 index from existing transactions that aren't already indexed.
+/// Idempotent: only inserts rows missing from FTS.
+fn populate_fts(conn: &Connection) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO transactions_fts(transaction_id, payee, description)
+         SELECT t.id, t.payee, t.description FROM transactions t
+         LEFT JOIN transactions_fts fts ON fts.transaction_id = t.id
+         WHERE fts.transaction_id IS NULL",
+        [],
+    )?;
+    Ok(())
+}
+
+/// Rebuild FTS5 index from scratch — drop all FTS rows and repopulate.
+pub fn rebuild_fts(conn: &Connection) -> AppResult<()> {
+    conn.execute("DELETE FROM transactions_fts", [])?;
+    conn.execute(
+        "INSERT INTO transactions_fts(transaction_id, payee, description)
+         SELECT id, payee, description FROM transactions",
+        [],
+    )?;
     Ok(())
 }
 
@@ -126,6 +151,36 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_dedupe ON transactions(accoun
 CREATE INDEX IF NOT EXISTS idx_recurring_next_date ON recurring_transactions(next_date);
 CREATE INDEX IF NOT EXISTS idx_recurring_account ON recurring_transactions(account_id);
 CREATE INDEX IF NOT EXISTS idx_recurring_active ON recurring_transactions(is_active);
+
+-- FTS5 full-text search for transactions
+CREATE VIRTUAL TABLE IF NOT EXISTS transactions_fts USING fts5(
+    transaction_id UNINDEXED,
+    payee,
+    description,
+    tokenize='unicode61'
+);
+
+-- Sync triggers: keep FTS5 in sync with transactions table
+CREATE TRIGGER IF NOT EXISTS trg_transactions_fts_insert
+AFTER INSERT ON transactions
+BEGIN
+    INSERT INTO transactions_fts(transaction_id, payee, description)
+    VALUES (NEW.id, NEW.payee, NEW.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_transactions_fts_update
+AFTER UPDATE OF payee, description ON transactions
+BEGIN
+    DELETE FROM transactions_fts WHERE transaction_id = OLD.id;
+    INSERT INTO transactions_fts(transaction_id, payee, description)
+    VALUES (NEW.id, NEW.payee, NEW.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_transactions_fts_delete
+AFTER DELETE ON transactions
+BEGIN
+    DELETE FROM transactions_fts WHERE transaction_id = OLD.id;
+END;
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {

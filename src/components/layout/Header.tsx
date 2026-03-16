@@ -1,5 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import { View } from '../../types';
+import { GlobalSearch } from '../search/GlobalSearch';
 import styles from './Header.module.css';
 
 const VIEW_TITLES: Record<View, string> = {
@@ -17,7 +18,9 @@ export function Header() {
   return (
     <header className={styles.header}>
       <span className={styles.title}>{VIEW_TITLES[currentView]}</span>
-      <div className={styles.right} />
+      <div className={styles.right}>
+        <GlobalSearch />
+      </div>
     </header>
   );
 }
