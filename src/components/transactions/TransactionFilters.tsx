@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Category, TransactionFilters } from '../../types';
+import { Account, Category, TransactionFilters } from '../../types';
 import { useDebounce } from '../../hooks/useDebounce';
 import styles from './TransactionFilters.module.css';
 
 interface TransactionFiltersProps {
   filters: TransactionFilters;
+  accounts: Account[];
   categories: Category[];
   onChange: (filters: TransactionFilters) => void;
 }
 
-export function TransactionFiltersBar({ filters, categories, onChange }: TransactionFiltersProps) {
+export function TransactionFiltersBar({ filters, accounts, categories, onChange }: TransactionFiltersProps) {
   const [search, setSearch] = useState(filters.search ?? '');
   const debouncedSearch = useDebounce(search, 300);
 
@@ -27,6 +28,20 @@ export function TransactionFiltersBar({ filters, categories, onChange }: Transac
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+      </div>
+
+      <div className={styles.field}>
+        <span className={styles.label}>Account</span>
+        <select
+          className={styles.select}
+          value={filters.accountId ?? ''}
+          onChange={(e) => onChange({ ...filters, accountId: e.target.value || undefined, page: 0 })}
+        >
+          <option value="">All Accounts</option>
+          {accounts.filter(a => !a.isArchived).map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className={styles.field}>
