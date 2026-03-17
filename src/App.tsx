@@ -16,6 +16,8 @@ import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
 import { KeyboardShortcutHelp } from './components/ui/KeyboardShortcutHelp';
+import { UnlockScreen } from './components/encryption/UnlockScreen';
+import { encryptionApi } from './api/encryption';
 import { recurringApi } from './api/recurring';
 import { DueRecurringItem } from './types';
 import { useState, useEffect, useCallback } from 'react';
@@ -89,6 +91,26 @@ function AppShell() {
 }
 
 export default function App() {
+  const [locked, setLocked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    encryptionApi.checkStatus().then(status => {
+      setLocked(status.isEncrypted);
+    }).catch(() => setLocked(false));
+  }, []);
+
+  if (locked === null) {
+    return null; // Loading encryption status
+  }
+
+  if (locked) {
+    return (
+      <ToastProvider>
+        <UnlockScreen onUnlocked={() => setLocked(false)} />
+      </ToastProvider>
+    );
+  }
+
   return (
     <ToastProvider>
       <AppProvider>

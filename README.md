@@ -6,16 +6,37 @@ Built with Tauri 2.x, React 19, TypeScript, and SQLite.
 
 ---
 
+## Privacy Statement
+
+PrivacyFinance is built on three principles:
+
+- **Privacy-first** — no telemetry, no analytics, no network calls. Your financial data never leaves your machine.
+- **Offline-only** — works without an internet connection. No cloud sync, no accounts required.
+- **No subscriptions** — free and open source. No premium tiers, no feature gates.
+
+---
+
 ## Features
 
 - **100% local** — your financial data never leaves your machine
-- **Accounts** — checking, savings, credit card, cash, investment
-- **Transactions** — income, expenses, and transfers between accounts
+- **Accounts** — checking, savings, credit card, cash, investment with multi-currency support
+- **Transactions** — income, expenses, and transfers between accounts with split support
 - **Categories** — color-coded with 15 defaults, fully customizable
 - **Dashboard** — monthly summary cards, spending pie chart, trend chart, account balances
 - **CSV Import** — 5-step wizard with column mapping, deduplication, and one-click rollback
-- **Keyboard shortcuts** — Ctrl+1-5 navigation, Ctrl+N new transaction, Ctrl+F search
-- **Dark theme** — high-contrast dark UI with tabular number formatting
+- **Budgeting** — monthly envelope budgets per category with rollover support
+- **Reports** — income/expense trends, category spending, cash flow, net worth, tag and payee analysis
+- **Recurring Transactions** — scheduled entries with auto-posting and frequency control
+- **Categorization Rules** — auto-categorize transactions by payee, description, or amount patterns
+- **Tags** — flexible tagging system for cross-cutting organization
+- **Split Transactions** — divide a single transaction across multiple categories
+- **Reconciliation** — statement reconciliation workflow with balance verification
+- **Database Encryption** — optional SQLCipher encryption at rest with password protection
+- **Export & Backup** — CSV, JSON, and full data export; one-click backup and restore
+- **Full-text Search** — FTS5-powered search across payees and descriptions
+- **Keyboard shortcuts** — Ctrl+1-9 navigation, Ctrl+N new transaction, Ctrl+F search, Ctrl+? help
+- **Accessibility** — ARIA landmarks, focus management, skip links, screen reader support
+- **Dark/Light theme** — high-contrast themes with tabular number formatting
 - **Import profiles** — save and reuse CSV column mappings per bank
 
 ---
@@ -27,7 +48,7 @@ Built with Tauri 2.x, React 19, TypeScript, and SQLite.
 | Desktop shell | Tauri 2.x |
 | Frontend | React 19 + TypeScript + Vite 7 |
 | Backend | Rust |
-| Database | SQLite via rusqlite (bundled, no install needed) |
+| Database | SQLite via rusqlite + SQLCipher (bundled, no install needed) |
 | Charts | Recharts |
 | CSV parsing | PapaParse (preview) + Rust csv crate (import) |
 | Styling | CSS Modules + CSS custom properties |
@@ -217,7 +238,7 @@ SQLite database stored at:
 
 ### Schema
 
-6 tables: `accounts`, `categories`, `transactions`, `import_batches`, `import_profiles`, `settings`.
+Tables: `accounts`, `categories`, `transactions`, `import_batches`, `import_profiles`, `settings`, `recurring_transactions`, `budgets`, `budget_items`, `categorization_rules`, `tags`, `transaction_tags`, `transaction_splits`, `reconciliations`, `reconciliation_items`, `exchange_rates`, `transactions_fts`.
 
 Key design decisions:
 - Amounts stored as **integer cents** (no floating point)
@@ -244,7 +265,7 @@ cd src-tauri
 cargo test
 ```
 
-42 tests covering migrations, account/category/transaction CRUD, transfers, dashboard aggregation, CSV import, and edge cases.
+113 tests covering migrations, account/category/transaction CRUD, transfers, dashboard aggregation, CSV import, encryption, and edge cases.
 
 ---
 
@@ -257,35 +278,18 @@ cargo test
 | `Ctrl+3` | Transactions |
 | `Ctrl+4` | Categories |
 | `Ctrl+5` | Import |
+| `Ctrl+6` | Recurring |
+| `Ctrl+7` | Budgets |
+| `Ctrl+8` | Rules |
+| `Ctrl+9` | Reports |
+| `Ctrl+B` | Budgets (alt) |
 | `Ctrl+N` | Focus transaction entry |
 | `Ctrl+F` | Focus search |
+| `Ctrl+?` | Keyboard shortcut help |
 | `Escape` | Close modal / clear search |
 
 ---
 
-## Post-MVP Roadmap
+## License
 
-**Dashboard**
-- Spending pie chart slices are clickable — navigates to Transactions filtered by that category and the selected month
-
-**Import**
-- Fuzzy duplicate detection — flag rows where amount + payee match an existing transaction within ±3 days and let the user decide before committing
-- FTS5 full-text search on payee/description (current LIKE query doesn't scale past ~50k rows)
-
-**Transactions**
-- Recurring transactions (scheduled repeating entries)
-- Full undo/redo across sessions (currently only import batch rollback is supported)
-- Split transactions (one transaction split across multiple categories)
-
-**Budgets**
-- Monthly budget / envelope system per category
-- Budget vs. actual variance on the dashboard
-
-**Data**
-- Data export — CSV, JSON, PDF statement
-- Backup/restore UI (manual DB file copy with guided dialog)
-- Multi-currency support with exchange rates
-
-**Other**
-- Complex ARIA combobox dropdowns (currently using native `<select>`)
-- Mobile / responsive layout
+MIT

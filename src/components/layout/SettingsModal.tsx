@@ -9,6 +9,8 @@ import { useApp } from '../../context/AppContext';
 import { todayISO } from '../../utils/formatDate';
 import { BackupInfo } from '../../types';
 import { ExchangeRateSettings } from '../settings/ExchangeRateSettings';
+import { EncryptionSettings } from '../encryption/EncryptionSettings';
+import { AboutDialog } from '../ui/AboutDialog';
 
 interface Props {
   onClose: () => void;
@@ -34,6 +36,7 @@ export function SettingsModal({ onClose }: Props) {
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
   const toast = useToast();
   const { theme, setTheme } = useApp();
 
@@ -66,7 +69,7 @@ export function SettingsModal({ onClose }: Props) {
     width: '100%',
   };
 
-  return (
+  return (<>
     <Modal title="Settings" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 340 }}>
 
@@ -229,6 +232,9 @@ export function SettingsModal({ onClose }: Props) {
           )}
         </div>
 
+        {/* Database Encryption */}
+        <EncryptionSettings />
+
         {/* Exchange Rates */}
         <ExchangeRateSettings />
 
@@ -262,13 +268,21 @@ export function SettingsModal({ onClose }: Props) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button variant="ghost" size="sm" onClick={() => setShowAbout(true)}>
+            About PrivacyFinance
           </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </div>
       </div>
+
     </Modal>
+    {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+  </>
   );
 }

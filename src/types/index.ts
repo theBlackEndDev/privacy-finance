@@ -540,6 +540,12 @@ export interface CreateExchangeRateInput {
   date: string;
 }
 
+// ── Encryption ───────────────────────────────────────────────────
+
+export interface EncryptionStatus {
+  isEncrypted: boolean;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation';

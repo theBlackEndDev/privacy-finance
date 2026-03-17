@@ -12,3 +12,4 @@ pub mod tag;
 pub mod report;
 pub mod reconciliation;
 pub mod exchange_rate;
+pub mod encryption;
