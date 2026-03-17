@@ -75,11 +75,11 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
   );
 
   return (
-    <form className={styles.bar} onSubmit={handleSubmit}>
+    <form className={styles.bar} onSubmit={handleSubmit} aria-label="Add transaction">
       {/* Account */}
       <div className={styles.field}>
-        <span className={styles.label}>Account</span>
-        <select className={styles.select} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+        <label htmlFor="txn-account" className={styles.label}>Account</label>
+        <select id="txn-account" className={styles.select} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
           {accounts.filter(a => !a.isArchived).map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
@@ -88,16 +88,17 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
 
       {/* Date */}
       <div className={styles.field}>
-        <span className={styles.label}>Date</span>
-        <input ref={dateRef} type="date" className={styles.input} value={date}
+        <label htmlFor="txn-date" className={styles.label}>Date</label>
+        <input id="txn-date" ref={dateRef} type="date" className={styles.input} value={date}
           onChange={(e) => setDate(e.target.value)} />
       </div>
 
       {/* Payee with autocomplete */}
       <div className={styles.field}>
-        <span className={styles.label}>Payee</span>
+        <label htmlFor="txn-payee" className={styles.label}>Payee</label>
         <div className={styles.autocomplete}>
           <input
+            id="txn-payee"
             className={styles.input}
             placeholder="Payee…"
             value={payee}
@@ -117,16 +118,18 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
 
       {/* Kind toggle */}
       <div className={styles.field}>
-        <span className={styles.label}>Kind</span>
-        <div className={styles.kindToggle}>
+        <span className={styles.label} id="txn-kind-label">Kind</span>
+        <div className={styles.kindToggle} role="group" aria-labelledby="txn-kind-label">
           {(['income', 'expense', 'transfer'] as Kind[]).map((k) => (
             <button
               key={k}
               type="button"
               className={`${styles.kindBtn} ${styles[`kindBtn${k.charAt(0).toUpperCase() + k.slice(1)}`]} ${kind === k ? styles.active : ''}`}
               onClick={() => setKind(k)}
+              aria-pressed={kind === k}
+              aria-label={k}
             >
-              {k === 'income' ? '+' : k === 'expense' ? '−' : '⇅'}
+              {k === 'income' ? '+' : k === 'expense' ? '\u2212' : '\u21C5'}
             </button>
           ))}
         </div>
@@ -135,8 +138,8 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
       {/* Category (hidden for transfer) */}
       {kind !== 'transfer' && (
         <div className={styles.field}>
-          <span className={styles.label}>Category</span>
-          <select className={styles.select} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <label htmlFor="txn-category" className={styles.label}>Category</label>
+          <select id="txn-category" className={styles.select} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">None</option>
             {filteredCategories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -147,18 +150,20 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
 
       {/* Amount */}
       <div className={styles.field}>
-        <span className={styles.label}>Amount</span>
+        <label htmlFor="txn-amount" className={styles.label}>Amount</label>
         <input
+          id="txn-amount"
           className={styles.input}
           placeholder="0.00"
           value={amount}
           style={{ width: 90 }}
           onChange={(e) => setAmount(e.target.value)}
+          aria-required="true"
         />
       </div>
 
       <Button type="submit" disabled={saving} size="sm" style={{ marginBottom: 1 }}>
-        {saving ? '…' : 'Add'}
+        {saving ? '\u2026' : 'Add'}
       </Button>
     </form>
   );

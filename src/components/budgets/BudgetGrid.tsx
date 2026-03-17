@@ -17,47 +17,49 @@ export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover 
 
   return (
     <div className={styles.container}>
-      {/* To Be Budgeted banner */}
-      <div className={styles.toBeBudgeted}>
+      {/* To Be Budgeted banner — outside table structure */}
+      <div className={styles.toBeBudgeted} aria-live="polite">
         <span className={styles.toBeBudgetedLabel}>To Be Budgeted</span>
         <span className={cx(styles.toBeBudgetedAmount, tbbClass)}>
           {formatCurrency(toBeBudgeted)}
         </span>
       </div>
 
-      {/* Header */}
-      <div className={styles.header}>
-        <span className={styles.headerCell}>Category</span>
-        <span className={styles.headerRight}>Budgeted</span>
-        <span className={styles.headerRight}>Spent</span>
-        <span className={styles.headerRight}>Available</span>
-        <span className={styles.headerCenter} title="Rollover">↻</span>
-      </div>
-
-      {/* Rows */}
-      {items.length === 0 ? (
-        <div className={styles.empty}>No budget items. Create a budget to get started.</div>
-      ) : (
-        items.map((row) => (
-          <BudgetCategoryRow
-            key={row.itemId}
-            row={row}
-            onUpdateBudgeted={onUpdateBudgeted}
-            onToggleRollover={onToggleRollover}
-          />
-        ))
-      )}
-
-      {/* Summary row */}
-      {summary && (
-        <div className={styles.summaryRow}>
-          <span className={styles.summaryLabel}>Totals</span>
-          <span className={styles.summaryAmount}>{formatCurrency(summary.totalBudgeted)}</span>
-          <span className={styles.summaryAmount}>{formatCurrency(summary.totalSpent)}</span>
-          <span className={styles.summaryAmount}>{formatCurrency(summary.totalAvailable)}</span>
-          <span />
+      <div role="table" aria-label="Budget grid">
+        {/* Header */}
+        <div role="row">
+          <span className={styles.headerCell} role="columnheader">Category</span>
+          <span className={styles.headerRight} role="columnheader">Budgeted</span>
+          <span className={styles.headerRight} role="columnheader">Spent</span>
+          <span className={styles.headerRight} role="columnheader">Available</span>
+          <span className={styles.headerCenter} role="columnheader" title="Rollover" aria-label="Rollover">{'\u21BB'}</span>
         </div>
-      )}
+
+        {/* Rows */}
+        {items.length === 0 ? (
+          <div className={styles.empty}>No budget items. Create a budget to get started.</div>
+        ) : (
+          items.map((row) => (
+            <BudgetCategoryRow
+              key={row.itemId}
+              row={row}
+              onUpdateBudgeted={onUpdateBudgeted}
+              onToggleRollover={onToggleRollover}
+            />
+          ))
+        )}
+
+        {/* Summary row */}
+        {summary && (
+          <div className={styles.summaryRow} role="row">
+            <span className={styles.summaryLabel} role="cell">Totals</span>
+            <span className={styles.summaryAmount} role="cell">{formatCurrency(summary.totalBudgeted)}</span>
+            <span className={styles.summaryAmount} role="cell">{formatCurrency(summary.totalSpent)}</span>
+            <span className={styles.summaryAmount} role="cell">{formatCurrency(summary.totalAvailable)}</span>
+            <span role="cell" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

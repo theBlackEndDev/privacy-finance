@@ -29,8 +29,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ICONS: Record<ToastType, string> = {
-    success: '✓',
-    error: '✕',
+    success: '\u2713',
+    error: '\u2715',
     info: 'i',
   };
 
@@ -39,8 +39,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className={styles.container}>
         {toasts.map(t => (
-          <div key={t.id} className={`${styles.toast} ${styles[t.type]}`}>
-            <span className={styles.icon}>{ICONS[t.type]}</span>
+          <div
+            key={t.id}
+            className={`${styles.toast} ${styles[t.type]}`}
+            role={t.type === 'error' ? 'alert' : 'status'}
+          >
+            <span className={styles.icon} aria-hidden="true">{ICONS[t.type]}</span>
             <span className={styles.message}>{t.message}</span>
           </div>
         ))}

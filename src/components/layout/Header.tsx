@@ -21,7 +21,7 @@ export function Header() {
 
   return (
     <header className={styles.header}>
-      <span className={styles.title}>{VIEW_TITLES[currentView]}</span>
+      <h1 className={styles.title}>{VIEW_TITLES[currentView]}</h1>
       <div className={styles.right}>
         <GlobalSearch />
       </div>

@@ -19,6 +19,7 @@ export function ReconciliationRow({ item, onToggle }: Props) {
         className={styles.checkbox}
         checked={item.isReconciled}
         onChange={() => onToggle(item.transactionId)}
+        aria-label={`Reconcile ${item.payee || 'transaction'} on ${item.date}`}
       />
       <span className={styles.date}>{formatDate(item.date)}</span>
       <span className={styles.payee}>{item.payee || '(no payee)'}</span>

@@ -21,6 +21,8 @@ function sanitizeSnippet(html: string): string {
     .replace(/&lt;\/mark&gt;/g, '</mark>');
 }
 
+const LISTBOX_ID = 'global-search-results';
+
 export function GlobalSearch() {
   const { navigate } = useApp();
   const [query, setQuery] = useState('');
@@ -111,6 +113,8 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const activeOptionId = activeIndex >= 0 ? `search-result-${activeIndex}` : undefined;
+
   return (
     <div className={styles.wrapper}>
       <input
@@ -122,15 +126,24 @@ export function GlobalSearch() {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => { if (results.length > 0) setIsOpen(true); }}
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-controls={LISTBOX_ID}
+        aria-activedescendant={activeOptionId}
+        aria-label="Search transactions"
+        aria-autocomplete="list"
       />
       {isOpen && (
-        <div className={styles.dropdown}>
+        <div className={styles.dropdown} role="listbox" id={LISTBOX_ID} aria-label="Search results">
           {results.length === 0 ? (
             <div className={styles.empty}>No results found</div>
           ) : (
             results.map((r, i) => (
               <div
                 key={r.id}
+                id={`search-result-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
                 className={`${styles.item} ${i === activeIndex ? styles.itemActive : ''}`}
                 onClick={() => handleSelect(r)}
                 onMouseEnter={() => setActiveIndex(i)}

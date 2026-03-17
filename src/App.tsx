@@ -15,19 +15,23 @@ import { ReconciliationPage } from './views/ReconciliationPage';
 import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
+import { KeyboardShortcutHelp } from './components/ui/KeyboardShortcutHelp';
 import { recurringApi } from './api/recurring';
 import { DueRecurringItem } from './types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from './components/ui/Toast';
 
 function AppShell() {
   const { currentView, navigate } = useApp();
-  useKeyboardShortcuts({ navigate });
   const toast = useToast();
 
   const [dueItems, setDueItems] = useState<DueRecurringItem[]>([]);
   const [showDueModal, setShowDueModal] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+
+  const toggleShortcutHelp = useCallback(() => setShowShortcutHelp(prev => !prev), []);
+  useKeyboardShortcuts({ navigate, onToggleShortcutHelp: toggleShortcutHelp });
 
   useEffect(() => {
     recurringApi.checkDue().then((items) => {
@@ -76,6 +80,9 @@ function AppShell() {
           onDismiss={() => setShowDueModal(false)}
           loading={generating}
         />
+      )}
+      {showShortcutHelp && (
+        <KeyboardShortcutHelp onClose={() => setShowShortcutHelp(false)} />
       )}
     </MainLayout>
   );

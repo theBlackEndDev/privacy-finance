@@ -34,8 +34,8 @@ export function BudgetCategoryRow({ row, onUpdateBudgeted, onToggleRollover }: P
 
   return (
     <>
-      <div className={styles.row}>
-        <div className={styles.category}>
+      <div className={styles.row} role="row">
+        <div className={styles.category} role="cell">
           <span className={styles.dot} style={{ background: row.categoryColor }} />
           <span className={styles.name}>{row.categoryName}</span>
         </div>
@@ -43,13 +43,15 @@ export function BudgetCategoryRow({ row, onUpdateBudgeted, onToggleRollover }: P
           ref={inputRef}
           className={styles.budgetedInput}
           type="text"
+          role="cell"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          aria-label={`Budgeted amount for ${row.categoryName}`}
         />
-        <span className={styles.amount}>{formatCurrency(row.spent)}</span>
-        <span className={cx(styles.available, availableClass)}>
+        <span className={styles.amount} role="cell">{formatCurrency(row.spent)}</span>
+        <span className={cx(styles.available, availableClass)} role="cell">
           {formatCurrency(row.available)}
         </span>
         <input
@@ -58,6 +60,8 @@ export function BudgetCategoryRow({ row, onUpdateBudgeted, onToggleRollover }: P
           checked={row.rollover}
           onChange={() => onToggleRollover(row.itemId, !row.rollover)}
           title="Enable rollover"
+          role="cell"
+          aria-label={`Rollover for ${row.categoryName}`}
         />
       </div>
       <div className={styles.progressCell}>

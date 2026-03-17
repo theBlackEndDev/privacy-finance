@@ -103,20 +103,25 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
+              aria-label="Search tags"
             />
 
+            <div role="listbox" aria-multiselectable="true" aria-label="Available tags">
             {filtered.map((tag) => (
-              <div key={tag.id} className={styles.option} onClick={() => toggleTag(tag)}>
+              <div key={tag.id} className={styles.option} onClick={() => toggleTag(tag)} role="option" aria-selected={selectedIds.has(tag.id)}>
                 <input
                   type="checkbox"
                   className={styles.checkbox}
                   checked={selectedIds.has(tag.id)}
                   readOnly
+                  tabIndex={-1}
+                  aria-hidden="true"
                 />
                 {tag.color && <span className={styles.colorDot} style={{ background: tag.color }} />}
                 {tag.name}
               </div>
             ))}
+            </div>
 
             {filtered.length === 0 && !canCreate && (
               <div className={styles.empty}>No tags found</div>
