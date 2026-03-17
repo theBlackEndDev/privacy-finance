@@ -277,6 +277,40 @@ CREATE TABLE IF NOT EXISTS transaction_tags (
 );
 
 CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag_id ON transaction_tags(tag_id);
+
+-- Account Reconciliation
+CREATE TABLE IF NOT EXISTS reconciliations (
+    id                TEXT PRIMARY KEY,
+    account_id        TEXT NOT NULL,
+    statement_date    TEXT NOT NULL,
+    statement_balance INTEGER NOT NULL,
+    status            TEXT NOT NULL CHECK(status IN ('pending', 'completed', 'cancelled')) DEFAULT 'pending',
+    created_at        TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS reconciliation_items (
+    reconciliation_id TEXT NOT NULL,
+    transaction_id    TEXT NOT NULL,
+    is_reconciled     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (reconciliation_id, transaction_id),
+    FOREIGN KEY (reconciliation_id) REFERENCES reconciliations(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_reconciliation_items_recon_id ON reconciliation_items(reconciliation_id);
+
+-- Exchange Rates
+CREATE TABLE IF NOT EXISTS exchange_rates (
+    id            TEXT PRIMARY KEY,
+    from_currency TEXT NOT NULL,
+    to_currency   TEXT NOT NULL,
+    rate          REAL NOT NULL,
+    date          TEXT NOT NULL,
+    created_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_pair_date ON exchange_rates(from_currency, to_currency, date);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {

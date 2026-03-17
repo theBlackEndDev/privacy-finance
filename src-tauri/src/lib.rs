@@ -97,6 +97,16 @@ pub fn run() {
             commands::reports::get_net_worth_report,
             commands::reports::get_tag_spending_report,
             commands::reports::get_payee_spending_report,
+            commands::reconciliation::start_reconciliation,
+            commands::reconciliation::toggle_reconciliation_item,
+            commands::reconciliation::get_reconciliation_diff,
+            commands::reconciliation::complete_reconciliation,
+            commands::reconciliation::cancel_reconciliation,
+            commands::exchange_rates::create_rate,
+            commands::exchange_rates::get_rate,
+            commands::exchange_rates::get_all_rates,
+            commands::exchange_rates::delete_rate,
+            commands::exchange_rates::convert_amount,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

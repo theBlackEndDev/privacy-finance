@@ -16,6 +16,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
   { view: 'budgets',      label: 'Budgets',      icon: '▣' },
   { view: 'rules',        label: 'Rules',        icon: '⚡' },
   { view: 'reports',      label: 'Reports',      icon: '▤' },
+  { view: 'reconciliation', label: 'Reconcile', icon: '☑' },
 ];
 
 export function Sidebar() {

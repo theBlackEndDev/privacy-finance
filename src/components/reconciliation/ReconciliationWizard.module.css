@@ -1,0 +1,203 @@
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 480px;
+}
+
+.stepIndicator {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.stepDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-color);
+  transition: background 0.2s;
+}
+
+.stepDotActive {
+  background: var(--color-primary);
+}
+
+.stepDotDone {
+  background: var(--color-income);
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-input, var(--bg-card));
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.formRow {
+  display: flex;
+  gap: 12px;
+}
+
+.formRow > * {
+  flex: 1;
+}
+
+.diffBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.diffLabel {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.diffValue {
+  font-weight: 700;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diffZero {
+  color: var(--color-income);
+}
+
+.diffNonZero {
+  color: var(--color-expense);
+}
+
+.balanceSummary {
+  display: flex;
+  gap: 24px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.balanceItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.balanceLabel {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.balanceValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.itemsList {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.headerCheckbox {
+  width: 18px;
+}
+
+.headerDate {
+  width: 90px;
+}
+
+.headerPayee {
+  flex: 1;
+}
+
+.headerKind {
+  width: 60px;
+}
+
+.headerAmount {
+  width: 100px;
+  text-align: right;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.successMessage {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.successIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.successTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.successDetail {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--color-expense);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+}
+
+.emptyList {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
