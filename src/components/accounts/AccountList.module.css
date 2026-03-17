@@ -41,6 +41,10 @@
   text-align: right;
 }
 
+.clickable {
+  cursor: pointer;
+}
+
 .archived {
   opacity: 0.5;
 }

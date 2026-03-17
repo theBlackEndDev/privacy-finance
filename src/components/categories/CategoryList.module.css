@@ -5,6 +5,11 @@
   margin-bottom: 20px;
 }
 
+.headerLeft {
+  display: flex;
+  align-items: center;
+}
+
 .title {
   font-size: 20px;
   font-weight: 600;
@@ -26,6 +31,42 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 6px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggleGroup {
+  display: flex;
+  gap: 2px;
+  margin-left: 12px;
+}
+
+.toggleBtn {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.toggleBtn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.toggleBtn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.toggleBtnActive {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
 }
