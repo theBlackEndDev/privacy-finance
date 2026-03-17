@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Category, CreateCategoryInput, UpdateCategoryInput } from '../types';
 import { categoriesApi } from '../api/categories';
+import { useConfirmDelete } from '../hooks/useConfirmDelete';
 import { CategoryList } from '../components/categories/CategoryList';
 import { CategoryForm } from '../components/categories/CategoryForm';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 
@@ -35,16 +37,13 @@ export function CategoriesPage() {
     await load();
   }
 
-  async function handleDelete(category: Category) {
-    if (!confirm(`Delete "${category.name}"? Transactions using it will become uncategorized.`)) return;
-    try {
+  const deleteFlow = useConfirmDelete<Category>({
+    onConfirm: async (category) => {
       await categoriesApi.delete(category.id);
       await load();
       toast('Category deleted');
-    } catch (err) {
-      toast(String(err), 'error');
-    }
-  }
+    },
+  });
 
   function openAdd() { setEditing(undefined); setShowForm(true); }
   function openEdit(category: Category) { setEditing(category); setShowForm(true); }
@@ -54,8 +53,17 @@ export function CategoriesPage() {
 
   return (
     <>
-      <CategoryList categories={categories} onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete} />
+      <CategoryList categories={categories} onAdd={openAdd} onEdit={openEdit} onDelete={deleteFlow.request} />
       {showForm && <CategoryForm category={editing} onSave={handleSave} onClose={closeForm} />}
+      {deleteFlow.pending && (
+        <ConfirmDialog
+          title="Delete Category"
+          message={`Delete "${deleteFlow.pending.name}"? Transactions using it will become uncategorized.`}
+          confirmLabel="Delete"
+          onConfirm={deleteFlow.confirm}
+          onCancel={deleteFlow.cancel}
+        />
+      )}
     </>
   );
 }

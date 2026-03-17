@@ -25,9 +25,7 @@
   min-width: 0;
   font-size: 14px;
   color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .actions {

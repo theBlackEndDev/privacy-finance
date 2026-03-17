@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Tag } from '../../types';
 import { tagsApi } from '../../api/tags';
 import { useToast } from '../ui/Toast';
+import { useConfirmDelete } from '../../hooks/useConfirmDelete';
 import { Button } from '../ui/Button';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import styles from './TagManager.module.css';
 
 export function TagManager() {
@@ -51,16 +53,13 @@ export function TagManager() {
     }
   }
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete tag "${name}"? This will untag all transactions.`)) return;
-    try {
-      await tagsApi.delete(id);
+  const deleteFlow = useConfirmDelete<{ id: string; name: string }>({
+    onConfirm: async (tag) => {
+      await tagsApi.delete(tag.id);
       await loadTags();
       toast('Tag deleted');
-    } catch (err) {
-      toast(String(err));
-    }
-  }
+    },
+  });
 
   function startEdit(tag: Tag) {
     setEditingId(tag.id);
@@ -137,7 +136,7 @@ export function TagManager() {
                   </button>
                   <button
                     className={`${styles.iconBtn} ${styles.deleteBtn}`}
-                    onClick={() => handleDelete(tag.id, tag.name)}
+                    onClick={() => deleteFlow.request({ id: tag.id, name: tag.name })}
                     title="Delete"
                   >
                     &times;
@@ -148,6 +147,15 @@ export function TagManager() {
           </div>
         ))}
       </div>
+      {deleteFlow.pending && (
+        <ConfirmDialog
+          title="Delete Tag"
+          message={`Delete tag "${deleteFlow.pending.name}"? This will untag all transactions.`}
+          confirmLabel="Delete"
+          onConfirm={deleteFlow.confirm}
+          onCancel={deleteFlow.cancel}
+        />
+      )}
     </div>
   );
 }

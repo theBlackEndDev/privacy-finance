@@ -4,6 +4,7 @@ import { transactionsApi } from '../../api/transactions';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useToast } from '../ui/Toast';
 import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
 import { SplitEditor } from '../splits/SplitEditor';
@@ -29,6 +30,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   const [error, setError] = useState('');
   const [showSplit, setShowSplit] = useState(t.isSplit);
   const [tags, setTags] = useState<TagBrief[]>(t.tags ?? []);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const toast = useToast();
 
   const filteredCategories = categories.filter(
@@ -55,7 +57,6 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   }
 
   async function handleDelete() {
-    if (!confirm('Delete this transaction? This cannot be undone.')) return;
     try {
       await transactionsApi.delete(t.id);
       toast('Transaction deleted');
@@ -63,10 +64,12 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
       onClose();
     } catch (err) {
       setError(String(err));
+      setShowDeleteConfirm(false);
     }
   }
 
   return (
+    <>
     <Modal title="Edit Transaction" onClose={onClose}>
       <form className={styles.form} onSubmit={handleSubmit}>
         <div className={styles.row}>
@@ -133,7 +136,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
         {error && <p style={{ color: 'var(--color-expense)', fontSize: 13 }}>{error}</p>}
 
         <div className={styles.footer}>
-          <Button variant="danger" type="button" size="sm" onClick={handleDelete}>Delete</Button>
+          <Button variant="danger" type="button" size="sm" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
           <div className={styles.footerRight}>
             <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
@@ -141,5 +144,15 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
         </div>
       </form>
     </Modal>
+    {showDeleteConfirm && (
+      <ConfirmDialog
+        title="Delete Transaction"
+        message="Delete this transaction? This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+    )}
+    </>
   );
 }
