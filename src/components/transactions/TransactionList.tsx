@@ -21,13 +21,13 @@ export function TransactionList({ page, onPageChange, onRowClick }: TransactionL
   const end = Math.min(start + page.items.length - 1, page.total);
 
   return (
-    <div className={styles.wrapper}>
-      <div className={styles.thead}>
-        <span className={styles.th}>Date</span>
-        <span className={styles.th}>Payee / Description</span>
-        <span className={styles.th}>Category</span>
-        <span className={`${styles.th} ${styles.thAmount}`}>Amount</span>
-        <span className={styles.th}>Cleared</span>
+    <div className={styles.wrapper} role="table" aria-label="Transactions">
+      <div className={styles.thead} role="row">
+        <span className={styles.th} role="columnheader">Date</span>
+        <span className={styles.th} role="columnheader">Payee / Description</span>
+        <span className={styles.th} role="columnheader">Category</span>
+        <span className={`${styles.th} ${styles.thAmount}`} role="columnheader">Amount</span>
+        <span className={styles.th} role="columnheader">Cleared</span>
       </div>
 
       {page.items.map((t) => (
@@ -36,12 +36,18 @@ export function TransactionList({ page, onPageChange, onRowClick }: TransactionL
 
       {totalPages > 1 && (
         <div className={styles.pagination}>
-          <span className={styles.pageInfo}>{start}–{end} of {page.total}</span>
+          <span className={styles.pageInfo}>{start}&ndash;{end} of {page.total}</span>
           <div className={styles.pageButtons}>
             <Button variant="ghost" size="sm" disabled={currentPage === 0}
-              onClick={() => onPageChange(currentPage - 1)}>← Prev</Button>
+              onClick={() => onPageChange(currentPage - 1)}
+              aria-label="Go to previous page">
+              &larr; Prev
+            </Button>
             <Button variant="ghost" size="sm" disabled={currentPage >= totalPages - 1}
-              onClick={() => onPageChange(currentPage + 1)}>Next →</Button>
+              onClick={() => onPageChange(currentPage + 1)}
+              aria-label="Go to next page">
+              Next &rarr;
+            </Button>
           </div>
         </div>
       )}

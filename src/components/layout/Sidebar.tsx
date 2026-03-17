@@ -38,14 +38,15 @@ export function Sidebar() {
           Privacy<span className={styles.logoAccent}>Finance</span>
         </div>
 
-        <nav className={styles.nav}>
+        <nav className={styles.nav} aria-label="Main navigation">
           {NAV_ITEMS.map(({ view, label, icon }) => (
             <button
               key={view}
               className={cx(styles.navItem, currentView === view && styles.navItemActive)}
               onClick={() => navigate(view)}
+              aria-current={currentView === view ? 'page' : undefined}
             >
-              <span className={styles.navIcon}>{icon}</span>
+              <span className={styles.navIcon} aria-hidden="true">{icon}</span>
               {label}
             </button>
           ))}

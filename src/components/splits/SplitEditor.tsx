@@ -106,7 +106,7 @@ export function SplitEditor({ transactionId, parentAmount, categories, onSaved }
       </div>
 
       {rows.map((row, i) => (
-        <div key={i} className={styles.splitRow}>
+        <div key={i} className={styles.splitRow} role="group" aria-label={`Split row ${i + 1}`}>
           <select
             className={styles.select}
             value={row.categoryId}
@@ -146,7 +146,7 @@ export function SplitEditor({ transactionId, parentAmount, categories, onSaved }
       <div className={styles.footer}>
         <div>
           <button className={styles.addBtn} onClick={addRow} type="button">+ Add row</button>
-          <span className={`${styles.total} ${isValid ? styles.valid : styles.invalid}`}>
+          <span className={`${styles.total} ${isValid ? styles.valid : styles.invalid}`} aria-live="polite">
             {' '}{formatCurrency(splitSum)} / {formatCurrency(parentAmount)}
           </span>
         </div>

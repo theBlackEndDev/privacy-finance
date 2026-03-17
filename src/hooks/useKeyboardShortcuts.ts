@@ -17,9 +17,10 @@ interface UseKeyboardShortcutsOptions {
   navigate: (view: View) => void;
   onFocusQuickEntry?: () => void;
   onFocusSearch?: () => void;
+  onToggleShortcutHelp?: () => void;
 }
 
-export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearch }: UseKeyboardShortcutsOptions) {
+export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearch, onToggleShortcutHelp }: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -49,6 +50,12 @@ export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearc
           onFocusQuickEntry();
           return;
         }
+        // Ctrl+? (Ctrl+Shift+/): keyboard shortcut help
+        if (e.key === '?' && onToggleShortcutHelp) {
+          e.preventDefault();
+          onToggleShortcutHelp();
+          return;
+        }
         // Ctrl+F: focus search
         if (e.key === 'f') {
           e.preventDefault();
@@ -67,5 +74,5 @@ export function useKeyboardShortcuts({ navigate, onFocusQuickEntry, onFocusSearc
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, onFocusQuickEntry, onFocusSearch]);
+  }, [navigate, onFocusQuickEntry, onFocusSearch, onToggleShortcutHelp]);
 }
