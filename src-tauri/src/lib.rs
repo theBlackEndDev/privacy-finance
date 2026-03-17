@@ -107,6 +107,11 @@ pub fn run() {
             commands::exchange_rates::get_all_rates,
             commands::exchange_rates::delete_rate,
             commands::exchange_rates::convert_amount,
+            commands::encryption::check_encryption_status,
+            commands::encryption::enable_encryption,
+            commands::encryption::unlock_database,
+            commands::encryption::change_password,
+            commands::encryption::disable_encryption,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

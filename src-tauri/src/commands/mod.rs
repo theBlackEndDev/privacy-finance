@@ -15,6 +15,7 @@ pub mod tags;
 pub mod reports;
 pub mod reconciliation;
 pub mod exchange_rates;
+pub mod encryption;
 mod tests;
 mod transaction_tests;
 mod import_tests;
