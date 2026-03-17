@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Account } from '../types';
-import { invoke } from '../api/invoke';
+import { accountsApi } from '../api/accounts';
 import { ReconciliationWizard } from '../components/reconciliation/ReconciliationWizard';
 import styles from './ReconciliationPage.module.css';
 
@@ -9,7 +9,7 @@ export function ReconciliationPage() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   useEffect(() => {
-    invoke<Account[]>('get_accounts', {}, []).then(setAccounts);
+    accountsApi.getAll().then(setAccounts);
   }, []);
 
   if (selectedAccount) {

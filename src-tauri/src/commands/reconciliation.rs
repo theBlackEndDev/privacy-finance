@@ -1,7 +1,19 @@
 use tauri::State;
 use crate::db::DbState;
 use crate::error::AppResult;
+use crate::helpers::timestamps::now_utc;
 use crate::models::reconciliation::*;
+
+fn row_to_reconciliation(row: &rusqlite::Row<'_>) -> rusqlite::Result<Reconciliation> {
+    Ok(Reconciliation {
+        id: row.get(0)?,
+        account_id: row.get(1)?,
+        statement_date: row.get(2)?,
+        statement_balance: row.get(3)?,
+        status: row.get(4)?,
+        created_at: row.get(5)?,
+    })
+}
 
 /// Calculate the cleared balance for an account up to a given date.
 /// cleared_balance = opening_balance + SUM(signed cleared transactions up to date)
@@ -54,16 +66,7 @@ fn load_summary(
         "SELECT id, account_id, statement_date, statement_balance, status, created_at
          FROM reconciliations WHERE id = ?1",
         [reconciliation_id],
-        |row| {
-            Ok(Reconciliation {
-                id: row.get(0)?,
-                account_id: row.get(1)?,
-                statement_date: row.get(2)?,
-                statement_balance: row.get(3)?,
-                status: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        },
+        row_to_reconciliation,
     )?;
 
     let mut stmt = conn.prepare(
@@ -112,7 +115,7 @@ pub fn start_reconciliation(
 ) -> AppResult<ReconciliationSummary> {
     let conn = db.write_conn.lock().unwrap();
     let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = now_utc();
 
     conn.execute(
         "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
@@ -120,25 +123,14 @@ pub fn start_reconciliation(
         rusqlite::params![id, input.account_id, input.statement_date, input.statement_balance, now],
     )?;
 
-    // Load unreconciled transactions for this account up to statement date
-    let mut stmt = conn.prepare(
-        "SELECT id FROM transactions
-         WHERE account_id = ?1 AND date <= ?2 AND is_cleared = 0
+    // Bulk-insert unreconciled transactions for this account up to statement date
+    conn.execute(
+        "INSERT INTO reconciliation_items (reconciliation_id, transaction_id, is_reconciled)
+         SELECT ?1, id, 0 FROM transactions
+         WHERE account_id = ?2 AND date <= ?3 AND is_cleared = 0
          ORDER BY date ASC",
+        rusqlite::params![id, input.account_id, input.statement_date],
     )?;
-    let tx_ids: Vec<String> = stmt
-        .query_map(rusqlite::params![input.account_id, input.statement_date], |row| {
-            row.get(0)
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-
-    for tx_id in &tx_ids {
-        conn.execute(
-            "INSERT INTO reconciliation_items (reconciliation_id, transaction_id, is_reconciled)
-             VALUES (?1, ?2, 0)",
-            rusqlite::params![id, tx_id],
-        )?;
-    }
 
     load_summary(&conn, &id)
 }
@@ -200,22 +192,8 @@ pub fn complete_reconciliation(
         [&reconciliation_id],
     )?;
 
-    let recon = conn.query_row(
-        "SELECT id, account_id, statement_date, statement_balance, status, created_at
-         FROM reconciliations WHERE id = ?1",
-        [&reconciliation_id],
-        |row| {
-            Ok(Reconciliation {
-                id: row.get(0)?,
-                account_id: row.get(1)?,
-                statement_date: row.get(2)?,
-                statement_balance: row.get(3)?,
-                status: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        },
-    )?;
-
+    let mut recon = summary.reconciliation;
+    recon.status = "completed".to_string();
     Ok(recon)
 }
 
@@ -242,6 +220,7 @@ pub fn cancel_reconciliation(
 mod tests {
     use super::*;
     use crate::db::migrations::run_migrations;
+    use crate::helpers::timestamps::now_utc;
     use rusqlite::Connection;
 
     fn setup_db() -> Connection {
@@ -252,7 +231,7 @@ mod tests {
 
     fn insert_test_tx(conn: &Connection, account_id: &str, date: &str, amount: i64, kind: &str, cleared: bool) -> String {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
         conn.execute(
             "INSERT INTO transactions (id, account_id, date, amount, kind, payee, description, is_cleared, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, 'Test', '', ?6, ?7, ?7)",
@@ -276,7 +255,7 @@ mod tests {
         insert_test_tx(&conn, &acct, "2026-03-02", 3000, "expense", true);
 
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
         conn.execute(
             "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
              VALUES (?1, ?2, '2026-03-31', 100000, 'pending', ?3)",
@@ -310,7 +289,7 @@ mod tests {
         let tx_id = insert_test_tx(&conn, &acct, "2026-03-01", 10000, "income", false);
 
         let recon_id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
         conn.execute(
             "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
              VALUES (?1, ?2, '2026-03-31', 0, 'pending', ?3)",
@@ -343,7 +322,7 @@ mod tests {
         let tx_id = insert_test_tx(&conn, &acct, "2026-03-01", 5000, "income", false);
 
         let recon_id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
 
         // First create the reconciliation with a placeholder balance
         conn.execute(
@@ -386,7 +365,7 @@ mod tests {
         let acct = get_test_account(&conn);
 
         let recon_id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
         // Set statement balance to something that won't match
         conn.execute(
             "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
@@ -405,7 +384,7 @@ mod tests {
         let tx_id = insert_test_tx(&conn, &acct, "2026-03-01", 5000, "expense", false);
 
         let recon_id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
         conn.execute(
             "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
              VALUES (?1, ?2, '2026-03-31', 0, 'pending', ?3)",

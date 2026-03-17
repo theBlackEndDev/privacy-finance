@@ -14,7 +14,7 @@ export function ExchangeRateSettings() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    exchangeRatesApi.getAll().then(setRates);
+    exchangeRatesApi.getAll().then(setRates).catch((err) => setError(String(err)));
   }, []);
 
   async function handleAdd() {
@@ -44,8 +44,12 @@ export function ExchangeRateSettings() {
   }
 
   async function handleDelete(id: string) {
-    await exchangeRatesApi.delete(id);
-    setRates((prev) => prev.filter((r) => r.id !== id));
+    try {
+      await exchangeRatesApi.delete(id);
+      setRates((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setError(String(err));
+    }
   }
 
   return (

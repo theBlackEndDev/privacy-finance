@@ -1,7 +1,41 @@
 use tauri::State;
 use crate::db::DbState;
 use crate::error::AppResult;
+use crate::helpers::timestamps::now_utc;
 use crate::models::exchange_rate::*;
+
+fn row_to_exchange_rate(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExchangeRate> {
+    Ok(ExchangeRate {
+        id: row.get(0)?,
+        from_currency: row.get(1)?,
+        to_currency: row.get(2)?,
+        rate: row.get(3)?,
+        date: row.get(4)?,
+        created_at: row.get(5)?,
+    })
+}
+
+/// Find the nearest-date exchange rate for a currency pair.
+fn find_nearest_rate(
+    conn: &rusqlite::Connection,
+    from: &str,
+    to: &str,
+    date: &str,
+) -> rusqlite::Result<Option<f64>> {
+    let result = conn.query_row(
+        "SELECT rate FROM exchange_rates
+         WHERE from_currency = ?1 AND to_currency = ?2
+         ORDER BY ABS(julianday(date) - julianday(?3)) ASC
+         LIMIT 1",
+        rusqlite::params![from, to, date],
+        |row| row.get::<_, f64>(0),
+    );
+    match result {
+        Ok(r) => Ok(Some(r)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
 
 #[tauri::command]
 pub fn create_rate(
@@ -10,7 +44,7 @@ pub fn create_rate(
 ) -> AppResult<ExchangeRate> {
     let conn = db.write_conn.lock().unwrap();
     let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = now_utc();
 
     conn.execute(
         "INSERT INTO exchange_rates (id, from_currency, to_currency, rate, date, created_at)
@@ -44,16 +78,7 @@ pub fn get_rate(
          ORDER BY ABS(julianday(date) - julianday(?3)) ASC
          LIMIT 1",
         rusqlite::params![from_currency, to_currency, date],
-        |row| {
-            Ok(ExchangeRate {
-                id: row.get(0)?,
-                from_currency: row.get(1)?,
-                to_currency: row.get(2)?,
-                rate: row.get(3)?,
-                date: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        },
+        row_to_exchange_rate,
     );
 
     match result {
@@ -74,16 +99,7 @@ pub fn get_all_rates(
     )?;
 
     let rates = stmt
-        .query_map([], |row| {
-            Ok(ExchangeRate {
-                id: row.get(0)?,
-                from_currency: row.get(1)?,
-                to_currency: row.get(2)?,
-                rate: row.get(3)?,
-                date: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })?
+        .query_map([], row_to_exchange_rate)?
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(rates)
@@ -113,29 +129,18 @@ pub fn convert_amount(
         return Ok(amount);
     }
 
-    let rate_result = conn.query_row(
-        "SELECT rate FROM exchange_rates
-         WHERE from_currency = ?1 AND to_currency = ?2
-         ORDER BY ABS(julianday(date) - julianday(?3)) ASC
-         LIMIT 1",
-        rusqlite::params![from_currency, to_currency, date],
-        |row| row.get::<_, f64>(0),
-    );
-
-    match rate_result {
-        Ok(rate) => Ok((amount as f64 * rate).round() as i64),
-        Err(rusqlite::Error::QueryReturnedNoRows) => {
-            Err(crate::error::AppError::Validation(
-                format!("No exchange rate found for {}/{}", from_currency, to_currency),
-            ))
-        }
-        Err(e) => Err(e.into()),
+    match find_nearest_rate(&conn, &from_currency, &to_currency, &date)? {
+        Some(rate) => Ok((amount as f64 * rate).round() as i64),
+        None => Err(crate::error::AppError::Validation(
+            format!("No exchange rate found for {}/{}", from_currency, to_currency),
+        )),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::db::migrations::run_migrations;
+    use crate::helpers::timestamps::now_utc;
     use rusqlite::Connection;
 
     fn setup_db() -> Connection {
@@ -146,7 +151,7 @@ mod tests {
 
     fn insert_rate(conn: &Connection, from: &str, to: &str, rate: f64, date: &str) -> String {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = now_utc();
         conn.execute(
             "INSERT INTO exchange_rates (id, from_currency, to_currency, rate, date, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
