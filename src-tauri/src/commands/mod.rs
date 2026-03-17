@@ -13,6 +13,8 @@ pub mod rules;
 pub mod splits;
 pub mod tags;
 pub mod reports;
+pub mod reconciliation;
+pub mod exchange_rates;
 mod tests;
 mod transaction_tests;
 mod import_tests;

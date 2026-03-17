@@ -8,6 +8,7 @@ import { useToast } from '../ui/Toast';
 import { useApp } from '../../context/AppContext';
 import { todayISO } from '../../utils/formatDate';
 import { BackupInfo } from '../../types';
+import { ExchangeRateSettings } from '../settings/ExchangeRateSettings';
 
 interface Props {
   onClose: () => void;
@@ -227,6 +228,9 @@ export function SettingsModal({ onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Exchange Rates */}
+        <ExchangeRateSettings />
 
         {/* Keyboard shortcuts reference */}
         <div>

@@ -1,0 +1,118 @@
+.section {
+  margin-top: 24px;
+}
+
+.heading {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.description {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.error {
+  color: var(--color-expense);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.input {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-input, var(--bg-card));
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 80px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.input[type="date"] {
+  width: 130px;
+}
+
+.input[type="number"] {
+  width: 90px;
+}
+
+.rateList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rateRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  font-size: 13px;
+}
+
+.pair {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 70px;
+}
+
+.rateValue {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 70px;
+}
+
+.rateDate {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex: 1;
+}
+
+.deleteBtn {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.deleteBtn:hover {
+  color: var(--color-expense);
+  background: rgba(239, 68, 68, 0.1);
+}

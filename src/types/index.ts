@@ -490,6 +490,56 @@ export interface PayeeSpendingRow {
   count: number;
 }
 
+// ── Reconciliation (Phase 18) ────────────────────────────────────
+
+export interface Reconciliation {
+  id: string;
+  accountId: string;
+  statementDate: string;
+  statementBalance: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  createdAt: string;
+}
+
+export interface ReconciliationItemDetail {
+  transactionId: string;
+  date: string;
+  payee: string;
+  amount: number;
+  kind: string;
+  isReconciled: boolean;
+}
+
+export interface ReconciliationSummary {
+  reconciliation: Reconciliation;
+  items: ReconciliationItemDetail[];
+  clearedBalance: number;
+  statementBalance: number;
+  difference: number;
+}
+
+export interface StartReconciliationInput {
+  accountId: string;
+  statementDate: string;
+  statementBalance: number;
+}
+
+export interface ExchangeRate {
+  id: string;
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  date: string;
+  createdAt: string;
+}
+
+export interface CreateExchangeRateInput {
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  date: string;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports';
+export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation';
