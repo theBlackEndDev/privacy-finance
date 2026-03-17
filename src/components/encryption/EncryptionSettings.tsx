@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { encryptionApi } from '../../api/encryption';
 import { useToast } from '../ui/Toast';
 import { Button } from '../ui/Button';
+import { Tooltip } from '../ui/Tooltip';
 
 const INPUT_STYLE: React.CSSProperties = {
   background: 'var(--bg-input)',
@@ -94,7 +95,8 @@ export function EncryptionSettings() {
   return (
     <div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 500 }}>
-        Database Encryption
+        Database Encryption{' '}
+        <Tooltip text="Encrypts your database file on disk using SQLCipher. Your data is unreadable without the password — even if someone copies the file. Keep your password safe; there's no recovery if you forget it." />
       </div>
 
       <div style={{

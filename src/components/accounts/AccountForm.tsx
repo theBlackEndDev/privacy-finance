@@ -3,6 +3,7 @@ import { Account, CreateAccountInput, UpdateAccountInput } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
+import { Tooltip } from '../ui/Tooltip';
 import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
 import styles from './AccountForm.module.css';
 
@@ -61,7 +62,10 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
         />
 
         <div>
-          <label className={styles.selectLabel}>Account Type</label>
+          <label className={styles.selectLabel}>
+            Account Type{' '}
+            <Tooltip text="Checking for daily spending, savings for reserves, credit card for tracking debt, cash for physical money, investment for brokerage or retirement accounts." />
+          </label>
           <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])}>
             {ACCOUNT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>

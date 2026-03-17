@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Account } from '../types';
 import { accountsApi } from '../api/accounts';
 import { ReconciliationWizard } from '../components/reconciliation/ReconciliationWizard';
+import { Tooltip } from '../components/ui/Tooltip';
 import styles from './ReconciliationPage.module.css';
 
 export function ReconciliationPage() {
@@ -29,7 +30,8 @@ export function ReconciliationPage() {
     <div className={styles.page}>
       <h2 className={styles.title}>Account Reconciliation</h2>
       <p className={styles.subtitle}>
-        Select an account to reconcile against your bank statement.
+        Select an account to reconcile against your bank statement.{' '}
+        <Tooltip text="Reconciliation verifies your records match your bank's. Compare your statement balance, mark matching transactions, and catch any discrepancies." />
       </p>
       <div className={styles.accountList}>
         {accounts
