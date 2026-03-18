@@ -6,6 +6,8 @@ import { Spinner } from '../components/ui/Spinner';
 import { BudgetMonthNav } from '../components/budgets/BudgetMonthNav';
 import { BudgetGrid } from '../components/budgets/BudgetGrid';
 import { BudgetDetailPanel } from '../components/budgets/BudgetDetailPanel';
+import { useBudgetHistory, BudgetField } from '../hooks/useBudgetHistory';
+import { UpdateBudgetItemInput } from '../types';
 
 function currentYearMonth(): [number, number] {
   const d = new Date();
@@ -52,31 +54,51 @@ export function BudgetsPage() {
     }
   }, [toast]);
 
+  const reloadCurrent = useCallback(() => {
+    loadBudget(year, month);
+  }, [year, month, loadBudget]);
+
+  const history = useBudgetHistory({ onApplied: reloadCurrent, toast });
+
   useEffect(() => {
     loadBudget(year, month);
   }, [year, month, loadBudget]);
 
+  // Clear history when navigating months
   function handleNavigate(y: number, m: number) {
+    history.clear();
     setYear(y);
     setMonth(m);
   }
 
-  async function handleUpdateBudgeted(itemId: string, cents: number) {
+  // Shared handler for undoable budget item updates
+  async function handleUndoableUpdate(
+    itemId: string,
+    field: BudgetField,
+    newValue: number | boolean | null,
+    payload: UpdateBudgetItemInput,
+    errMsg: string,
+  ) {
+    const row = items.find(i => i.itemId === itemId);
     try {
-      await budgetApi.updateItem(itemId, { budgeted: cents });
+      await budgetApi.updateItem(itemId, payload);
+      // Only push to history after successful API call
+      if (row) {
+        const oldValue = field === 'targetAmount' ? (row.targetAmount ?? null) : row[field];
+        history.push({ itemId, categoryName: row.categoryName, field, oldValue, newValue });
+      }
       await loadBudget(year, month);
     } catch (err) {
-      toast(`Failed to update: ${err}`, 'error');
+      toast(`${errMsg}: ${err}`, 'error');
     }
   }
 
-  async function handleToggleRollover(itemId: string, rollover: boolean) {
-    try {
-      await budgetApi.updateItem(itemId, { rollover });
-      await loadBudget(year, month);
-    } catch (err) {
-      toast(`Failed to toggle rollover: ${err}`, 'error');
-    }
+  function handleUpdateBudgeted(itemId: string, cents: number) {
+    handleUndoableUpdate(itemId, 'budgeted', cents, { budgeted: cents }, 'Failed to update');
+  }
+
+  function handleToggleRollover(itemId: string, rollover: boolean) {
+    handleUndoableUpdate(itemId, 'rollover', rollover, { rollover }, 'Failed to toggle rollover');
   }
 
   async function handleCopy() {
@@ -99,13 +121,8 @@ export function BudgetsPage() {
     }
   }
 
-  async function handleUpdateTarget(itemId: string, targetAmount: number | null) {
-    try {
-      await budgetApi.updateItem(itemId, { targetAmount });
-      await loadBudget(year, month);
-    } catch (err) {
-      toast(`Failed to update target: ${err}`, 'error');
-    }
+  function handleUpdateTarget(itemId: string, targetAmount: number | null) {
+    handleUndoableUpdate(itemId, 'targetAmount', targetAmount, { targetAmount }, 'Failed to update target');
   }
 
   function handleSelectCategory(row: BudgetCategoryRow) {
@@ -116,6 +133,25 @@ export function BudgetsPage() {
     setSelectedRow(null);
   }
 
+  // Keyboard shortcuts for undo/redo (scoped to budget page)
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        history.undo();
+      } else if (e.key === 'Z' && e.shiftKey) {
+        e.preventDefault();
+        history.redo();
+      }
+    }
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [history.undo, history.redo]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <BudgetMonthNav
@@ -124,6 +160,10 @@ export function BudgetsPage() {
         onNavigate={handleNavigate}
         onCopy={handleCopy}
         onRollover={handleRollover}
+        onUndo={history.undo}
+        onRedo={history.redo}
+        canUndo={history.canUndo}
+        canRedo={history.canRedo}
       />
 
       {loading ? (

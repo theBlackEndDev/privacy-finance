@@ -13,9 +13,13 @@ interface Props {
   onCopy: () => void;
   onRollover: () => void;
   copyDisabled?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
-export function BudgetMonthNav({ year, month, onNavigate, onCopy, onRollover, copyDisabled }: Props) {
+export function BudgetMonthNav({ year, month, onNavigate, onCopy, onRollover, copyDisabled, onUndo, onRedo, canUndo, canRedo }: Props) {
   function goPrev() {
     if (month === 1) {
       onNavigate(year - 1, 12);
@@ -40,6 +44,28 @@ export function BudgetMonthNav({ year, month, onNavigate, onCopy, onRollover, co
       <span className={styles.monthDisplay}>{MONTH_NAMES[month - 1]} {year}</span>
       <div className={styles.actions}>
         <button className={styles.navBtn} onClick={goNext}>▶</button>
+        {onUndo && (
+          <button
+            className={styles.navBtn}
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+          >
+            ↩
+          </button>
+        )}
+        {onRedo && (
+          <button
+            className={styles.navBtn}
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
+          >
+            ↪
+          </button>
+        )}
         <Button variant="ghost" size="sm" onClick={onCopy} disabled={copyDisabled}>
           Copy Last Month
         </Button>
