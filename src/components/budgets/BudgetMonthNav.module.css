@@ -30,7 +30,12 @@
   transition: var(--transition-fast);
 }
 
-.navBtn:hover {
+.navBtn:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.navBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
