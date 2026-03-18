@@ -9,6 +9,8 @@ interface AppContextValue {
   navigate: (view: View) => void;
   activeAccountId: string | null;
   setActiveAccountId: (id: string | null) => void;
+  pendingEditTransactionId: string | null;
+  setPendingEditTransactionId: (id: string | null) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
 }
@@ -22,6 +24,7 @@ function applyTheme(theme: Theme) {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [pendingEditTransactionId, setPendingEditTransactionId] = useState<string | null>(null);
   const [theme, setThemeState] = useState<Theme>('dark');
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const navigate = useCallback((view: View) => setCurrentView(view), []);
 
   return (
-    <AppContext.Provider value={{ currentView, navigate, activeAccountId, setActiveAccountId, theme, setTheme }}>
+    <AppContext.Provider value={{ currentView, navigate, activeAccountId, setActiveAccountId, pendingEditTransactionId, setPendingEditTransactionId, theme, setTheme }}>
       {children}
     </AppContext.Provider>
   );

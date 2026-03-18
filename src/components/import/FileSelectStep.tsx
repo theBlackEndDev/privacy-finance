@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Account } from '../../types';
 import { Button } from '../ui/Button';
+import { Tooltip } from '../ui/Tooltip';
 import { isTauri } from '../../api/invoke';
 
 interface Props {
@@ -39,7 +40,8 @@ export function FileSelectStep({ accounts, onNext }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 500 }}>
-          CSV File
+          CSV File{' '}
+          <Tooltip text="Most banks let you export transactions as CSV. Look for 'Download' or 'Export' in your bank's transaction history. We'll auto-detect columns in the next step." />
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <Button variant="ghost" onClick={pickFile}>Browse…</Button>

@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
-import { Transaction } from '../types';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Transaction, TransactionFilters } from '../types';
 import { useAccounts } from '../context/AccountContext';
 import { useCategories } from '../context/CategoryContext';
 import { useTransactions, TransactionProvider } from '../context/TransactionContext';
 import { useApp } from '../context/AppContext';
+import { transactionsApi } from '../api/transactions';
 import { TransactionForm } from '../components/transactions/TransactionForm';
 import { TransferForm } from '../components/transactions/TransferForm';
 import { TransactionFiltersBar } from '../components/transactions/TransactionFilters';
@@ -17,16 +18,35 @@ function TransactionsInner() {
   const { accounts } = useAccounts();
   const { categories } = useCategories();
   const { page, filters, loading, setFilters, refresh } = useTransactions();
-  const { activeAccountId } = useApp();
+  const { activeAccountId, setActiveAccountId, pendingEditTransactionId, setPendingEditTransactionId } = useApp();
 
-  // Sync sidebar account selection into filters
+  // Sync sidebar account selection into filters (merge, don't replace)
   useEffect(() => {
-    setFilters({ page: 0, pageSize: 50, accountId: activeAccountId ?? undefined });
+    setFilters({ ...filters, page: 0, accountId: activeAccountId ?? undefined });
   }, [activeAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wrap setFilters to sync account changes back to AppContext
+  const handleFiltersChange = useCallback((newFilters: TransactionFilters) => {
+    setFilters(newFilters);
+    const newAccountId = newFilters.accountId ?? null;
+    if (newAccountId !== activeAccountId) {
+      setActiveAccountId(newAccountId);
+    }
+  }, [setFilters, activeAccountId, setActiveAccountId]);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const quickEntryRef = useRef<HTMLInputElement | null>(null);
+
+  // Open edit modal when a transaction is selected from GlobalSearch
+  useEffect(() => {
+    if (!pendingEditTransactionId) return;
+    const id = pendingEditTransactionId;
+    setPendingEditTransactionId(null);
+    transactionsApi.getOne(id).then((t) => {
+      if (t) setEditing(t);
+    });
+  }, [pendingEditTransactionId, setPendingEditTransactionId]);
 
   function handlePageChange(p: number) {
     setFilters({ ...filters, page: p });
@@ -48,8 +68,9 @@ function TransactionsInner() {
         <div style={{ flex: 1 }}>
           <TransactionFiltersBar
             filters={filters}
+            accounts={accounts}
             categories={categories}
-            onChange={setFilters}
+            onChange={handleFiltersChange}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-sidebar)' }}>

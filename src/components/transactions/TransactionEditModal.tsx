@@ -7,6 +7,7 @@ import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useToast } from '../ui/Toast';
 import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
+import { todayISO } from '../../utils/formatDate';
 import { SplitEditor } from '../splits/SplitEditor';
 import { TagPicker } from '../tags/TagPicker';
 import styles from './TransactionEditModal.module.css';
@@ -19,6 +20,7 @@ interface TransactionEditModalProps {
 }
 
 export function TransactionEditModal({ transaction: t, categories, onSaved, onClose }: TransactionEditModalProps) {
+  const today = todayISO();
   const [date, setDate] = useState(t.date);
   const [payee, setPayee] = useState(t.payee);
   const [amount, setAmount] = useState(formatCurrency(t.amount).replace('$', ''));
@@ -31,6 +33,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   const [showSplit, setShowSplit] = useState(t.isSplit);
   const [tags, setTags] = useState<TagBrief[]>(t.tags ?? []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const isFutureDate = date > today;
   const toast = useToast();
 
   const filteredCategories = categories.filter(
@@ -43,7 +46,8 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
     try {
       const input: UpdateTransactionInput = {
         date, payee, amount: parseCurrency(amount), kind,
-        categoryId: categoryId || null, description, isCleared,
+        categoryId: categoryId || null, description,
+        isCleared: isFutureDate ? false : isCleared,
       };
       await transactionsApi.update(t.id, input);
       toast('Transaction updated');
@@ -105,9 +109,14 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
 
         <Input label="Description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional note" />
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={isCleared} onChange={(e) => setIsCleared(e.target.checked)} />
-          Cleared
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: isFutureDate ? 'var(--text-muted)' : 'var(--text-secondary)', cursor: isFutureDate ? 'not-allowed' : 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={isFutureDate ? false : isCleared}
+            onChange={(e) => setIsCleared(e.target.checked)}
+            disabled={isFutureDate}
+          />
+          {isFutureDate ? 'Pending (future date)' : 'Cleared'}
         </label>
 
         {kind === 'expense' && (
