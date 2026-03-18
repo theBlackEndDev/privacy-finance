@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { cx } from '../../utils/classNames';
+import { ACCOUNT_TYPE_LABELS } from '../../utils/accountTypes';
 import styles from './AccountList.module.css';
 
 interface AccountListProps {
@@ -13,15 +14,6 @@ interface AccountListProps {
   onDelete: (account: Account) => void;
   onClickAccount?: (account: Account) => void;
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  checking: 'Checking',
-  savings: 'Savings',
-  credit_card: 'Credit Card',
-  cash: 'Cash',
-  investment: 'Investment',
-  other: 'Other',
-};
 
 export function AccountList({ accounts, onAdd, onEdit, onDelete, onClickAccount }: AccountListProps) {
   const active = accounts.filter((a) => !a.isArchived);
@@ -98,7 +90,7 @@ function AccountRow({ account, onEdit, onDelete, onClick }: AccountRowProps) {
     >
       <div>
         <div className={styles.name}>{account.name}</div>
-        <div className={styles.type}>{TYPE_LABELS[account.type] ?? account.type}</div>
+        <div className={styles.type}>{ACCOUNT_TYPE_LABELS[account.type] ?? account.type}</div>
       </div>
       <div className={styles.balance}>{formatCurrency(account.openingBalance)}</div>
       <div className={styles.actions}>

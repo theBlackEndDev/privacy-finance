@@ -3,6 +3,7 @@ import { AccountProvider } from './context/AccountContext';
 import { CategoryProvider } from './context/CategoryContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { AccountsPage } from './views/AccountsPage';
+import { AccountDetailPage } from './views/AccountDetailPage';
 import { CategoriesPage } from './views/CategoriesPage';
 import { TransactionsPage } from './views/TransactionsPage';
 import { DashboardPage } from './views/DashboardPage';
@@ -59,8 +60,9 @@ function AppShell() {
 
   const view = (() => {
     switch (currentView) {
-      case 'accounts':     return <AccountsPage />;
-      case 'categories':   return <CategoriesPage />;
+      case 'accounts':        return <AccountsPage />;
+      case 'account-detail':  return <AccountDetailPage />;
+      case 'categories':      return <CategoriesPage />;
       case 'dashboard':    return <DashboardPage />;
       case 'transactions': return <TransactionsPage />;
       case 'import':       return <ImportPage />;

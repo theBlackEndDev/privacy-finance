@@ -1,0 +1,116 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+}
+
+.backBtn {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.backBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.headerInfo {
+  flex: 1;
+}
+
+.accountName {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.accountType {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.balanceBlock {
+  text-align: right;
+}
+
+.balance {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.balanceLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summaryBar {
+  display: flex;
+  gap: 24px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summaryValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.income {
+  color: var(--color-income);
+}
+
+.expense {
+  color: var(--color-expense);
+}
+
+.content {
+  padding: 16px 20px;
+}
+
+.centered {
+  display: flex;
+  justify-content: center;
+  padding-top: 48px;
+}
+
+.centeredSmall {
+  display: flex;
+  justify-content: center;
+  padding-top: 32px;
+}

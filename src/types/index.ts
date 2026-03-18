@@ -562,4 +562,4 @@ export interface EncryptionStatus {
 
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation';
+export type View = 'dashboard' | 'accounts' | 'account-detail' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation';

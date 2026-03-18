@@ -1,18 +1,10 @@
 import { AccountBalance } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { ACCOUNT_TYPE_LABELS } from '../../utils/accountTypes';
 
 interface Props {
   balances: AccountBalance[];
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  checking: 'Checking',
-  savings: 'Savings',
-  credit_card: 'Credit Card',
-  cash: 'Cash',
-  investment: 'Investment',
-  other: 'Other',
-};
 
 export function AccountBalances({ balances }: Props) {
   const total = balances.reduce((sum, b) => sum + b.balance, 0);
@@ -32,7 +24,7 @@ export function AccountBalances({ balances }: Props) {
         >
           <div>
             <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{b.accountName}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{TYPE_LABELS[b.accountType] ?? b.accountType}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ACCOUNT_TYPE_LABELS[b.accountType as keyof typeof ACCOUNT_TYPE_LABELS] ?? b.accountType}</div>
           </div>
           <div style={{
             fontSize: 14,
