@@ -24,7 +24,7 @@ function sanitizeSnippet(html: string): string {
 const LISTBOX_ID = 'global-search-results';
 
 export function GlobalSearch() {
-  const { navigate } = useApp();
+  const { navigate, setPendingEditTransactionId } = useApp();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -53,10 +53,11 @@ export function GlobalSearch() {
     doSearch(debouncedQuery);
   }, [debouncedQuery, doSearch]);
 
-  function handleSelect(_result: SearchResult) {
+  function handleSelect(result: SearchResult) {
     setIsOpen(false);
     setQuery('');
     setResults([]);
+    setPendingEditTransactionId(result.id);
     navigate('transactions');
   }
 

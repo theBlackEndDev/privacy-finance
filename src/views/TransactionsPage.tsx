@@ -4,6 +4,7 @@ import { useAccounts } from '../context/AccountContext';
 import { useCategories } from '../context/CategoryContext';
 import { useTransactions, TransactionProvider } from '../context/TransactionContext';
 import { useApp } from '../context/AppContext';
+import { transactionsApi } from '../api/transactions';
 import { TransactionForm } from '../components/transactions/TransactionForm';
 import { TransferForm } from '../components/transactions/TransferForm';
 import { TransactionFiltersBar } from '../components/transactions/TransactionFilters';
@@ -17,7 +18,7 @@ function TransactionsInner() {
   const { accounts } = useAccounts();
   const { categories } = useCategories();
   const { page, filters, loading, setFilters, refresh } = useTransactions();
-  const { activeAccountId, setActiveAccountId } = useApp();
+  const { activeAccountId, setActiveAccountId, pendingEditTransactionId, setPendingEditTransactionId } = useApp();
 
   // Sync sidebar account selection into filters (merge, don't replace)
   useEffect(() => {
@@ -36,6 +37,16 @@ function TransactionsInner() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const quickEntryRef = useRef<HTMLInputElement | null>(null);
+
+  // Open edit modal when a transaction is selected from GlobalSearch
+  useEffect(() => {
+    if (!pendingEditTransactionId) return;
+    const id = pendingEditTransactionId;
+    setPendingEditTransactionId(null);
+    transactionsApi.getOne(id).then((t) => {
+      if (t) setEditing(t);
+    });
+  }, [pendingEditTransactionId, setPendingEditTransactionId]);
 
   function handlePageChange(p: number) {
     setFilters({ ...filters, page: p });
