@@ -3,14 +3,17 @@ use uuid::Uuid;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::timestamps::now_utc;
-use crate::models::category::{Category, CreateCategoryInput, UpdateCategoryInput};
+use crate::models::category::{Category, CategoryGroup, CreateCategoryInput, UpdateCategoryInput};
 
 #[tauri::command]
 pub fn get_categories(state: State<DbState>) -> AppResult<Vec<Category>> {
     let conn = state.read_conn.lock().unwrap();
     let mut stmt = conn.prepare(
-        "SELECT id, name, color, icon, type, sort_order, is_archived, created_at, updated_at
-         FROM categories ORDER BY type ASC, sort_order ASC, name ASC"
+        "SELECT c.id, c.name, c.color, c.icon, c.type, c.sort_order, c.is_archived,
+                c.group_id, cg.name, c.created_at, c.updated_at
+         FROM categories c
+         LEFT JOIN category_groups cg ON c.group_id = cg.id
+         ORDER BY c.type ASC, c.sort_order ASC, c.name ASC"
     )?;
     let cats = stmt.query_map([], |row| {
         Ok(Category {
@@ -21,8 +24,10 @@ pub fn get_categories(state: State<DbState>) -> AppResult<Vec<Category>> {
             category_type: row.get(4)?,
             sort_order: row.get(5)?,
             is_archived: row.get::<_, i64>(6)? != 0,
-            created_at: row.get(7)?,
-            updated_at: row.get(8)?,
+            group_id: row.get(7)?,
+            group_name: row.get(8)?,
+            created_at: row.get(9)?,
+            updated_at: row.get(10)?,
         })
     })?
     .collect::<Result<Vec<_>, _>>()?;
@@ -52,6 +57,8 @@ pub fn create_category(input: CreateCategoryInput, state: State<DbState>) -> App
         category_type: input.category_type,
         sort_order: sort,
         is_archived: false,
+        group_id: None,
+        group_name: None,
         created_at: now.clone(),
         updated_at: now,
     })
@@ -63,7 +70,7 @@ pub fn update_category(id: String, input: UpdateCategoryInput, state: State<DbSt
     let now = now_utc();
 
     let current = conn.query_row(
-        "SELECT name, color, icon, type, sort_order, is_archived FROM categories WHERE id = ?1",
+        "SELECT name, color, icon, type, sort_order, is_archived, group_id FROM categories WHERE id = ?1",
         [&id],
         |row| Ok((
             row.get::<_, String>(0)?,
@@ -72,6 +79,7 @@ pub fn update_category(id: String, input: UpdateCategoryInput, state: State<DbSt
             row.get::<_, String>(3)?,
             row.get::<_, i64>(4)?,
             row.get::<_, i64>(5)?,
+            row.get::<_, Option<String>>(6)?,
         )),
     ).map_err(|_| AppError::NotFound(format!("category {id}")))?;
 
@@ -81,17 +89,22 @@ pub fn update_category(id: String, input: UpdateCategoryInput, state: State<DbSt
     let category_type = input.category_type.unwrap_or(current.3);
     let sort = input.sort_order.unwrap_or(current.4);
     let archived = input.is_archived.map(|b| b as i64).unwrap_or(current.5);
+    let group_id = match input.group_id {
+        Some(gid) => gid,     // explicit set (Some(id)) or clear (None)
+        None => current.6,    // not provided — keep current
+    };
 
     conn.execute(
-        "UPDATE categories SET name=?1, color=?2, icon=?3, type=?4, sort_order=?5, is_archived=?6, updated_at=?7 WHERE id=?8",
-        rusqlite::params![name, color, icon, category_type, sort, archived, now, id],
+        "UPDATE categories SET name=?1, color=?2, icon=?3, type=?4, sort_order=?5, is_archived=?6, group_id=?7, updated_at=?8 WHERE id=?9",
+        rusqlite::params![name, color, icon, category_type, sort, archived, group_id, now, id],
     )?;
 
     drop(conn);
 
     let read = state.read_conn.lock().unwrap();
-    let created_at: String = read.query_row(
-        "SELECT created_at FROM categories WHERE id = ?1", [&id], |r| r.get(0)
+    let (created_at, group_name): (String, Option<String>) = read.query_row(
+        "SELECT c.created_at, cg.name FROM categories c LEFT JOIN category_groups cg ON c.group_id = cg.id WHERE c.id = ?1",
+        [&id], |r| Ok((r.get(0)?, r.get(1)?))
     ).map_err(|_| AppError::NotFound(format!("category {id}")))?;
 
     Ok(Category {
@@ -102,6 +115,8 @@ pub fn update_category(id: String, input: UpdateCategoryInput, state: State<DbSt
         category_type,
         sort_order: sort,
         is_archived: archived != 0,
+        group_id,
+        group_name,
         created_at,
         updated_at: now,
     })
@@ -123,4 +138,40 @@ pub fn delete_category(id: String, state: State<DbState>) -> AppResult<()> {
     conn.execute("DELETE FROM categories WHERE id = ?1", [&id])?;
 
     Ok(())
+}
+
+// ── Category Groups ─────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn list_category_groups(state: State<DbState>) -> AppResult<Vec<CategoryGroup>> {
+    let conn = state.read_conn.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT id, name, sort_order, created_at, updated_at FROM category_groups ORDER BY sort_order ASC, name ASC"
+    )?;
+    let groups = stmt.query_map([], |row| {
+        Ok(CategoryGroup {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            sort_order: row.get(2)?,
+            created_at: row.get(3)?,
+            updated_at: row.get(4)?,
+        })
+    })?
+    .collect::<Result<Vec<_>, _>>()?;
+    Ok(groups)
+}
+
+#[tauri::command]
+pub fn create_category_group(name: String, sort_order: Option<i64>, state: State<DbState>) -> AppResult<CategoryGroup> {
+    let conn = state.write_conn.lock().unwrap();
+    let id = Uuid::new_v4().to_string();
+    let now = now_utc();
+    let sort = sort_order.unwrap_or(0);
+
+    conn.execute(
+        "INSERT INTO category_groups (id, name, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+        rusqlite::params![id, name, sort, now],
+    )?;
+
+    Ok(CategoryGroup { id, name, sort_order: sort, created_at: now.clone(), updated_at: now })
 }

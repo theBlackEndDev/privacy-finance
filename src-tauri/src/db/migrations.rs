@@ -8,6 +8,8 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     fix_negative_expense_amounts(conn)?;
     populate_fts(conn)?;
     add_is_split_column(conn)?;
+    add_category_group_id_column(conn)?;
+    seed_category_groups(conn)?;
     Ok(())
 }
 
@@ -20,6 +22,81 @@ fn add_is_split_column(conn: &Connection) -> AppResult<()> {
     if !has_column {
         conn.execute_batch("ALTER TABLE transactions ADD COLUMN is_split INTEGER NOT NULL DEFAULT 0")?;
     }
+    Ok(())
+}
+
+/// Idempotent: add group_id column to categories if it doesn't exist.
+fn add_category_group_id_column(conn: &Connection) -> AppResult<()> {
+    let has_column: bool = conn
+        .prepare("PRAGMA table_info(categories)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|name| name.as_deref() == Ok("group_id"));
+    if !has_column {
+        conn.execute_batch("ALTER TABLE categories ADD COLUMN group_id TEXT REFERENCES category_groups(id) ON DELETE SET NULL")?;
+    }
+    Ok(())
+}
+
+/// Idempotent: seed default category groups and assign categories to them.
+fn seed_category_groups(conn: &Connection) -> AppResult<()> {
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM category_groups", [], |row| row.get(0))?;
+    if count > 0 {
+        return Ok(());
+    }
+
+    // Check if group_id column exists (it should after add_category_group_id_column)
+    let has_column: bool = conn
+        .prepare("PRAGMA table_info(categories)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|name| name.as_deref() == Ok("group_id"));
+    if !has_column {
+        return Ok(());
+    }
+
+    let now = now_utc();
+
+    let grp_essentials = uuid::Uuid::new_v4().to_string();
+    let grp_lifestyle  = uuid::Uuid::new_v4().to_string();
+    let grp_savings    = uuid::Uuid::new_v4().to_string();
+    let grp_income     = uuid::Uuid::new_v4().to_string();
+
+    for (id, name, sort) in [
+        (&grp_essentials, "Essentials",      0),
+        (&grp_lifestyle,  "Lifestyle",       1),
+        (&grp_savings,    "Savings & Goals", 2),
+        (&grp_income,     "Income",          3),
+    ] {
+        conn.execute(
+            "INSERT INTO category_groups (id, name, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+            rusqlite::params![id, name, sort, now],
+        )?;
+    }
+
+    // Assign default categories to groups
+    // Essentials: Housing, Food, Transportation, Utilities, Healthcare
+    for name in ["Housing", "Food", "Transportation", "Utilities", "Healthcare"] {
+        conn.execute(
+            "UPDATE categories SET group_id = ?1 WHERE name = ?2",
+            rusqlite::params![grp_essentials, name],
+        )?;
+    }
+
+    // Lifestyle: Entertainment, Shopping, Subscriptions, Personal, Education, Other
+    for name in ["Entertainment", "Shopping", "Subscriptions", "Personal", "Education", "Other"] {
+        conn.execute(
+            "UPDATE categories SET group_id = ?1 WHERE name = ?2",
+            rusqlite::params![grp_lifestyle, name],
+        )?;
+    }
+
+    // Income: Salary, Freelance, Investments, Other Income
+    for name in ["Salary", "Freelance", "Investments", "Other Income"] {
+        conn.execute(
+            "UPDATE categories SET group_id = ?1 WHERE name = ?2",
+            rusqlite::params![grp_income, name],
+        )?;
+    }
+
     Ok(())
 }
 
@@ -299,6 +376,15 @@ CREATE TABLE IF NOT EXISTS reconciliation_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reconciliation_items_recon_id ON reconciliation_items(reconciliation_id);
+
+-- Category Groups
+CREATE TABLE IF NOT EXISTS category_groups (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL UNIQUE,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
 
 -- Exchange Rates
 CREATE TABLE IF NOT EXISTS exchange_rates (

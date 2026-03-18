@@ -1,9 +1,50 @@
+import { useCallback, useMemo } from 'react';
 import { BudgetCategoryRow as RowData, BudgetSummary } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { cx } from '../../utils/classNames';
 import { BudgetCategoryRow } from './BudgetCategoryRow';
 import { Tooltip } from '../ui/Tooltip';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './BudgetGrid.module.css';
+
+const UNGROUPED = '__ungrouped__';
+
+interface GroupData {
+  groupId: string;
+  groupName: string;
+  items: RowData[];
+  budgeted: number;
+  spent: number;
+  available: number;
+}
+
+function groupItems(items: RowData[]): GroupData[] {
+  const map = new Map<string, GroupData>();
+
+  for (const item of items) {
+    const gid = item.groupId ?? UNGROUPED;
+    const gname = item.groupName ?? 'Ungrouped';
+    const group = map.get(gid);
+    if (!group) {
+      map.set(gid, { groupId: gid, groupName: gname, items: [item], budgeted: item.budgeted, spent: item.spent, available: item.available });
+    } else {
+      map.set(gid, {
+        ...group,
+        items: [...group.items, item],
+        budgeted: group.budgeted + item.budgeted,
+        spent: group.spent + item.spent,
+        available: group.available + item.available,
+      });
+    }
+  }
+
+  // Sort: named groups first (by insertion order from sorted query), ungrouped last
+  const values = [...map.values()];
+  return [
+    ...values.filter(g => g.groupId !== UNGROUPED),
+    ...values.filter(g => g.groupId === UNGROUPED),
+  ];
+}
 
 interface Props {
   items: RowData[];
@@ -16,9 +57,23 @@ export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover 
   const toBeBudgeted = summary?.toBeBudgeted ?? 0;
   const tbbClass = toBeBudgeted > 0 ? styles.positive : toBeBudgeted < 0 ? styles.negative : styles.zero;
 
+  const [collapsedArr, setCollapsedArr] = useLocalStorage<string[]>('budget-collapsed-groups', []);
+  const collapsed = useMemo(() => new Set(collapsedArr), [collapsedArr]);
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setCollapsedArr(
+      collapsed.has(groupId)
+        ? collapsedArr.filter(id => id !== groupId)
+        : [...collapsedArr, groupId]
+    );
+  }, [collapsed, collapsedArr, setCollapsedArr]);
+
+  const groups = useMemo(() => groupItems(items), [items]);
+  const hasGroups = groups.some(g => g.groupId !== UNGROUPED);
+
   return (
     <div className={styles.container}>
-      {/* To Be Budgeted banner — outside table structure */}
+      {/* To Be Budgeted banner */}
       <div className={styles.toBeBudgeted} aria-live="polite">
         <span className={styles.toBeBudgetedLabel}>
           To Be Budgeted{' '}
@@ -48,6 +103,37 @@ export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover 
         {/* Rows */}
         {items.length === 0 ? (
           <div className={styles.empty}>No budget items. Create a budget to get started.</div>
+        ) : hasGroups ? (
+          groups.map((group) => {
+            const isCollapsed = collapsed.has(group.groupId);
+            return (
+              <div key={group.groupId}>
+                <div
+                  className={styles.groupHeader}
+                  role="row"
+                  onClick={() => toggleGroup(group.groupId)}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className={styles.groupHeaderName} role="cell">
+                    <span className={isCollapsed ? styles.chevronCollapsed : styles.chevronExpanded}>▼</span>
+                    {group.groupName}
+                  </span>
+                  <span className={styles.groupSubtotal} role="cell">{formatCurrency(group.budgeted)}</span>
+                  <span className={styles.groupSubtotal} role="cell">{formatCurrency(group.spent)}</span>
+                  <span className={styles.groupSubtotal} role="cell">{formatCurrency(group.available)}</span>
+                  <span role="cell" />
+                </div>
+                {!isCollapsed && group.items.map((row) => (
+                  <BudgetCategoryRow
+                    key={row.itemId}
+                    row={row}
+                    onUpdateBudgeted={onUpdateBudgeted}
+                    onToggleRollover={onToggleRollover}
+                  />
+                ))}
+              </div>
+            );
+          })
         ) : (
           items.map((row) => (
             <BudgetCategoryRow
