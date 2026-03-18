@@ -9,6 +9,16 @@ export function formatDate(isoDate: string): string {
 }
 
 /**
+ * Format an ISO date string to short month/day display.
+ * e.g. "2026-03-13" → "Mar 13"
+ */
+export function formatShortDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
  * Format a Date object as YYYY-MM-DD.
  */
 export function formatDateISO(d: Date): string {

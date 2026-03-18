@@ -337,6 +337,7 @@ export interface BudgetCategoryRow {
   rollover: boolean;
   groupId?: string;
   groupName?: string;
+  targetAmount?: number | null;
 }
 
 export interface BudgetWithItems {
@@ -355,6 +356,7 @@ export interface BudgetSummary {
 export interface UpdateBudgetItemInput {
   budgeted?: number;
   rollover?: boolean;
+  targetAmount?: number | null;
 }
 
 // ── Categorization Rules ──────────────────────────────────────────

@@ -51,9 +51,10 @@ interface Props {
   summary: BudgetSummary | null;
   onUpdateBudgeted: (itemId: string, cents: number) => void;
   onToggleRollover: (itemId: string, rollover: boolean) => void;
+  onSelectCategory?: (row: RowData) => void;
 }
 
-export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover }: Props) {
+export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover, onSelectCategory }: Props) {
   const toBeBudgeted = summary?.toBeBudgeted ?? 0;
   const tbbClass = toBeBudgeted > 0 ? styles.positive : toBeBudgeted < 0 ? styles.negative : styles.zero;
 
@@ -129,6 +130,7 @@ export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover 
                     row={row}
                     onUpdateBudgeted={onUpdateBudgeted}
                     onToggleRollover={onToggleRollover}
+                    onSelect={onSelectCategory}
                   />
                 ))}
               </div>

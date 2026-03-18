@@ -1,5 +1,5 @@
 import { invoke } from './invoke';
-import { Budget, BudgetWithItems, BudgetSummary, UpdateBudgetItemInput } from '../types';
+import { Budget, BudgetWithItems, BudgetSummary, UpdateBudgetItemInput, Transaction } from '../types';
 
 export const budgetApi = {
   create: (year: number, month: number) =>
@@ -14,4 +14,6 @@ export const budgetApi = {
     invoke<BudgetSummary>('get_budget_summary', { year, month }),
   calculateRollover: (year: number, month: number) =>
     invoke<number>('calculate_rollover', { year, month }),
+  getCategoryActivity: (categoryId: string, year: number, month: number) =>
+    invoke<Transaction[]>('get_category_activity', { categoryId, year, month }, []),
 };

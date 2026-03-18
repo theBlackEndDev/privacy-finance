@@ -10,6 +10,7 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     add_is_split_column(conn)?;
     add_category_group_id_column(conn)?;
     seed_category_groups(conn)?;
+    add_target_amount_column(conn)?;
     Ok(())
 }
 
@@ -97,6 +98,18 @@ fn seed_category_groups(conn: &Connection) -> AppResult<()> {
         )?;
     }
 
+    Ok(())
+}
+
+/// Idempotent: add target_amount column to budget_items if it doesn't exist.
+fn add_target_amount_column(conn: &Connection) -> AppResult<()> {
+    let has_column: bool = conn
+        .prepare("PRAGMA table_info(budget_items)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|name| name.as_deref() == Ok("target_amount"));
+    if !has_column {
+        conn.execute_batch("ALTER TABLE budget_items ADD COLUMN target_amount INTEGER")?;
+    }
     Ok(())
 }
 

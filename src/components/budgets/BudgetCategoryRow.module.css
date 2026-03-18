@@ -73,6 +73,20 @@
   accent-color: var(--color-accent);
 }
 
+.clickable {
+  cursor: pointer;
+}
+
+.targetDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: inline-block;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
 .progressCell {
   padding: 0 16px 6px;
 }
