@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { CategorySummary } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import styles from './SpendingPieChart.module.css';
 
 interface Props {
   data: CategorySummary[];
@@ -8,11 +9,7 @@ interface Props {
 
 export function SpendingPieChart({ data }: Props) {
   if (data.length === 0) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 14 }}>
-        No expense data this month
-      </div>
-    );
+    return <div className={styles.empty}>No expense data this month</div>;
   }
 
   const chartData = data.map(d => ({
@@ -33,8 +30,8 @@ export function SpendingPieChart({ data }: Props) {
           paddingAngle={2}
           dataKey="value"
         >
-          {chartData.map((entry, i) => (
-            <Cell key={i} fill={entry.color} />
+          {chartData.map((entry) => (
+            <Cell key={entry.name} fill={entry.color} />
           ))}
         </Pie>
         <Tooltip

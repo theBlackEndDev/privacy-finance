@@ -1,4 +1,6 @@
 import { formatCurrency } from '../../utils/formatCurrency';
+import { cx } from '../../utils/classNames';
+import styles from './SummaryCards.module.css';
 
 interface Props {
   income: number;
@@ -8,28 +10,21 @@ interface Props {
 
 export function SummaryCards({ income, expense, net }: Props) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-      <Card label="Income" value={income} color="var(--color-income)" />
-      <Card label="Expenses" value={Math.abs(expense)} color="var(--color-expense)" />
-      <Card label="Net" value={net} color={net >= 0 ? 'var(--color-income)' : 'var(--color-expense)'} />
+    <div className={styles.grid}>
+      <SummaryCard label="Income" value={income} variant="income" />
+      <SummaryCard label="Expenses" value={Math.abs(expense)} variant="expense" />
+      <SummaryCard label="Net" value={net} variant={net >= 0 ? 'income' : 'expense'} />
     </div>
   );
 }
 
-function Card({ label, value, color }: { label: string; value: number; color: string }) {
+type Variant = 'income' | 'expense';
+
+function SummaryCard({ label, value, variant }: { label: string; value: number; variant: Variant }) {
   return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-color)',
-      borderRadius: 8,
-      padding: '20px 24px',
-    }}>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color, fontWeight: 600 }}>
-        {formatCurrency(value)}
-      </div>
+    <div className={styles.card}>
+      <div className={styles.label}>{label}</div>
+      <div className={cx(styles.value, styles[variant])}>{formatCurrency(value)}</div>
     </div>
   );
 }

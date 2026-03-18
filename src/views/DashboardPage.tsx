@@ -8,6 +8,8 @@ import { MonthlyTrendChart } from '../components/dashboard/MonthlyTrendChart';
 import { AccountBalances } from '../components/dashboard/AccountBalances';
 import { RecentTransactions } from '../components/dashboard/RecentTransactions';
 import { Spinner } from '../components/ui/Spinner';
+import { cx } from '../utils/classNames';
+import styles from './DashboardPage.module.css';
 
 function MonthSelector({ month, onChange }: { month: string; onChange: (m: string) => void }) {
   return (
@@ -15,39 +17,27 @@ function MonthSelector({ month, onChange }: { month: string; onChange: (m: strin
       type="month"
       value={month}
       onChange={e => onChange(e.target.value)}
-      style={{
-        background: 'var(--bg-input)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 6,
-        color: 'var(--text-primary)',
-        padding: '6px 10px',
-        fontSize: 13,
-        fontFamily: 'var(--font-mono)',
-      }}
+      className={styles.monthInput}
     />
   );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div className={styles.sectionTitle}>{children}</div>;
+}
+
+function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+    <div className={cx(styles.card, className)}>
       {children}
     </div>
   );
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{
-      background: 'var(--bg-card)',
-      border: '1px solid var(--border-color)',
-      borderRadius: 8,
-      padding: 20,
-      ...style,
-    }}>
-      {children}
-    </div>
-  );
+function lastDayOfMonth(month: string): string {
+  const [year, mon] = month.split('-').map(Number);
+  const last = new Date(year, mon, 0).getDate();
+  return `${month}-${String(last).padStart(2, '0')}`;
 }
 
 export function DashboardPage() {
@@ -55,32 +45,30 @@ export function DashboardPage() {
   const [recent, setRecent] = useState<Transaction[]>([]);
 
   useEffect(() => {
-    transactionsApi.getAll({ dateFrom: `${month}-01`, dateTo: `${month}-31`, pageSize: 10, page: 1 })
-      .then(p => setRecent(p.items))
-      .catch(() => setRecent([]));
+    let cancelled = false;
+    transactionsApi.getAll({ dateFrom: `${month}-01`, dateTo: lastDayOfMonth(month), pageSize: 10, page: 1 })
+      .then(p => { if (!cancelled) setRecent(p.items); })
+      .catch(() => { if (!cancelled) setRecent([]); });
+    return () => { cancelled = true; };
   }, [month]);
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 64 }}>
+      <div className={styles.centered}>
         <Spinner />
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div style={{ color: 'var(--color-expense)', padding: 24 }}>
-        Error loading dashboard: {error}
-      </div>
-    );
+    return <div className={styles.error}>Error loading dashboard: {error}</div>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className={styles.page}>
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Monthly overview</div>
+      <div className={styles.headerRow}>
+        <div className={styles.headerLabel}>Monthly overview</div>
         <MonthSelector month={month} onChange={setMonth} />
       </div>
 
@@ -88,7 +76,7 @@ export function DashboardPage() {
       {data && <SummaryCards income={data.income} expense={data.expense} net={data.net} />}
 
       {/* Middle row: pie + trend */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className={styles.gridTwo}>
         <Card>
           <SectionTitle>Spending by Category</SectionTitle>
           <SpendingPieChart data={data?.byCategory ?? []} />
@@ -100,7 +88,7 @@ export function DashboardPage() {
       </div>
 
       {/* Bottom row: account balances + recent transactions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className={styles.gridTwo}>
         <Card>
           <SectionTitle>Account Balances</SectionTitle>
           <AccountBalances balances={balances} />

@@ -3,6 +3,7 @@ import {
 } from 'recharts';
 import { MonthSummary } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import styles from './MonthlyTrendChart.module.css';
 
 interface Props {
   data: MonthSummary[];
@@ -10,11 +11,7 @@ interface Props {
 
 export function MonthlyTrendChart({ data }: Props) {
   if (data.length === 0) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 14 }}>
-        No trend data available
-      </div>
-    );
+    return <div className={styles.empty}>No trend data available</div>;
   }
 
   const chartData = data.map(d => ({
