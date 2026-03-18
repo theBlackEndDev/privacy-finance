@@ -66,3 +66,16 @@
   border: 5px solid transparent;
   border-top-color: var(--border-color);
 }
+
+.contentRight {
+  composes: content;
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.contentRight::after {
+  left: auto;
+  right: 8px;
+  transform: none;
+}

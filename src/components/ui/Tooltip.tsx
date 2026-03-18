@@ -3,9 +3,10 @@ import styles from './Tooltip.module.css';
 
 interface TooltipProps {
   text: string;
+  align?: 'center' | 'right';
 }
 
-export function Tooltip({ text }: TooltipProps) {
+export function Tooltip({ text, align = 'center' }: TooltipProps) {
   const id = useId();
 
   return (
@@ -17,7 +18,7 @@ export function Tooltip({ text }: TooltipProps) {
       >
         ?
       </button>
-      <span id={id} role="tooltip" className={styles.content}>
+      <span id={id} role="tooltip" className={align === 'right' ? styles.contentRight : styles.content}>
         {text}
       </span>
     </span>

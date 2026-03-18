@@ -87,17 +87,20 @@ export function BudgetGrid({ items, summary, onUpdateBudgeted, onToggleRollover,
 
       <div role="table" aria-label="Budget grid">
         {/* Header */}
-        <div role="row">
+        <div className={styles.header} role="row">
           <span className={styles.headerCell} role="columnheader">Category</span>
           <span className={styles.headerRight} role="columnheader">
-            Budgeted <Tooltip text="How much you plan to spend in this category this month. Set this based on your priorities." />
+            Budgeted{' '}
+            <Tooltip text="How much you plan to spend in this category this month. Set this based on your priorities." />
           </span>
           <span className={styles.headerRight} role="columnheader">Spent</span>
           <span className={styles.headerRight} role="columnheader">
-            Available <Tooltip text="What's left to spend: budgeted minus spent. Negative means you've overspent — consider moving money from another category." />
+            Available{' '}
+            <Tooltip text="What's left to spend: budgeted minus spent. Negative means you've overspent — consider moving money from another category." />
           </span>
           <span className={styles.headerCenter} role="columnheader" title="Rollover" aria-label="Rollover">
-            {'\u21BB'} <Tooltip text="When enabled, unspent money carries forward to next month instead of resetting to zero." />
+            {'\u21BB'}{' '}
+            <Tooltip text="When enabled, unspent money carries forward to next month instead of resetting to zero." align="right" />
           </span>
         </div>
 
