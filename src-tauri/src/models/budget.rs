@@ -24,6 +24,7 @@ pub struct BudgetCategoryRow {
     pub rollover: bool,
     pub group_id: Option<String>,
     pub group_name: Option<String>,
+    pub target_amount: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -48,4 +49,5 @@ pub struct BudgetSummary {
 pub struct UpdateBudgetItemInput {
     pub budgeted: Option<i64>,
     pub rollover: Option<bool>,
+    pub target_amount: Option<Option<i64>>,
 }

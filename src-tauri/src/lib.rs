@@ -73,6 +73,7 @@ pub fn run() {
             commands::budget::copy_budget,
             commands::budget::get_budget_summary,
             commands::budget::calculate_rollover,
+            commands::budget::get_category_activity,
             commands::rules::create_rule,
             commands::rules::get_all_rules,
             commands::rules::update_rule,

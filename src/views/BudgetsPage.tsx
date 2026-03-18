@@ -5,6 +5,7 @@ import { useToast } from '../components/ui/Toast';
 import { Spinner } from '../components/ui/Spinner';
 import { BudgetMonthNav } from '../components/budgets/BudgetMonthNav';
 import { BudgetGrid } from '../components/budgets/BudgetGrid';
+import { BudgetDetailPanel } from '../components/budgets/BudgetDetailPanel';
 
 function currentYearMonth(): [number, number] {
   const d = new Date();
@@ -18,6 +19,7 @@ export function BudgetsPage() {
   const [items, setItems] = useState<BudgetCategoryRow[]>([]);
   const [summary, setSummary] = useState<BudgetSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRow, setSelectedRow] = useState<BudgetCategoryRow | null>(null);
   const toast = useToast();
 
   const loadBudget = useCallback(async (y: number, m: number) => {
@@ -37,8 +39,12 @@ export function BudgetsPage() {
         ]);
       }
 
-      setItems(data?.items ?? []);
+      const newItems = data?.items ?? [];
+      setItems(newItems);
       setSummary(sum);
+      setSelectedRow(prev =>
+        prev ? newItems.find(i => i.itemId === prev.itemId) ?? null : null
+      );
     } catch (err) {
       toast(`Failed to load budget: ${err}`, 'error');
     } finally {
@@ -93,6 +99,23 @@ export function BudgetsPage() {
     }
   }
 
+  async function handleUpdateTarget(itemId: string, targetAmount: number | null) {
+    try {
+      await budgetApi.updateItem(itemId, { targetAmount });
+      await loadBudget(year, month);
+    } catch (err) {
+      toast(`Failed to update target: ${err}`, 'error');
+    }
+  }
+
+  function handleSelectCategory(row: BudgetCategoryRow) {
+    setSelectedRow(row);
+  }
+
+  function handleClosePanel() {
+    setSelectedRow(null);
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <BudgetMonthNav
@@ -114,8 +137,19 @@ export function BudgetsPage() {
             summary={summary}
             onUpdateBudgeted={handleUpdateBudgeted}
             onToggleRollover={handleToggleRollover}
+            onSelectCategory={handleSelectCategory}
           />
         </div>
+      )}
+
+      {selectedRow && (
+        <BudgetDetailPanel
+          row={selectedRow}
+          year={year}
+          month={month}
+          onClose={handleClosePanel}
+          onUpdateTarget={handleUpdateTarget}
+        />
       )}
     </div>
   );

@@ -4,6 +4,7 @@ use crate::helpers::timestamps::now_utc;
 use crate::models::budget::{
     Budget, BudgetCategoryRow, BudgetSummary, BudgetWithItems, UpdateBudgetItemInput,
 };
+use crate::models::transaction::Transaction;
 use tauri::State;
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -110,7 +111,8 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
             bi.rollover,
             COALESCE(t_sum.spent, 0) AS spent,
             c.group_id,
-            cg.name
+            cg.name,
+            bi.target_amount
          FROM budget_items bi
          JOIN categories c ON c.id = bi.category_id
          LEFT JOIN category_groups cg ON c.group_id = cg.id
@@ -139,6 +141,7 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
                 rollover: row.get::<_, i64>(5)? != 0,
                 group_id: row.get(7)?,
                 group_name: row.get(8)?,
+                target_amount: row.get(9)?,
             })
         })?
         .collect::<Result<_, _>>()?;
@@ -146,7 +149,7 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
     Ok(Some(BudgetWithItems { budget, items }))
 }
 
-/// Update a single budget item's budgeted amount and/or rollover flag.
+/// Update a single budget item's budgeted amount, rollover flag, and/or target.
 #[tauri::command]
 pub fn update_budget_item(
     item_id: String,
@@ -156,29 +159,69 @@ pub fn update_budget_item(
     let conn = state.write_conn.lock().unwrap();
     let now = now_utc();
 
-    match (input.budgeted, input.rollover) {
-        (Some(b), Some(r)) => {
-            conn.execute(
-                "UPDATE budget_items SET budgeted = ?1, rollover = ?2, updated_at = ?3 WHERE id = ?4",
-                rusqlite::params![b, r as i64, now, item_id],
-            )?;
-        }
-        (Some(b), None) => {
-            conn.execute(
-                "UPDATE budget_items SET budgeted = ?1, updated_at = ?2 WHERE id = ?3",
-                rusqlite::params![b, now, item_id],
-            )?;
-        }
-        (None, Some(r)) => {
-            conn.execute(
-                "UPDATE budget_items SET rollover = ?1, updated_at = ?2 WHERE id = ?3",
-                rusqlite::params![r as i64, now, item_id],
-            )?;
-        }
-        (None, None) => {}
+    let mut sets: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    let mut idx = 1;
+
+    if let Some(b) = input.budgeted {
+        sets.push(format!("budgeted = ?{idx}"));
+        params.push(Box::new(b));
+        idx += 1;
+    }
+    if let Some(r) = input.rollover {
+        sets.push(format!("rollover = ?{idx}"));
+        params.push(Box::new(r as i64));
+        idx += 1;
+    }
+    if let Some(ta) = input.target_amount {
+        sets.push(format!("target_amount = ?{idx}"));
+        params.push(Box::new(ta));
+        idx += 1;
     }
 
+    if sets.is_empty() {
+        return Ok(());
+    }
+
+    sets.push(format!("updated_at = ?{idx}"));
+    params.push(Box::new(now));
+    idx += 1;
+
+    let sql = format!(
+        "UPDATE budget_items SET {} WHERE id = ?{idx}",
+        sets.join(", ")
+    );
+    params.push(Box::new(item_id));
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+    conn.execute(&sql, param_refs.as_slice())?;
+
     Ok(())
+}
+
+/// Get transactions for a specific category in a given budget month.
+#[tauri::command]
+pub fn get_category_activity(
+    category_id: String,
+    year: i32,
+    month: i32,
+    state: State<'_, DbState>,
+) -> AppResult<Vec<Transaction>> {
+    use crate::commands::transactions::{row_to_transaction, SELECT};
+
+    let conn = state.read_conn.lock().unwrap();
+    let pattern = month_like_pattern(year, month);
+
+    let sql = format!(
+        "{SELECT} WHERE t.category_id = ?1 AND t.date LIKE ?2 ORDER BY t.date DESC, t.created_at DESC"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+
+    let txns = stmt
+        .query_map(rusqlite::params![category_id, pattern], row_to_transaction)?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(txns)
 }
 
 /// Copy the previous month's budget allocations to the specified month.

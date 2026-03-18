@@ -34,7 +34,7 @@ pub(crate) fn row_to_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<Tr
     })
 }
 
-const SELECT: &str = "
+pub(crate) const SELECT: &str = "
     SELECT t.id, t.account_id, t.date, t.amount, t.kind,
            t.category_id, t.payee, t.description, t.is_cleared, t.is_split,
            t.transfer_group_id, t.import_batch_id, t.created_at, t.updated_at,
