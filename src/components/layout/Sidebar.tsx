@@ -28,7 +28,7 @@ export function Sidebar() {
 
   function handleAccountClick(id: string) {
     setActiveAccountId(id);
-    navigate('transactions');
+    navigate('account-detail');
   }
 
   return (

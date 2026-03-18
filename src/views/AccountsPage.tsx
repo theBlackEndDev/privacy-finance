@@ -49,7 +49,7 @@ export function AccountsPage() {
 
   const handleClickAccount = useCallback((account: Account) => {
     setActiveAccountId(account.id);
-    navigate('transactions');
+    navigate('account-detail');
   }, [setActiveAccountId, navigate]);
 
   function openAdd() { setEditing(undefined); setShowForm(true); }

@@ -4,9 +4,10 @@ import { GlobalSearch } from '../search/GlobalSearch';
 import styles from './Header.module.css';
 
 const VIEW_TITLES: Record<View, string> = {
-  dashboard:    'Dashboard',
-  accounts:     'Accounts',
-  transactions: 'Transactions',
+  dashboard:        'Dashboard',
+  accounts:         'Accounts',
+  'account-detail': 'Account',
+  transactions:     'Transactions',
   categories:   'Categories',
   import:       'Import',
   recurring:    'Recurring',
