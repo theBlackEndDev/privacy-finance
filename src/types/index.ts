@@ -39,6 +39,16 @@ export interface Category {
   type: 'income' | 'expense';
   sortOrder: number;
   isArchived: boolean;
+  groupId?: string;
+  groupName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -325,6 +335,8 @@ export interface BudgetCategoryRow {
   spent: number;     // cents
   available: number; // cents (budgeted - spent)
   rollover: boolean;
+  groupId?: string;
+  groupName?: string;
 }
 
 export interface BudgetWithItems {

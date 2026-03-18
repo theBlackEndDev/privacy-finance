@@ -28,6 +28,8 @@ pub fn run() {
             commands::categories::create_category,
             commands::categories::update_category,
             commands::categories::delete_category,
+            commands::categories::list_category_groups,
+            commands::categories::create_category_group,
             commands::transactions::create_transaction,
             commands::transactions::get_transaction,
             commands::transactions::update_transaction,

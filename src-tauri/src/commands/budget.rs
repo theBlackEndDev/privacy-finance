@@ -108,9 +108,12 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
             c.color,
             bi.budgeted,
             bi.rollover,
-            COALESCE(t_sum.spent, 0) AS spent
+            COALESCE(t_sum.spent, 0) AS spent,
+            c.group_id,
+            cg.name
          FROM budget_items bi
          JOIN categories c ON c.id = bi.category_id
+         LEFT JOIN category_groups cg ON c.group_id = cg.id
          LEFT JOIN (
              SELECT category_id, SUM(amount) AS spent
              FROM transactions
@@ -118,7 +121,7 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
              GROUP BY category_id
          ) t_sum ON t_sum.category_id = bi.category_id
          WHERE bi.budget_id = ?2
-         ORDER BY c.sort_order",
+         ORDER BY COALESCE(cg.sort_order, 999), c.sort_order",
     )?;
 
     let items: Vec<BudgetCategoryRow> = stmt
@@ -134,6 +137,8 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
                 spent,
                 available: budgeted - spent,
                 rollover: row.get::<_, i64>(5)? != 0,
+                group_id: row.get(7)?,
+                group_name: row.get(8)?,
             })
         })?
         .collect::<Result<_, _>>()?;

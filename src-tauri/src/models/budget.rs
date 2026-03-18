@@ -22,6 +22,8 @@ pub struct BudgetCategoryRow {
     pub spent: i64,
     pub available: i64,
     pub rollover: bool,
+    pub group_id: Option<String>,
+    pub group_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
