@@ -49,11 +49,15 @@ export function Modal({ title, onClose, children }: ModalProps) {
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     contentRef.current?.focus();
+    return () => {
+      previous?.focus();
+    };
+  }, []);
 
+  useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      previous?.focus();
     };
   }, [handleKeyDown]);
 

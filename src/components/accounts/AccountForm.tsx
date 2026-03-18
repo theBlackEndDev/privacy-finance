@@ -5,6 +5,7 @@ import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
 import { Tooltip } from '../ui/Tooltip';
 import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
+import { ACCOUNT_TYPE_OPTIONS } from '../../utils/accountTypes';
 import styles from './AccountForm.module.css';
 
 interface AccountFormProps {
@@ -12,15 +13,6 @@ interface AccountFormProps {
   onSave: (input: CreateAccountInput | UpdateAccountInput) => Promise<void>;
   onClose: () => void;
 }
-
-const ACCOUNT_TYPES = [
-  { value: 'checking', label: 'Checking' },
-  { value: 'savings', label: 'Savings' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'other', label: 'Other' },
-];
 
 export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? '');
@@ -67,7 +59,7 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
             <Tooltip text="Checking for daily spending, savings for reserves, credit card for tracking debt, cash for physical money, investment for brokerage or retirement accounts." />
           </label>
           <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])}>
-            {ACCOUNT_TYPES.map((t) => (
+            {ACCOUNT_TYPE_OPTIONS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>

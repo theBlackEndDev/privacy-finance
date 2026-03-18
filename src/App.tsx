@@ -17,8 +17,12 @@ import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
 import { KeyboardShortcutHelp } from './components/ui/KeyboardShortcutHelp';
+import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { UnlockScreen } from './components/encryption/UnlockScreen';
+import { useAccounts } from './context/AccountContext';
+import { useCategories } from './context/CategoryContext';
 import { encryptionApi } from './api/encryption';
+import { settingsApi } from './api/settings';
 import { recurringApi } from './api/recurring';
 import { DueRecurringItem } from './types';
 import { useState, useEffect, useCallback } from 'react';
@@ -26,12 +30,31 @@ import { useToast } from './components/ui/Toast';
 
 function AppShell() {
   const { currentView, navigate } = useApp();
+  const { accounts, loading: accountsLoading, refresh: refreshAccounts } = useAccounts();
+  const { categories } = useCategories();
   const toast = useToast();
 
   const [dueItems, setDueItems] = useState<DueRecurringItem[]>([]);
   const [showDueModal, setShowDueModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [onboarding, setOnboarding] = useState<'loading' | 'visible' | 'hidden'>('loading');
+
+  useEffect(() => {
+    if (accountsLoading) return;
+    if (accounts.length > 0) {
+      setOnboarding('hidden');
+      return;
+    }
+    settingsApi.get('onboarding_complete').then(val => {
+      setOnboarding(val !== 'true' ? 'visible' : 'hidden');
+    }).catch(() => setOnboarding('hidden'));
+  }, [accountsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleOnboardingComplete() {
+    setOnboarding('hidden');
+    await refreshAccounts();
+  }
 
   const toggleShortcutHelp = useCallback(() => setShowShortcutHelp(prev => !prev), []);
   useKeyboardShortcuts({ navigate, onToggleShortcutHelp: toggleShortcutHelp });
@@ -87,6 +110,12 @@ function AppShell() {
       )}
       {showShortcutHelp && (
         <KeyboardShortcutHelp onClose={() => setShowShortcutHelp(false)} />
+      )}
+      {onboarding === 'visible' && (
+        <OnboardingWizard
+          categories={categories}
+          onComplete={handleOnboardingComplete}
+        />
       )}
     </MainLayout>
   );

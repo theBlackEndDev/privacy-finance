@@ -8,3 +8,7 @@ export const ACCOUNT_TYPE_LABELS: Record<Account['type'], string> = {
   investment: 'Investment',
   other: 'Other',
 };
+
+export const ACCOUNT_TYPE_OPTIONS = (
+  Object.entries(ACCOUNT_TYPE_LABELS) as [Account['type'], string][]
+).map(([value, label]) => ({ value, label }));
