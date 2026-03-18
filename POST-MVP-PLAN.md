@@ -847,3 +847,22 @@ All tests run against in-memory SQLite (:memory:) with the same migration applie
 **Total: 213 tasks, ~23-25 hours, 10 commit points**
 
 **Combined with MVP: 349 tasks, ~38-41 hours, 21 commit points**
+
+---
+
+## Post-MVP Backlog
+
+### Complete Onboarding Flow — Plan Required
+
+**Status:** Needs planning session
+**Priority:** High — current onboarding is functional but sparse (welcome screen + single account creation + category list)
+
+**Goals for planning session:**
+- Design a multi-step onboarding that guides users through the full app value proposition
+- Consider: currency/locale selection, first account wizard with multiple accounts, category customization, import existing data prompt, brief feature tour/tooltips
+- Review competitor onboarding patterns (YNAB, Copilot, Monarch Money) for inspiration
+- Decide which steps are required vs optional/skippable
+- Define animations and transitions between steps
+- Plan how onboarding state is persisted and what triggers re-showing it (e.g. factory reset)
+
+**Output of planning session:** A detailed phase spec (like Phases 11-20 above) with numbered tasks, time estimates, and a commit point.
