@@ -1,0 +1,53 @@
+.empty {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.date {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.payee {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.amount {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.income {
+  color: var(--color-income);
+}
+
+.expense {
+  color: var(--color-expense);
+}
+
+.transfer {
+  color: var(--color-transfer);
+}

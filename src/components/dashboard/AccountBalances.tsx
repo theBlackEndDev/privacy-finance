@@ -1,6 +1,8 @@
 import { AccountBalance } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { ACCOUNT_TYPE_LABELS } from '../../utils/accountTypes';
+import { cx } from '../../utils/classNames';
+import styles from './AccountBalances.module.css';
 
 interface Props {
   balances: AccountBalance[];
@@ -12,40 +14,22 @@ export function AccountBalances({ balances }: Props) {
   return (
     <div>
       {balances.map(b => (
-        <div
-          key={b.accountId}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '10px 0',
-            borderBottom: '1px solid var(--border-color)',
-          }}
-        >
+        <div key={b.accountId} className={styles.row}>
           <div>
-            <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{b.accountName}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{ACCOUNT_TYPE_LABELS[b.accountType as keyof typeof ACCOUNT_TYPE_LABELS] ?? b.accountType}</div>
+            <div className={styles.name}>{b.accountName}</div>
+            <div className={styles.type}>
+              {ACCOUNT_TYPE_LABELS[b.accountType as keyof typeof ACCOUNT_TYPE_LABELS] ?? b.accountType}
+            </div>
           </div>
-          <div style={{
-            fontSize: 14,
-            fontFamily: 'var(--font-mono)',
-            fontVariantNumeric: 'tabular-nums',
-            color: b.balance < 0 ? 'var(--color-expense)' : 'var(--text-primary)',
-          }}>
+          <div className={cx(styles.balance, b.balance < 0 && styles.negative)}>
             {formatCurrency(b.balance)}
           </div>
         </div>
       ))}
       {balances.length > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>Net Worth</div>
-          <div style={{
-            fontSize: 14,
-            fontFamily: 'var(--font-mono)',
-            fontVariantNumeric: 'tabular-nums',
-            fontWeight: 600,
-            color: total < 0 ? 'var(--color-expense)' : 'var(--color-income)',
-          }}>
+        <div className={styles.totalRow}>
+          <div className={styles.totalLabel}>Net Worth</div>
+          <div className={cx(styles.totalValue, total < 0 ? styles.negative : styles.positive)}>
             {formatCurrency(total)}
           </div>
         </div>

@@ -1,6 +1,14 @@
 import { Transaction } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
+import { cx } from '../../utils/classNames';
+import styles from './RecentTransactions.module.css';
+
+const AMOUNT_PREFIX: Record<Transaction['kind'], string> = {
+  income: '+',
+  expense: '-',
+  transfer: '',
+};
 
 interface Props {
   transactions: Transaction[];
@@ -8,44 +16,20 @@ interface Props {
 
 export function RecentTransactions({ transactions }: Props) {
   if (transactions.length === 0) {
-    return (
-      <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '16px 0', textAlign: 'center' }}>
-        No transactions this month
-      </div>
-    );
+    return <div className={styles.empty}>No transactions this month</div>;
   }
 
   return (
     <div>
       {transactions.map(t => (
-        <div
-          key={t.id}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '80px 1fr auto',
-            gap: 12,
-            alignItems: 'center',
-            padding: '9px 0',
-            borderBottom: '1px solid var(--border-color)',
-          }}
-        >
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatDate(t.date)}</div>
+        <div key={t.id} className={styles.row}>
+          <div className={styles.date}>{formatDate(t.date)}</div>
           <div>
-            <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {t.payee || '—'}
-            </div>
-            {t.categoryName && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.categoryName}</div>
-            )}
+            <div className={styles.payee}>{t.payee || '\u2014'}</div>
+            {t.categoryName && <div className={styles.category}>{t.categoryName}</div>}
           </div>
-          <div style={{
-            fontSize: 13,
-            fontFamily: 'var(--font-mono)',
-            fontVariantNumeric: 'tabular-nums',
-            textAlign: 'right',
-            color: t.kind === 'income' ? 'var(--color-income)' : t.kind === 'transfer' ? 'var(--color-transfer)' : 'var(--color-expense)',
-          }}>
-            {t.kind === 'income' ? '+' : t.kind === 'transfer' ? '' : '-'}{formatCurrency(Math.abs(t.amount))}
+          <div className={cx(styles.amount, styles[t.kind])}>
+            {AMOUNT_PREFIX[t.kind]}{formatCurrency(Math.abs(t.amount))}
           </div>
         </div>
       ))}

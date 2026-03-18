@@ -1,0 +1,51 @@
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.name {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.type {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.balance {
+  font-size: 14px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+.totalLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.totalValue {
+  font-size: 14px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.negative {
+  color: var(--color-expense);
+}
+
+.positive {
+  color: var(--color-income);
+}
