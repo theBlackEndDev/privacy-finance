@@ -83,13 +83,24 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         shell: bash
         run: |
+          has_apple_id_auth=false
+          has_api_key_auth=false
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            has_apple_id_auth=true
+          fi
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ] && [ -n "$APPLE_API_KEY_P8" ]; then
+            has_api_key_auth=true
+          fi
+
           {
             echo "## macOS beta release readiness"
             echo ""
@@ -97,17 +108,13 @@ jobs:
             echo "Target lane: ${{ matrix.artifact_name }}"
             echo "Architectures covered by workflow: Apple Silicon + Intel (separate macOS artifacts)"
             echo ""
-            echo "### Secret presence"
+            echo "### Signing secrets"
             for key in \
               APPLE_CERTIFICATE \
               APPLE_CERTIFICATE_PASSWORD \
               APPLE_SIGNING_IDENTITY \
               APPLE_TEAM_ID \
-              APPLE_ID \
-              APPLE_APP_SPECIFIC_PASSWORD \
-              APPLE_API_KEY_ID \
-              APPLE_API_ISSUER \
-              APPLE_API_KEY; do
+              KEYCHAIN_PASSWORD; do
               if [ -n "${!key}" ]; then
                 echo "- ${key}: configured"
               else
@@ -115,12 +122,58 @@ jobs:
               fi
             done
             echo ""
-            echo "Note: this workflow currently builds macOS artifacts and reports signing/notarization readiness."
-            echo "Actual signing/notarization steps should be enabled after secrets are provided."
+            echo "### Notarization auth paths"
+            echo "- Apple ID auth ready: ${has_apple_id_auth}"
+            echo "- App Store Connect API key auth ready: ${has_api_key_auth}"
+            echo ""
+            echo "### Optional secret"
+            if [ -n "$APPLE_PROVIDER_SHORT_NAME" ]; then
+              echo "- APPLE_PROVIDER_SHORT_NAME: configured"
+            else
+              echo "- APPLE_PROVIDER_SHORT_NAME: not set"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS' && secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.KEYCHAIN_PASSWORD != ''
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Write App Store Connect API key file
+        if: runner.os == 'macOS' && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_ISSUER != '' && secrets.APPLE_API_KEY_P8 != ''
+        shell: bash
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          mkdir -p private_keys
+          printf '%s' "$APPLE_API_KEY_P8" > "private_keys/AuthKey_${APPLE_API_KEY}.p8"
+          echo "APPLE_API_KEY_PATH=$PWD/private_keys/AuthKey_${APPLE_API_KEY}.p8" >> "$GITHUB_ENV"
 
       - name: Build desktop bundles
         shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
           if [ -n "${{ matrix.tauri_args }}" ]; then
             npm exec tauri -- build ${{ matrix.tauri_args }}
