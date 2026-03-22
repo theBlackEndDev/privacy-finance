@@ -254,7 +254,34 @@ On first launch, the app seeds:
 - 15 categories (4 income, 11 expense)
 - 3 months of realistic sample transactions
 
-To reset to seed data, close the app and delete the database file, then reopen.
+To reset back to seed data:
+1. fully close the app
+2. delete the SQLite database file for your platform
+3. reopen the app
+
+Platform-specific commands:
+
+#### macOS
+```bash
+rm -f ~/Library/Application\ Support/com.privacyfinance.app/privacyfinance.db
+```
+
+#### Linux
+```bash
+rm -f ~/.local/share/com.privacyfinance.app/privacyfinance.db
+```
+
+#### Windows (PowerShell)
+```powershell
+Remove-Item "$env:APPDATA\com.privacyfinance.app\privacyfinance.db" -Force
+```
+
+#### Windows (Command Prompt)
+```cmd
+del /f "%APPDATA%\com.privacyfinance.app\privacyfinance.db"
+```
+
+If the file does not exist yet, the command will simply do nothing. On next launch, the app will recreate the database and re-seed the default sample data.
 
 ---
 
