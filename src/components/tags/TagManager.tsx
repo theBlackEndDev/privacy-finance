@@ -10,7 +10,7 @@ import styles from './TagManager.module.css';
 export function TagManager() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [newName, setNewName] = useState('');
-  const [newColor, setNewColor] = useState('#6366f1');
+  const [newColor, setNewColor] = useState('#0d9488');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
@@ -34,7 +34,7 @@ export function TagManager() {
     try {
       await tagsApi.create({ name: newName.trim(), color: newColor });
       setNewName('');
-      setNewColor('#6366f1');
+      setNewColor('#0d9488');
       await loadTags();
       toast('Tag created');
     } catch (err) {
@@ -64,7 +64,7 @@ export function TagManager() {
   function startEdit(tag: Tag) {
     setEditingId(tag.id);
     setEditName(tag.name);
-    setEditColor(tag.color ?? '#6366f1');
+    setEditColor(tag.color ?? '#0d9488');
   }
 
   return (
@@ -127,7 +127,7 @@ export function TagManager() {
               <>
                 <span
                   className={styles.tagDot}
-                  style={{ background: tag.color ?? '#6366f1' }}
+                  style={{ background: tag.color ?? '#0d9488' }}
                 />
                 <span className={styles.tagName}>{tag.name}</span>
                 <div className={styles.actions}>

@@ -3,24 +3,26 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--bg-primary);
+  background:
+    radial-gradient(circle at top left, rgba(13, 148, 136, 0.16), transparent 0 34%),
+    linear-gradient(180deg, var(--bg-primary) 0%, #0c1524 100%);
 }
 
 .card {
-  background: var(--bg-secondary);
+  background: linear-gradient(180deg, rgba(17, 28, 45, 0.96), rgba(13, 23, 37, 0.98));
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 40px;
-  max-width: 400px;
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 420px;
   width: 100%;
   text-align: center;
+  box-shadow: var(--shadow-lg);
 }
 
-.title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 4px;
+.brandBlock {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
 }
 
 .subtitle {
@@ -44,9 +46,9 @@
 .input {
   background: var(--bg-input);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--text-primary);
-  padding: 10px 12px;
+  padding: 12px 14px;
   font-size: 14px;
   width: 100%;
   box-sizing: border-box;
@@ -55,7 +57,7 @@
 .input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
 }
 
 .error {
@@ -65,11 +67,11 @@
 }
 
 .button {
-  background: var(--color-accent);
+  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-hover));
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 11px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -77,7 +79,7 @@
 }
 
 .button:hover:not(:disabled) {
-  opacity: 0.9;
+  filter: brightness(1.04);
 }
 
 .button:disabled {
@@ -88,9 +90,9 @@
 .warning {
   margin-top: 20px;
   padding: 12px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 10px;
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.5;

@@ -15,7 +15,7 @@ interface CategoryFormProps {
 export function CategoryForm({ category, onSave, onClose }: CategoryFormProps) {
   const [name, setName] = useState(category?.name ?? '');
   const [type, setType] = useState<'income' | 'expense'>(category?.type ?? 'expense');
-  const [color, setColor] = useState(category?.color ?? '#6366f1');
+  const [color, setColor] = useState(category?.color ?? '#0d9488');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 

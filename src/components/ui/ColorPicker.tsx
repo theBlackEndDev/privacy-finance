@@ -2,9 +2,9 @@ import { cx } from '../../utils/classNames';
 import styles from './ColorPicker.module.css';
 
 const PRESET_COLORS = [
-  '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
-  '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7',
-  '#ec4899', '#f43f5e', '#0ea5e9', '#6b7280', '#ffffff',
+  '#0d9488', '#0f766e', '#10b981', '#14b8a6', '#0ea5e9',
+  '#3b82f6', '#64748b', '#f59e0b', '#f97316', '#ef4444',
+  '#ec4899', '#8b5cf6', '#a855f7', '#6b7280', '#ffffff',
 ];
 
 interface ColorPickerProps {

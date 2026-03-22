@@ -10,16 +10,11 @@
 }
 
 .logo {
-  padding: 20px 16px 16px;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
+  padding: 18px 16px 16px;
   border-bottom: 1px solid var(--border-color);
-}
-
-.logoAccent {
-  color: var(--color-accent);
+  background:
+    radial-gradient(circle at top left, rgba(13, 148, 136, 0.18), transparent 0 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
 }
 
 .nav {

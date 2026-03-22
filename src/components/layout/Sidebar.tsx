@@ -4,6 +4,7 @@ import { useAccounts } from '../../context/AccountContext';
 import { View } from '../../types';
 import { cx } from '../../utils/classNames';
 import { SettingsModal } from './SettingsModal';
+import { BrandWordmark } from '../brand/BrandWordmark';
 import styles from './Sidebar.module.css';
 
 const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
@@ -35,7 +36,7 @@ export function Sidebar() {
     <>
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          Privacy<span className={styles.logoAccent}>Finance</span>
+          <BrandWordmark compact />
         </div>
 
         <nav className={styles.nav} aria-label="Main navigation">

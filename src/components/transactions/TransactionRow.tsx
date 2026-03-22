@@ -39,7 +39,7 @@ export function TransactionRow({ transaction: t, onClick }: TransactionRowProps)
       <div className={styles.category}>
         {t.categoryName ? (
           <>
-            <span className={styles.categoryDot} style={{ background: t.categoryColor ?? '#6366f1' }} />
+            <span className={styles.categoryDot} style={{ background: t.categoryColor ?? '#0d9488' }} />
             <span className={styles.categoryName}>{t.categoryName}</span>
           </>
         ) : t.kind === 'transfer' ? (

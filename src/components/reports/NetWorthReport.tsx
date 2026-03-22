@@ -14,7 +14,7 @@ interface Props {
   onData?: (data: unknown) => void;
 }
 
-const COLORS = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+const COLORS = ['#0d9488', '#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'];
 
 export function NetWorthReport({ startDate, endDate, onData }: Props) {
   const [data, setData] = useState<NetWorthPoint[]>([]);

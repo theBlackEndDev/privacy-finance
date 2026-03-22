@@ -1,18 +1,21 @@
 .header {
-  height: 52px;
+  height: 56px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--content-padding);
-  background: var(--bg-primary);
+  background:
+    radial-gradient(circle at top left, rgba(13, 148, 136, 0.08), transparent 0 28%),
+    var(--bg-primary);
   flex-shrink: 0;
 }
 
 .title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .right {

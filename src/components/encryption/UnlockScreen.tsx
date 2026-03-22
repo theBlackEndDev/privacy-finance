@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { encryptionApi } from '../../api/encryption';
+import { BrandWordmark } from '../brand/BrandWordmark';
 import styles from './UnlockScreen.module.css';
 
 interface Props {
@@ -31,7 +32,9 @@ export function UnlockScreen({ onUnlocked }: Props) {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h1 className={styles.title}>PrivacyFinance</h1>
+        <div className={styles.brandBlock}>
+          <BrandWordmark showTagline />
+        </div>
         <p className={styles.subtitle}>Your database is encrypted</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>

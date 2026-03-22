@@ -30,7 +30,7 @@ export function TagSpendingReport({ startDate, endDate, onData }: Props) {
     <div className={styles.table}>
       {data.map((row) => (
         <div key={row.tagId} className={styles.tableRow}>
-          <span className={styles.dot} style={{ background: row.tagColor ?? '#6366f1' }} />
+          <span className={styles.dot} style={{ background: row.tagColor ?? '#0d9488' }} />
           <span className={styles.name}>{row.tagName}</span>
           <span className={styles.amount}>{formatCurrency(row.total)}</span>
         </div>
