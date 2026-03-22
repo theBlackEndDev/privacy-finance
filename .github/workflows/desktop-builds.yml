@@ -1,4 +1,4 @@
-name: Desktop Builds
+name: Desktop Release Builds
 
 on:
   workflow_dispatch:
@@ -18,11 +18,17 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            artifact_name: privacyfinance-macos
+            artifact_name: privacyfinance-macos-beta
+            artifact_glob: src-tauri/target/release/bundle/dmg/**
+            release_notes: macOS beta build (.app/.dmg target)
           - os: windows-latest
             artifact_name: privacyfinance-windows
+            artifact_glob: src-tauri/target/release/bundle/**
+            release_notes: Windows build output
           - os: ubuntu-22.04
             artifact_name: privacyfinance-linux
+            artifact_glob: src-tauri/target/release/bundle/**
+            release_notes: Linux build output
 
     steps:
       - name: Checkout
@@ -56,26 +62,79 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      - name: macOS signing/notarization readiness
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        shell: bash
+        run: |
+          {
+            echo "## macOS beta release readiness"
+            echo ""
+            echo "Target artifact: .dmg (beta distribution)"
+            echo "Preferred first architecture: Apple Silicon"
+            echo ""
+            echo "### Secret presence"
+            for key in \
+              APPLE_CERTIFICATE \
+              APPLE_CERTIFICATE_PASSWORD \
+              APPLE_SIGNING_IDENTITY \
+              APPLE_TEAM_ID \
+              APPLE_ID \
+              APPLE_APP_SPECIFIC_PASSWORD \
+              APPLE_API_KEY_ID \
+              APPLE_API_ISSUER \
+              APPLE_API_KEY; do
+              if [ -n "${!key}" ]; then
+                echo "- ${key}: configured"
+              else
+                echo "- ${key}: missing"
+              fi
+            done
+            echo ""
+            echo "Note: this workflow currently builds macOS artifacts and reports signing/notarization readiness."
+            echo "Actual signing/notarization steps should be enabled after secrets are provided."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build desktop bundles
         run: npm exec tauri -- build
+
+      - name: Summarize expected artifacts
+        shell: bash
+        run: |
+          {
+            echo "## ${RUNNER_OS} artifact summary"
+            echo ""
+            echo "Expected output: ${{ matrix.release_notes }}"
+            echo "Artifact glob: \
+`${{ matrix.artifact_glob }}`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload bundle artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: src-tauri/target/release/bundle/**
+          path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
 
       - name: Attach bundles to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: src-tauri/target/release/bundle/**
+          files: ${{ matrix.artifact_glob }}
           draft: true
           generate_release_notes: true
 
 # Future release hardening to add:
-# - macOS signing + notarization secrets / steps
-# - Windows code signing
-# - updater signing if/when auto-update is introduced
-# - release-channel separation for beta vs stable
+# - enable actual macOS signing + notarization once Apple secrets are configured
+# - add Windows code-signing path
+# - add updater signing if/when auto-update is introduced
+# - split beta vs stable release channels
