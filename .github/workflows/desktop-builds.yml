@@ -18,17 +18,29 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            artifact_name: privacyfinance-macos-beta
-            artifact_glob: src-tauri/target/release/bundle/dmg/**
-            release_notes: macOS beta build (.app/.dmg target)
+            artifact_name: privacyfinance-macos-apple-silicon
+            artifact_glob: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/**
+            release_notes: macOS beta build for Apple Silicon (.app/.dmg target)
+            rust_targets: aarch64-apple-darwin
+            tauri_args: --target aarch64-apple-darwin
+          - os: macos-latest
+            artifact_name: privacyfinance-macos-intel
+            artifact_glob: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/**
+            release_notes: macOS beta build for Intel Macs (.app/.dmg target)
+            rust_targets: x86_64-apple-darwin
+            tauri_args: --target x86_64-apple-darwin
           - os: windows-latest
             artifact_name: privacyfinance-windows
             artifact_glob: src-tauri/target/release/bundle/**
             release_notes: Windows build output
+            rust_targets: ''
+            tauri_args: ''
           - os: ubuntu-22.04
             artifact_name: privacyfinance-linux
             artifact_glob: src-tauri/target/release/bundle/**
             release_notes: Linux build output
+            rust_targets: ''
+            tauri_args: ''
 
     steps:
       - name: Checkout
@@ -42,6 +54,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -80,7 +94,8 @@ jobs:
             echo "## macOS beta release readiness"
             echo ""
             echo "Target artifact: .dmg (beta distribution)"
-            echo "Preferred first architecture: Apple Silicon"
+            echo "Target lane: ${{ matrix.artifact_name }}"
+            echo "Architectures covered by workflow: Apple Silicon + Intel (separate macOS artifacts)"
             echo ""
             echo "### Secret presence"
             for key in \
@@ -105,7 +120,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build desktop bundles
-        run: npm exec tauri -- build
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.tauri_args }}" ]; then
+            npm exec tauri -- build ${{ matrix.tauri_args }}
+          else
+            npm exec tauri -- build
+          fi
 
       - name: Summarize expected artifacts
         shell: bash
