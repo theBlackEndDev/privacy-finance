@@ -1,19 +1,25 @@
 import {
   Account,
   AccountBalance,
+  BudgetCategoryRow,
+  BudgetSummary,
+  BudgetWithItems,
+  CashFlowPoint,
+  CategorizationRule,
   Category,
   CategorySpendingRow,
   DashboardData,
+  DueRecurringItem,
   IncomeExpenseReport,
   MonthSummary,
   NetWorthPoint,
   PayeeSpendingRow,
+  RecurringTransaction,
   TagBrief,
   TagSpendingRow,
   Transaction,
   TransactionFilters,
   TransactionPage,
-  CashFlowPoint,
 } from '../types';
 
 const now = '2026-03-22T00:00:00Z';
@@ -227,6 +233,278 @@ const payeeSpending: PayeeSpendingRow[] = [
   { payee: 'City Power & Gas', total: -8900, count: 1 },
 ];
 
+const budgetItems: BudgetCategoryRow[] = [
+  {
+    itemId: 'budget-housing',
+    categoryId: 'cat-housing',
+    categoryName: 'Housing',
+    categoryColor: '#ef4444',
+    budgeted: 185000,
+    spent: 185000,
+    available: 0,
+    rollover: false,
+    groupId: 'grp-fixed',
+    groupName: 'Fixed Costs',
+    targetAmount: 185000,
+  },
+  {
+    itemId: 'budget-utilities',
+    categoryId: 'cat-utilities',
+    categoryName: 'Utilities',
+    categoryColor: '#14b8a6',
+    budgeted: 18000,
+    spent: 16100,
+    available: 1900,
+    rollover: true,
+    groupId: 'grp-fixed',
+    groupName: 'Fixed Costs',
+    targetAmount: 18000,
+  },
+  {
+    itemId: 'budget-food',
+    categoryId: 'cat-food',
+    categoryName: 'Food',
+    categoryColor: '#f97316',
+    budgeted: 52000,
+    spent: 44200,
+    available: 7800,
+    rollover: true,
+    groupId: 'grp-flex',
+    groupName: 'Flexible Spending',
+    targetAmount: 50000,
+  },
+  {
+    itemId: 'budget-transport',
+    categoryId: 'cat-transport',
+    categoryName: 'Transportation',
+    categoryColor: '#f59e0b',
+    budgeted: 18000,
+    spent: 12300,
+    available: 5700,
+    rollover: true,
+    groupId: 'grp-flex',
+    groupName: 'Flexible Spending',
+    targetAmount: 15000,
+  },
+  {
+    itemId: 'budget-shopping',
+    categoryId: 'cat-shopping',
+    categoryName: 'Shopping',
+    categoryColor: '#ec4899',
+    budgeted: 15000,
+    spent: 22300,
+    available: -7300,
+    rollover: false,
+    groupId: 'grp-flex',
+    groupName: 'Flexible Spending',
+    targetAmount: 12000,
+  },
+  {
+    itemId: 'budget-entertainment',
+    categoryId: 'cat-entertainment',
+    categoryName: 'Entertainment',
+    categoryColor: '#6366f1',
+    budgeted: 12000,
+    spent: 9000,
+    available: 3000,
+    rollover: true,
+    groupId: 'grp-flex',
+    groupName: 'Flexible Spending',
+    targetAmount: 10000,
+  },
+  {
+    itemId: 'budget-health',
+    categoryId: 'cat-health',
+    categoryName: 'Healthcare',
+    categoryColor: '#e11d48',
+    budgeted: 22000,
+    spent: 20000,
+    available: 2000,
+    rollover: true,
+    groupId: 'grp-goals',
+    groupName: 'Goals & Protection',
+    targetAmount: 22000,
+  },
+  {
+    itemId: 'budget-subs',
+    categoryId: 'cat-subs',
+    categoryName: 'Subscriptions',
+    categoryColor: '#a855f7',
+    budgeted: 2500,
+    spent: 1400,
+    available: 1100,
+    rollover: true,
+    groupId: 'grp-fixed',
+    groupName: 'Fixed Costs',
+    targetAmount: 2500,
+  },
+];
+
+const budgetData: BudgetWithItems = {
+  budget: {
+    id: 'budget-2026-03',
+    year: 2026,
+    month: 3,
+    notes: 'March plan for household spending and savings targets',
+    createdAt: now,
+    updatedAt: now,
+  },
+  items: budgetItems,
+};
+
+const budgetSummary: BudgetSummary = {
+  totalBudgeted: 324500,
+  totalSpent: 310300,
+  totalAvailable: 14200,
+  totalIncome: 954700,
+  toBeBudgeted: 630200,
+};
+
+const rules: CategorizationRule[] = [
+  {
+    id: 'rule-1',
+    name: 'Whole Foods → Food',
+    matchField: 'payee',
+    matchType: 'contains',
+    pattern: 'whole foods',
+    categoryId: 'cat-food',
+    priority: 1,
+    isActive: true,
+    applyCount: 18,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rule-2',
+    name: 'Uber → Transportation',
+    matchField: 'payee',
+    matchType: 'contains',
+    pattern: 'uber',
+    categoryId: 'cat-transport',
+    priority: 2,
+    isActive: true,
+    applyCount: 9,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rule-3',
+    name: 'Salary deposits',
+    matchField: 'description',
+    matchType: 'contains',
+    pattern: 'salary',
+    categoryId: 'cat-salary',
+    priority: 3,
+    isActive: true,
+    applyCount: 6,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rule-4',
+    name: 'Prime / Amazon purchases',
+    matchField: 'payee',
+    matchType: 'contains',
+    pattern: 'amazon',
+    categoryId: 'cat-shopping',
+    priority: 4,
+    isActive: true,
+    applyCount: 11,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rule-5',
+    name: 'Streaming & news subscriptions',
+    matchField: 'description',
+    matchType: 'contains',
+    pattern: 'monthly',
+    categoryId: 'cat-subs',
+    priority: 5,
+    isActive: false,
+    applyCount: 3,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
+const recurringItems: RecurringTransaction[] = [
+  {
+    id: 'rec-1',
+    accountId: 'acct-checking',
+    payee: 'Sunset Apartments',
+    description: 'Monthly rent',
+    amount: 185000,
+    kind: 'expense',
+    categoryId: 'cat-housing',
+    transferToAccountId: null,
+    frequency: 'monthly',
+    startDate: '2025-01-01',
+    endDate: null,
+    nextDate: '2026-04-01',
+    isActive: true,
+    autoPost: true,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rec-2',
+    accountId: 'acct-checking',
+    payee: 'Acme Corp',
+    description: 'Payroll deposit',
+    amount: 425000,
+    kind: 'income',
+    categoryId: 'cat-salary',
+    transferToAccountId: null,
+    frequency: 'biweekly',
+    startDate: '2025-01-03',
+    endDate: null,
+    nextDate: '2026-03-28',
+    isActive: true,
+    autoPost: true,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rec-3',
+    accountId: 'acct-card',
+    payee: 'New York Times',
+    description: 'News subscription',
+    amount: 1400,
+    kind: 'expense',
+    categoryId: 'cat-subs',
+    transferToAccountId: null,
+    frequency: 'monthly',
+    startDate: '2025-08-01',
+    endDate: null,
+    nextDate: '2026-04-05',
+    isActive: true,
+    autoPost: false,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'rec-4',
+    accountId: 'acct-checking',
+    payee: 'Savings Transfer',
+    description: 'Monthly savings transfer',
+    amount: 50000,
+    kind: 'transfer',
+    categoryId: null,
+    transferToAccountId: 'acct-savings',
+    frequency: 'monthly',
+    startDate: '2025-06-30',
+    endDate: null,
+    nextDate: '2026-03-31',
+    isActive: true,
+    autoPost: true,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
+const dueRecurringItems: DueRecurringItem[] = [];
+
 function tx(
   id: string,
   accountId: string,
@@ -295,8 +573,10 @@ export function getDemoInvokeFallback(cmd: string, args?: Record<string, unknown
   switch (cmd) {
     case 'get_setting': {
       const key = String((args?.key as string | undefined) ?? '');
-      if (key === 'theme') return 'dark';
+      if (key === 'theme') return 'light';
       if (key === 'onboarding_complete') return 'true';
+      if (key === 'currency_symbol') return '$';
+      if (key === 'date_format') return 'MMM D';
       return null;
     }
     case 'set_setting':
@@ -326,6 +606,33 @@ export function getDemoInvokeFallback(cmd: string, args?: Record<string, unknown
       const payees = [...new Set(transactions.map((t) => t.payee))];
       return payees.filter((p) => p.toLowerCase().includes(search)).slice(0, 8);
     }
+    case 'get_budget':
+      return budgetData;
+    case 'get_budget_summary':
+      return budgetSummary;
+    case 'get_category_activity': {
+      const categoryId = String((args?.categoryId as string | undefined) ?? '');
+      const [year, month] = [Number(args?.year ?? 2026), Number(args?.month ?? 3)];
+      const prefix = `${year}-${String(month).padStart(2, '0')}`;
+      return transactions.filter((t) => t.categoryId === categoryId && t.date.startsWith(prefix));
+    }
+    case 'get_all_rules':
+      return rules;
+    case 'apply_rules_to_uncategorized':
+      return 4;
+    case 'test_rule':
+      return transactions.slice(0, 3).map((t) => ({
+        transactionId: t.id,
+        date: t.date,
+        payee: t.payee,
+        description: t.description,
+        amount: t.amount,
+        matchedFieldValue: t.payee,
+      }));
+    case 'get_all_recurring':
+      return recurringItems;
+    case 'check_due_recurring':
+      return dueRecurringItems;
     case 'get_income_expense_report':
       return incomeExpenseReport;
     case 'get_category_spending_report':
