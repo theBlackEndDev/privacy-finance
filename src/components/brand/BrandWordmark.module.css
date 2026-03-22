@@ -6,29 +6,29 @@
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
 }
 
 .markShell {
-  width: 40px;
-  height: 44px;
+  width: 36px;
+  height: 40px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 12px;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), rgba(236, 250, 248, 0.98) 46%, rgba(214, 244, 240, 0.98) 100%),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), rgba(241, 252, 250, 0.98) 52%, rgba(225, 247, 243, 0.98) 100%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(227, 244, 242, 0.96));
-  border: 1px solid rgba(13, 148, 136, 0.16);
+  border: 1px solid rgba(13, 148, 136, 0.18);
   box-shadow:
-    0 12px 24px rgba(2, 8, 20, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    0 10px 20px rgba(2, 8, 20, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .markImage {
-  width: 24px;
-  height: 28px;
+  width: 28px;
+  height: 32px;
   object-fit: contain;
   flex-shrink: 0;
   filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.2));
@@ -42,7 +42,7 @@
   display: inline-flex;
   align-items: baseline;
   gap: 0;
-  color: #eef5ff;
+  color: #f4f8ff;
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -60,14 +60,14 @@
 }
 
 .compact .markShell {
-  width: 36px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 36px;
+  border-radius: 10px;
 }
 
 .compact .markImage {
-  width: 23px;
-  height: 27px;
+  width: 26px;
+  height: 30px;
 }
 
 .compact .wordmark {
