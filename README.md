@@ -162,6 +162,8 @@ npm --version
 
 ## Running in Development
 
+### macOS / Linux
+
 ```bash
 # Clone the repo
 git clone <repo-url>
@@ -174,9 +176,36 @@ npm install
 npm run tauri dev
 ```
 
+### Pulling a feature branch locally
+
+```bash
+git fetch origin
+git checkout feat/branding-demo-screenshots
+git pull
+```
+
+### Clean rebuild (macOS / Linux)
+
+If the app UI is not reflecting recent changes, do a clean rebuild:
+
+```bash
+rm -rf dist
+npm install
+npm run tauri dev
+```
+
+### Browser preview only (macOS / Linux)
+
+Useful for quick frontend review. This does **not** replace the native Tauri app:
+
+```bash
+npm run build
+npm run preview
+```
+
 First run takes 2–5 minutes to compile the Rust backend. Subsequent runs are faster.
 
-> **Note:** This opens a native desktop window — it is not a web app. Accessing the Vite dev server URL directly in a browser will not work (Tauri `invoke()` calls require the desktop runtime).
+> **Note:** `npm run tauri dev` opens the real native desktop app. `npm run preview` is only for browser/frontend review.
 
 ---
 
@@ -282,6 +311,27 @@ del /f "%APPDATA%\com.privacyfinance.app\privacyfinance.db"
 ```
 
 If the file does not exist yet, the command will simply do nothing. On next launch, the app will recreate the database and re-seed the default sample data.
+
+### Reset app data directory
+
+If you want to wipe both the database **and** local settings/state:
+
+#### macOS
+```bash
+rm -rf ~/Library/Application\ Support/com.privacyfinance.app
+```
+
+#### Linux
+```bash
+rm -rf ~/.local/share/com.privacyfinance.app
+```
+
+#### Windows (PowerShell)
+```powershell
+Remove-Item "$env:APPDATA\com.privacyfinance.app" -Recurse -Force
+```
+
+This is more aggressive than deleting just `privacyfinance.db`.
 
 ---
 
