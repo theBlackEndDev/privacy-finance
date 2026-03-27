@@ -37,6 +37,8 @@ export function SettingsModal({ onClose }: Props) {
   const [backupInfo, setBackupInfo] = useState<BackupInfo | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [deleteStep, setDeleteStep] = useState(0); // 0=hidden, 1=first confirm, 2=final confirm
+  const [deleting, setDeleting] = useState(false);
   const toast = useToast();
   const { theme, setTheme } = useApp();
 
@@ -266,6 +268,79 @@ export function SettingsModal({ onClose }: Props) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--color-danger, #ef4444)', marginBottom: 8, fontWeight: 600 }}>Danger Zone</div>
+          {deleteStep === 0 && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setDeleteStep(1)}
+            >
+              Delete All Data
+            </Button>
+          )}
+          {deleteStep === 1 && (
+            <div style={{
+              padding: 12,
+              border: '1px solid var(--color-danger, #ef4444)',
+              borderRadius: 6,
+              background: 'rgba(239, 68, 68, 0.05)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-danger, #ef4444)', marginBottom: 6 }}>
+                Are you sure?
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                This will permanently delete all accounts, transactions, categories, budgets, agents, and settings. Default categories will be re-created. This cannot be undone.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteStep(0)}>Cancel</Button>
+                <Button variant="danger" size="sm" onClick={() => setDeleteStep(2)}>
+                  Yes, I want to delete everything
+                </Button>
+              </div>
+            </div>
+          )}
+          {deleteStep === 2 && (
+            <div style={{
+              padding: 12,
+              border: '2px solid var(--color-danger, #ef4444)',
+              borderRadius: 6,
+              background: 'rgba(239, 68, 68, 0.1)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-danger, #ef4444)', marginBottom: 6 }}>
+                Final confirmation
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                This is your last chance. All data will be permanently erased. There is no undo.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button variant="ghost" size="sm" onClick={() => setDeleteStep(0)}>Cancel</Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    try {
+                      await settingsApi.deleteAllData();
+                      toast('All data deleted. Please restart the app.');
+                      setDeleteStep(0);
+                      onClose();
+                    } catch (e) {
+                      toast(String(e), 'error');
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                >
+                  {deleting ? 'Deleting...' : 'DELETE EVERYTHING'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

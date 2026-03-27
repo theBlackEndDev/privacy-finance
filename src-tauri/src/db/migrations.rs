@@ -2,6 +2,37 @@ use rusqlite::Connection;
 use crate::error::AppResult;
 use crate::helpers::timestamps::now_utc;
 
+/// Delete all user data from every table and re-seed defaults.
+/// Tables are deleted in FK-safe order (children first).
+pub fn reset_all_data(conn: &Connection) -> AppResult<()> {
+    conn.execute_batch("
+        DELETE FROM agent_audit_log;
+        DELETE FROM agent_scope_grants;
+        DELETE FROM agent_keys;
+        DELETE FROM agents;
+        DELETE FROM reconciliation_items;
+        DELETE FROM reconciliations;
+        DELETE FROM transaction_tags;
+        DELETE FROM tags;
+        DELETE FROM transaction_splits;
+        DELETE FROM budget_items;
+        DELETE FROM budgets;
+        DELETE FROM categorization_rules;
+        DELETE FROM recurring_transactions;
+        DELETE FROM transactions;
+        DELETE FROM import_batches;
+        DELETE FROM import_profiles;
+        DELETE FROM categories;
+        DELETE FROM category_groups;
+        DELETE FROM accounts;
+        DELETE FROM exchange_rates;
+        DELETE FROM settings;
+    ")?;
+    seed_defaults(conn)?;
+    seed_category_groups(conn)?;
+    Ok(())
+}
+
 pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(SCHEMA)?;
     seed_defaults(conn)?;

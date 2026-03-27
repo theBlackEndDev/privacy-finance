@@ -72,6 +72,7 @@ pub fn run() {
             commands::import::delete_import_profile,
             commands::settings::get_setting,
             commands::settings::set_setting,
+            commands::settings::delete_all_data,
             commands::recurring::get_all_recurring,
             commands::recurring::get_recurring,
             commands::recurring::create_recurring,

@@ -1,5 +1,6 @@
 use tauri::State;
 use crate::db::DbState;
+use crate::db::migrations::reset_all_data;
 use crate::error::AppResult;
 use crate::helpers::timestamps::now_utc;
 
@@ -27,5 +28,13 @@ pub fn set_setting(key: String, value: String, state: State<'_, DbState>) -> App
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         rusqlite::params![key, value, now],
     )?;
+    Ok(())
+}
+
+/// Delete ALL user data and re-seed defaults. Irreversible.
+#[tauri::command]
+pub fn delete_all_data(state: State<'_, DbState>) -> AppResult<()> {
+    let conn = state.write_conn.lock().unwrap();
+    reset_all_data(&conn)?;
     Ok(())
 }
