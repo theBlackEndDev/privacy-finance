@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 use serde::Serialize;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 
 /// Result of a template-matched query.
 #[derive(Debug, Serialize)]

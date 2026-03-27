@@ -76,23 +76,29 @@ pub fn start_gateway(db_path: PathBuf) -> AppResult<GatewayHandle> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
-    tokio::spawn(async move {
-        let listener = match tokio::net::TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("[AgentGateway] Failed to bind to {addr}: {e}");
-                return;
-            }
-        };
-        eprintln!("[AgentGateway] Listening on http://{addr}");
+    // Use a dedicated Tokio runtime for the gateway — Tauri's setup()
+    // runs on the main thread which doesn't have a Tokio reactor.
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new()
+            .expect("failed to create gateway tokio runtime");
+        rt.block_on(async move {
+            let listener = match tokio::net::TcpListener::bind(addr).await {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("[AgentGateway] Failed to bind to {addr}: {e}");
+                    return;
+                }
+            };
+            eprintln!("[AgentGateway] Listening on http://{addr}");
 
-        axum::serve(listener, app)
-            .with_graceful_shutdown(async {
-                let _ = shutdown_rx.await;
-                eprintln!("[AgentGateway] Shutting down");
-            })
-            .await
-            .ok();
+            axum::serve(listener, app)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                    eprintln!("[AgentGateway] Shutting down");
+                })
+                .await
+                .ok();
+        });
     });
 
     Ok(GatewayHandle {
@@ -383,7 +389,6 @@ pub struct GatewayStatus {
 }
 
 use tauri::State;
-use crate::db::DbState;
 
 #[tauri::command]
 pub fn get_gateway_status(
