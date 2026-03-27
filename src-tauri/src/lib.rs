@@ -124,6 +124,9 @@ pub fn run() {
             commands::agents::delete_agent,
             commands::agent_scopes::get_agent_scopes,
             commands::agent_scopes::set_agent_scope,
+            commands::agent_keys::generate_agent_key,
+            commands::agent_keys::get_agent_keys,
+            commands::agent_keys::revoke_agent_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

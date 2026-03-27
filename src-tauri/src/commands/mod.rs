@@ -18,6 +18,7 @@ pub mod exchange_rates;
 pub mod encryption;
 pub mod agents;
 pub mod agent_scopes;
+pub mod agent_keys;
 mod tests;
 mod transaction_tests;
 mod import_tests;
