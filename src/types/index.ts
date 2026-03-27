@@ -560,6 +560,35 @@ export interface EncryptionStatus {
   isEncrypted: boolean;
 }
 
+// ── AI Search ─────────────────────────────────────────────────────
+
+export type SearchIntent = 'SPENDING_TOTAL' | 'SPENDING_BY_CATEGORY' | 'SPENDING_COMPARISON' | 'INCOME_TOTAL' | 'BALANCE_CHECK' | 'BUDGET_STATUS' | 'TRANSACTION_SEARCH' | 'TOP_MERCHANTS' | 'TOP_EXPENSES' | 'RECURRING_CHECK' | 'NET_WORTH' | 'CATEGORY_DETAIL';
+export type CardType = 'total' | 'comparison' | 'budgetStatus' | 'transactionList' | 'breakdown' | 'accountSummary';
+
+export interface TotalCardData { type: 'total'; label: string; amount: number; count: number; periodLabel: string; comparisonAmount?: number; comparisonCount?: number; changePct?: number; topItems: BreakdownItem[]; }
+export interface ComparisonCardData { type: 'comparison'; label: string; currentLabel: string; currentAmount: number; previousLabel: string; previousAmount: number; changeAmount: number; changePct: number; }
+export interface BudgetStatusCardData { type: 'budgetStatus'; items: BudgetStatusItem[]; periodLabel: string; }
+export interface TransactionListCardData { type: 'transactionList'; transactions: TransactionListItem[]; total: number; count: number; label: string; }
+export interface BreakdownCardData { type: 'breakdown'; label: string; items: BreakdownItem[]; total: number; }
+export interface AccountSummaryCardData { type: 'accountSummary'; accounts: AccountSummaryItem[]; netWorth: number; }
+
+export type CardData = TotalCardData | ComparisonCardData | BudgetStatusCardData | TransactionListCardData | BreakdownCardData | AccountSummaryCardData;
+
+export interface BreakdownItem { name: string; color?: string; amount: number; percentage: number; }
+export interface BudgetStatusItem { categoryName: string; color: string; budgeted: number; spent: number; available: number; }
+export interface TransactionListItem { id: string; date: string; payee: string; amount: number; kind: string; categoryName?: string; }
+export interface AccountSummaryItem { name: string; accountType: string; balance: number; }
+
+export interface AISearchResult {
+  matched: boolean;
+  intent: SearchIntent | null;
+  cardType: CardType | null;
+  cardData: CardData | null;
+  textAnswer: string | null;
+  suggestions: string[];
+  queryTimeMs: number;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'account-detail' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation';

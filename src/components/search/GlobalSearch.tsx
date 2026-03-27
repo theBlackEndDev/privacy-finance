@@ -3,7 +3,10 @@ import { searchApi } from '../../api/search';
 import { SearchResult } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useAISearch } from '../../hooks/useAISearch';
+import { isQuestion } from '../../utils/isQuestion';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { AISearchResults } from './AISearchResults';
 import styles from './GlobalSearch.module.css';
 
 const AMOUNT_PREFIX: Record<string, string> = {
@@ -15,7 +18,6 @@ const AMOUNT_PREFIX: Record<string, string> = {
 function sanitizeSnippet(html: string): string {
   const div = document.createElement('div');
   div.textContent = html;
-  // Re-inject only <mark> tags from FTS5 snippet()
   return div.innerHTML
     .replace(/&lt;mark&gt;/g, '<mark>')
     .replace(/&lt;\/mark&gt;/g, '</mark>');
@@ -29,25 +31,39 @@ export function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [mode, setMode] = useState<'keyword' | 'ai'>('keyword');
   const inputRef = useRef<HTMLInputElement>(null);
+  const aiSearch = useAISearch();
 
-  const debouncedQuery = useDebounce(query, 300);
+  const debouncedQuery = useDebounce(query, 250);
 
   const doSearch = useCallback(async (q: string) => {
     if (q.trim().length === 0) {
       setResults([]);
       setIsOpen(false);
+      aiSearch.clear();
+      setMode('keyword');
       return;
     }
-    try {
-      const data = await searchApi.searchFull(q, 10);
-      setResults(data);
-      setIsOpen(data.length > 0);
-      setActiveIndex(-1);
-    } catch {
+
+    if (isQuestion(q)) {
+      setMode('ai');
       setResults([]);
+      aiSearch.search(q);
+      setIsOpen(true);
+    } else {
+      setMode('keyword');
+      aiSearch.clear();
+      try {
+        const data = await searchApi.searchFull(q, 10);
+        setResults(data);
+        setIsOpen(data.length > 0);
+        setActiveIndex(-1);
+      } catch {
+        setResults([]);
+      }
     }
-  }, []);
+  }, [aiSearch]);
 
   useEffect(() => {
     doSearch(debouncedQuery);
@@ -62,13 +78,15 @@ export function GlobalSearch() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (!isOpen || results.length === 0) {
-      if (e.key === 'Escape') {
-        inputRef.current?.blur();
-        setIsOpen(false);
-      }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+      inputRef.current?.blur();
       return;
     }
+
+    // Only handle arrow/enter for keyword mode
+    if (mode !== 'keyword' || !isOpen || results.length === 0) return;
 
     switch (e.key) {
       case 'ArrowDown':
@@ -85,15 +103,9 @@ export function GlobalSearch() {
           handleSelect(results[activeIndex]);
         }
         break;
-      case 'Escape':
-        e.preventDefault();
-        setIsOpen(false);
-        inputRef.current?.blur();
-        break;
     }
   }
 
-  // Listen for custom focus-search event (fired by Ctrl+F shortcut)
   useEffect(() => {
     function handleFocusSearch() {
       inputRef.current?.focus();
@@ -102,7 +114,6 @@ export function GlobalSearch() {
     return () => window.removeEventListener('focus-search', handleFocusSearch);
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as HTMLElement;
@@ -114,7 +125,16 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Keep dropdown open when AI results arrive
+  useEffect(() => {
+    if (mode === 'ai' && aiSearch.result) {
+      setIsOpen(true);
+    }
+  }, [mode, aiSearch.result]);
+
   const activeOptionId = activeIndex >= 0 ? `search-result-${activeIndex}` : undefined;
+  const showAI = mode === 'ai' && (aiSearch.loading || aiSearch.result);
+  const showKeyword = mode === 'keyword' && results.length > 0;
 
   return (
     <div className={styles.wrapper}>
@@ -122,48 +142,59 @@ export function GlobalSearch() {
         ref={inputRef}
         type="text"
         className={styles.input}
-        placeholder="Search transactions… (Ctrl+F)"
+        placeholder="Search or ask a question… (Ctrl+F)"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        onFocus={() => { if (results.length > 0) setIsOpen(true); }}
+        onFocus={() => {
+          if (results.length > 0 || aiSearch.result) setIsOpen(true);
+        }}
         role="combobox"
         aria-expanded={isOpen}
         aria-controls={LISTBOX_ID}
         aria-activedescendant={activeOptionId}
-        aria-label="Search transactions"
+        aria-label="Search or ask a question"
         aria-autocomplete="list"
       />
       {isOpen && (
-        <div className={styles.dropdown} role="listbox" id={LISTBOX_ID} aria-label="Search results">
-          {results.length === 0 ? (
+        <div className={`${styles.dropdown} ${showAI ? styles.dropdownWide : ''}`} id={LISTBOX_ID}>
+          {showAI && aiSearch.result && (
+            <AISearchResults result={aiSearch.result} loading={aiSearch.loading} />
+          )}
+          {showAI && aiSearch.loading && !aiSearch.result && (
+            <div className={styles.empty}>Searching...</div>
+          )}
+          {showKeyword && (
+            <div role="listbox" aria-label="Search results">
+              {results.map((r, i) => (
+                <div
+                  key={r.id}
+                  id={`search-result-${i}`}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  className={`${styles.item} ${i === activeIndex ? styles.itemActive : ''}`}
+                  onClick={() => handleSelect(r)}
+                  onMouseEnter={() => setActiveIndex(i)}
+                >
+                  <div className={styles.itemLeft}>
+                    <span className={styles.payee}>{r.payee || 'No payee'}</span>
+                    <span
+                      className={styles.snippet}
+                      dangerouslySetInnerHTML={{ __html: sanitizeSnippet(r.snippet) }}
+                    />
+                  </div>
+                  <div className={styles.meta}>
+                    <span className={styles.amount}>
+                      {AMOUNT_PREFIX[r.kind]}{formatCurrency(r.amount)}
+                    </span>
+                    <span className={styles.date}>{r.date}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {mode === 'keyword' && results.length === 0 && query.trim().length > 0 && !aiSearch.loading && (
             <div className={styles.empty}>No results found</div>
-          ) : (
-            results.map((r, i) => (
-              <div
-                key={r.id}
-                id={`search-result-${i}`}
-                role="option"
-                aria-selected={i === activeIndex}
-                className={`${styles.item} ${i === activeIndex ? styles.itemActive : ''}`}
-                onClick={() => handleSelect(r)}
-                onMouseEnter={() => setActiveIndex(i)}
-              >
-                <div className={styles.itemLeft}>
-                  <span className={styles.payee}>{r.payee || 'No payee'}</span>
-                  <span
-                    className={styles.snippet}
-                    dangerouslySetInnerHTML={{ __html: sanitizeSnippet(r.snippet) }}
-                  />
-                </div>
-                <div className={styles.meta}>
-                  <span className={styles.amount}>
-                    {AMOUNT_PREFIX[r.kind]}{formatCurrency(r.amount)}
-                  </span>
-                  <span className={styles.date}>{r.date}</span>
-                </div>
-              </div>
-            ))
           )}
         </div>
       )}
