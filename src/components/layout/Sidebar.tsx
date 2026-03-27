@@ -18,6 +18,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
   { view: 'rules',        label: 'Rules',        icon: '⚡' },
   { view: 'reports',      label: 'Reports',      icon: '▤' },
   { view: 'reconciliation', label: 'Reconcile', icon: '☑' },
+  { view: 'agents',         label: 'Agents',    icon: '🛡' },
 ];
 
 export function Sidebar() {

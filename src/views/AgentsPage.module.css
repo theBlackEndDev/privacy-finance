@@ -1,0 +1,41 @@
+.page {
+  padding: 24px;
+  max-width: 900px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auditSection {
+  margin-top: 32px;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.loading {
+  padding: 48px;
+  text-align: center;
+  color: var(--text-muted);
+}

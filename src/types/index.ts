@@ -560,6 +560,74 @@ export interface EncryptionStatus {
   isEncrypted: boolean;
 }
 
+// ── Agent Gateway ─────────────────────────────────────────────────
+
+export interface Agent {
+  id: string;
+  name: string;
+  publisher: string;
+  version: string;
+  description?: string;
+  manifestUrl?: string;
+  iconUrl?: string;
+  status: 'pending' | 'approved' | 'denied' | 'revoked';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAgentInput {
+  name: string;
+  publisher: string;
+  version?: string;
+  description?: string;
+  manifestUrl?: string;
+  iconUrl?: string;
+}
+
+export interface UpdateAgentInput {
+  name?: string;
+  publisher?: string;
+  version?: string;
+  description?: string;
+  manifestUrl?: string;
+  iconUrl?: string;
+}
+
+export interface AgentKey {
+  id: string;
+  agentId: string;
+  scopes: string;
+  expiresAt?: string;
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
+export interface AgentKeyCreated {
+  id: string;
+  agentId: string;
+  rawKey: string;
+  scopes: string;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+export interface ScopeGrant {
+  id: string;
+  agentId: string;
+  scope: string;
+  accessMode: 'always' | 'ask_each_time' | 'never';
+}
+
+export interface AuditEntry {
+  id: string;
+  agentId: string;
+  scopeRequested: string;
+  scopeGranted: string;
+  status: string;
+  resultSummary?: string;
+  createdAt: string;
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
-export type View = 'dashboard' | 'accounts' | 'account-detail' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation';
+export type View = 'dashboard' | 'accounts' | 'account-detail' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation' | 'agents';

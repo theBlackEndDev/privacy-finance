@@ -15,6 +15,7 @@ const VIEW_TITLES: Record<View, string> = {
   rules:        'Rules',
   reports:      'Reports',
   reconciliation: 'Reconciliation',
+  agents:         'Agent Gateway',
 };
 
 export function Header() {

@@ -13,6 +13,7 @@ import { BudgetsPage } from './views/BudgetsPage';
 import { RulesPage } from './views/RulesPage';
 import { ReportsPage } from './views/ReportsPage';
 import { ReconciliationPage } from './views/ReconciliationPage';
+import { AgentsPage } from './views/AgentsPage';
 import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
@@ -94,6 +95,7 @@ function AppShell() {
       case 'rules':        return <RulesPage />;
       case 'reports':      return <ReportsPage />;
       case 'reconciliation': return <ReconciliationPage />;
+      case 'agents':         return <AgentsPage />;
     }
   })();
 
