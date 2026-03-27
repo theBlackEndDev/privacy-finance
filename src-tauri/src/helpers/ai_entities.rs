@@ -39,7 +39,7 @@ const CATEGORY_ALIASES: &[(&str, &[&str])] = &[
     ("transportation", &["gas", "fuel", "uber", "lyft", "transit", "bus", "subway", "transport", "car", "auto", "parking"]),
     ("entertainment", &["movies", "games", "gaming", "netflix", "spotify", "streaming", "fun", "entertainment", "music"]),
     ("shopping", &["amazon", "clothes", "clothing", "retail", "shopping", "online"]),
-    ("health", &["medical", "doctor", "pharmacy", "health", "dental", "vision", "hospital", "prescription", "gym", "fitness"]),
+    ("health", &["medical", "doctor", "pharmacy", "health", "healthcare", "dental", "vision", "hospital", "prescription", "gym", "fitness", "copay", "deductible"]),
     ("insurance", &["insurance", "premium", "coverage"]),
     ("education", &["tuition", "school", "books", "courses", "education", "learning"]),
     ("subscriptions", &["subscription", "subscriptions", "monthly", "recurring"]),
