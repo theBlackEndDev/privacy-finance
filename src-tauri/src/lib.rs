@@ -15,6 +15,29 @@ pub fn run() {
         .setup(|app| {
             let state = init_db(app.handle())
                 .expect("failed to initialize database");
+
+            // Start Agent Gateway HTTP server
+            let db_path = app.handle().path().app_data_dir()
+                .expect("failed to get app data dir")
+                .join("privacyfinance.db");
+
+            match commands::agent_gateway::start_gateway(db_path) {
+                Ok(handle) => {
+                    eprintln!("[AgentGateway] Started on port {}", handle.port);
+                    app.manage(std::sync::Mutex::new(handle));
+                }
+                Err(e) => {
+                    eprintln!("[AgentGateway] Failed to start: {e}");
+                    // Non-fatal: app works without gateway
+                    app.manage(std::sync::Mutex::new(
+                        commands::agent_gateway::GatewayHandle {
+                            shutdown_tx: None,
+                            port: 3847,
+                        }
+                    ));
+                }
+            }
+
             app.manage(state);
             Ok(())
         })
@@ -127,6 +150,7 @@ pub fn run() {
             commands::agent_keys::generate_agent_key,
             commands::agent_keys::get_agent_keys,
             commands::agent_keys::revoke_agent_key,
+            commands::agent_gateway::get_gateway_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
