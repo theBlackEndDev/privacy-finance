@@ -154,6 +154,8 @@ pub fn run() {
             commands::agent_audit::get_audit_log,
             commands::agent_manifest::parse_agent_manifest,
             commands::agent_manifest::register_from_manifest,
+            commands::agent_directory::get_curated_agents,
+            commands::agent_directory::install_curated_agent,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

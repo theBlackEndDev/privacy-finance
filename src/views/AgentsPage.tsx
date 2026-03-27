@@ -6,6 +6,7 @@ import { AddAgentModal } from '../components/agents/AddAgentModal';
 import { AgentDetailModal } from '../components/agents/AgentDetailModal';
 import { AgentApprovalModal } from '../components/agents/AgentApprovalModal';
 import { AuditLog } from '../components/agents/AuditLog';
+import { CuratedDirectory } from '../components/agents/CuratedDirectory';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 import styles from './AgentsPage.module.css';
@@ -56,11 +57,17 @@ export function AgentsPage() {
       </div>
 
       {agents.length === 0 ? (
-        <EmptyState
-          title="No agents yet"
-          description="PrivacyFinance protects your financial data from AI agents — on your device. Add an agent to get started."
-          action={<Button onClick={() => setShowAdd(true)}>Add Agent Manually</Button>}
-        />
+        <>
+          <EmptyState
+            title="Your Agent Gateway"
+            description="PrivacyFinance protects your financial data from AI agents — on your device. No agents yet. Try one below or add your own."
+            action={<Button onClick={() => setShowAdd(true)}>Add Agent Manually</Button>}
+          />
+          <CuratedDirectory
+            onInstalled={loadAgents}
+            installedIds={agents.map((a) => a.id)}
+          />
+        </>
       ) : (
         <div className={styles.grid}>
           {agents.map((agent) => (
@@ -75,6 +82,11 @@ export function AgentsPage() {
           ))}
         </div>
       )}
+
+      <CuratedDirectory
+        onInstalled={loadAgents}
+        installedIds={agents.map((a) => a.id)}
+      />
 
       {agents.length > 0 && (
         <div className={styles.auditSection}>
