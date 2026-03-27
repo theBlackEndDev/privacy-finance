@@ -17,12 +17,6 @@ pub enum AppError {
 
     #[error("Not found: {0}")]
     NotFound(String),
-
-    #[error("Agent auth error: {0}")]
-    AgentAuth(String),
-
-    #[error("Agent scope error: {0}")]
-    AgentScope(String),
 }
 
 // Tauri commands must return serializable errors

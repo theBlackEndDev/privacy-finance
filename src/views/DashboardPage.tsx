@@ -8,6 +8,7 @@ import { MonthlyTrendChart } from '../components/dashboard/MonthlyTrendChart';
 import { AccountBalances } from '../components/dashboard/AccountBalances';
 import { RecentTransactions } from '../components/dashboard/RecentTransactions';
 import { Spinner } from '../components/ui/Spinner';
+import { AskBar } from '../components/query/AskBar';
 import { cx } from '../utils/classNames';
 import styles from './DashboardPage.module.css';
 
@@ -66,6 +67,9 @@ export function DashboardPage() {
 
   return (
     <div className={styles.page}>
+      {/* Natural language query */}
+      <AskBar />
+
       {/* Header row */}
       <div className={styles.headerRow}>
         <div className={styles.headerLabel}>Monthly overview</div>
