@@ -88,24 +88,29 @@ pf_live_sk_[agent_id_hash]_[scope_hash]_[timestamp]
 
 ### 4.3 Local Inference Engine
 
-**What it is:** Transaction analysis and insight generation runs entirely on-device using a local model.
+**What it is:** Two-tier on-device inference — template matching by default, optional small model for complex queries.
 
-**Why it matters:** The agent never sees raw transaction data. The local engine processes the query and returns only the derived result.
+**Tier 1 — Template Matching (default, zero overhead):**
 
-**Example — "What did I spend on restaurants last month?"**
+The 80% case: common financial queries are handled by direct pattern → SQL mapping with no ML model.
 
-Without local inference:
-1. Agent requests all transactions
-2. PrivacyFinance returns full transaction list
-3. Agent processes locally → **raw data exposed**
+Example:
+- Query: "what did I spend on restaurants last month"
+- Template maps: `SELECT SUM(amount) FROM transactions WHERE category = 'Restaurants' AND date >= [first of last month] AND kind = 'expense'`
+- Result: `$847.23`
+- Zero model overhead — runs on any device instantly
 
-With local inference:
-1. Agent requests aggregate: "total restaurant spending last month"
-2. PrivacyFinance local engine computes: `SELECT SUM(amount) FROM transactions WHERE category = 'Restaurants' AND date >= [30 days ago]`
-3. Returns: `$847.23` → **only the answer, no raw data**
+**Tier 2 — Small Local Model (optional install):**
+
+For queries that don't match a template, an optional local model handles translation.
+
+- Recommended: **Phi-3.5-mini** (~2GB install)
+- Runs via Ollama, entirely on-device
+- Falls back to template suggestions if it can't resolve the query
+- No GPU required, works on 4GB+ RAM
 
 **Privacy guarantee:**
-> Your transaction data never leaves your device. Agents receive only computed results.
+> No cloud. No network requests for inference. Raw transaction data never leaves the device under any circumstances.
 
 ---
 
@@ -199,7 +204,7 @@ if (status.granted) {
 - **Platform:** Tauri (existing PrivacyFinance app)
 - **Database:** SQLite (existing, local)
 - **Agent gateway:** Local HTTP server on `localhost` port 3847
-- **Local inference:** Ollama API or bundled lightweight model via llama.cpp
+- **Local inference:** Tier 1 template matching (default) + optional Tier 2 Phi-3.5-mini via Ollama
 - **Agent protocol:** REST over localhost — simple, debuggable
 - **Agent discovery:** Manifest URL scheme (`privacy-finance-agent://`)
 
@@ -292,13 +297,46 @@ Auth: `Authorization: Bearer <key>` header. CORS: localhost only.
 
 ### 6.5 Privacy Model
 
+**No cloud. No exceptions.**
+
+All inference runs 100% on-device. There is no cloud fallback, no query routing to external servers, and no mode where raw financial data leaves the user's machine.
+
 | Data | Who sees it |
 |------|-------------|
 | Raw transactions | Only PrivacyFinance local engine |
 | Aggregated results | Agent (e.g., "you spent $412 on dining") |
 | Account balances | Only if `accounts:read:balances` scope granted |
 | Audit log | User only |
-| Nothing | Outside the declared scopes |
+| Nothing | Ever, outside the device |
+
+### 6.6 Inference Tiers
+
+**Tier 1 — Template Matching (default, always on)**
+
+The 80% case: common financial queries are handled by pattern → SQL mapping with zero ML overhead.
+
+Examples:
+```
+"what did I spend on dining"     → SELECT SUM(amount) WHERE category = 'Dining'
+"how much did I earn this month" → SELECT SUM(amount) WHERE kind = 'income'
+"show transactions over $500"    → SELECT * WHERE amount > 50000
+```
+
+Covers: spending totals, income totals, category breakdowns, date range queries, amount thresholds, merchant lookups, budget comparisons.
+
+**Tier 2 — Small Local Model (optional install)**
+
+For queries that don't match a template, an optional small quantized model can be installed.
+
+Recommended model: **Phi-3.5-mini** (3.8B params, ~2GB install)
+- Runs entirely on-device
+- Translates natural language → SQL
+- Falls back to template suggestions when it can't resolve the query
+- User opts in via Settings → "Install Local Inference Model"
+
+No GPU required. Works on 4GB+ RAM devices.
+
+**Privacy guarantee:** Inference is fully local. No network requests for inference. No data leaves the device under any circumstances.
 
 ---
 
@@ -331,10 +369,10 @@ Auth: `Authorization: Bearer <key>` header. CORS: localhost only.
 - Per-scope grant/deny UI
 
 ### Phase G3: Local Inference
-- Ollama integration for local model
-- Natural language → structured result pipeline
-- Agent SDK (TypeScript)
-- `pf://infer` endpoint
+- Template matching engine (Tier 1) — covers 80% of queries, no model required
+- Phi-3.5-mini integration as optional Tier 2 install
+- Fallback: when template doesn't match and no model installed, return structured suggestions ("Did you mean: [query options]?")
+- No cloud component. No exceptions.
 
 ### Phase G4: Agent Ecosystem
 - Agent manifest registry
@@ -346,12 +384,13 @@ Auth: `Authorization: Bearer <key>` header. CORS: localhost only.
 
 ## 9. Open Questions
 
-1. **Bundled model or user-provided?** Bundled is simpler but increases app size. User-provided via Ollama is more flexible.
+1. ~~Bundled model or user-provided?~~ — **Decided: user-provided optional install. Tier 1 template matching is default (zero overhead). Tier 2 Phi-3.5-mini is an opt-in install.**
 2. **Scope granularity** — is `transactions:read:category:streaming` fine-grained enough, or do we need field-level (e.g., no payee names)?
 3. **Agent key rotation** — should keys auto-rotate? How does that interact with permanently approved agents?
 4. **Cross-device** — if a user has PrivacyFinance on multiple devices, do agents need a key per device or can they sync?
-5. **Agent manifest hosting** — who hosts the manifest? What prevents manifest spoofing?
+5. ~~**Agent manifest hosting**~~ — ~~who hosts the manifest? What prevents manifest spoofing?~~
 6. **Monetization** — free gateway for personal use, paid for agent publishers?
+7. **Tier 2 model distribution** — direct download, or integrate with a model registry like HuggingFace?
 
 ---
 
