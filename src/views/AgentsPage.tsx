@@ -4,6 +4,7 @@ import { agentsApi } from '../api/agents';
 import { AgentCard } from '../components/agents/AgentCard';
 import { AddAgentModal } from '../components/agents/AddAgentModal';
 import { AgentDetailModal } from '../components/agents/AgentDetailModal';
+import { AuditLog } from '../components/agents/AuditLog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
 import styles from './AgentsPage.module.css';
@@ -60,6 +61,13 @@ export function AgentsPage() {
               onDelete={() => handleDelete(agent.id)}
             />
           ))}
+        </div>
+      )}
+
+      {agents.length > 0 && (
+        <div className={styles.auditSection}>
+          <h3 className={styles.sectionTitle}>Activity Log</h3>
+          <AuditLog />
         </div>
       )}
 
