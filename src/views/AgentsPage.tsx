@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Agent } from '../types';
+import { Agent, ScopeGrant } from '../types';
 import { agentsApi } from '../api/agents';
 import { AgentCard } from '../components/agents/AgentCard';
 import { AddAgentModal } from '../components/agents/AddAgentModal';
 import { AgentDetailModal } from '../components/agents/AgentDetailModal';
+import { AgentApprovalModal } from '../components/agents/AgentApprovalModal';
 import { AuditLog } from '../components/agents/AuditLog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Button } from '../components/ui/Button';
@@ -14,6 +15,7 @@ export function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [approvalAgent, setApprovalAgent] = useState<{ agent: Agent; scopes: string[] } | null>(null);
 
   async function loadAgents() {
     setLoading(true);
@@ -29,8 +31,18 @@ export function AgentsPage() {
     loadAgents();
   }
 
-  async function handleStatusChange(id: string, status: string) {
-    await agentsApi.updateStatus(id, status);
+  async function handleApprove(agent: Agent) {
+    // Fetch the agent's pre-populated scopes (from manifest or defaults)
+    const scopes: ScopeGrant[] = await agentsApi.getScopes(agent.id);
+    const scopeStrings = scopes.length > 0
+      ? scopes.map((s) => s.scope)
+      : ['transactions:read']; // default scope if none configured
+
+    setApprovalAgent({ agent, scopes: scopeStrings });
+  }
+
+  async function handleRevoke(id: string) {
+    await agentsApi.updateStatus(id, 'revoked');
     loadAgents();
   }
 
@@ -56,8 +68,8 @@ export function AgentsPage() {
               key={agent.id}
               agent={agent}
               onManage={() => setSelectedAgent(agent)}
-              onRevoke={() => handleStatusChange(agent.id, 'revoked')}
-              onApprove={() => handleStatusChange(agent.id, 'approved')}
+              onRevoke={() => handleRevoke(agent.id)}
+              onApprove={() => handleApprove(agent)}
               onDelete={() => handleDelete(agent.id)}
             />
           ))}
@@ -82,6 +94,15 @@ export function AgentsPage() {
         <AgentDetailModal
           agent={selectedAgent}
           onClose={() => { setSelectedAgent(null); loadAgents(); }}
+        />
+      )}
+
+      {approvalAgent && (
+        <AgentApprovalModal
+          agent={approvalAgent.agent}
+          requestedScopes={approvalAgent.scopes}
+          onClose={() => setApprovalAgent(null)}
+          onDecision={() => { setApprovalAgent(null); loadAgents(); }}
         />
       )}
     </div>
