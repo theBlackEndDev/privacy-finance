@@ -628,6 +628,23 @@ export interface AuditEntry {
   createdAt: string;
 }
 
+export interface AgentManifest {
+  agentId?: string;
+  name: string;
+  publisher: string;
+  version?: string;
+  description?: string;
+  iconUrl?: string;
+  requestedScopes: string[];
+}
+
+export interface ParsedManifest {
+  manifest: AgentManifest;
+  scopeDescriptions: { scope: string; description: string }[];
+  valid: boolean;
+  errors: string[];
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'account-detail' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation' | 'agents';

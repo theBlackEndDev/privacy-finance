@@ -21,6 +21,7 @@ pub mod agent_scopes;
 pub mod agent_keys;
 pub mod agent_gateway;
 pub mod agent_audit;
+pub mod agent_manifest;
 mod tests;
 mod transaction_tests;
 mod import_tests;

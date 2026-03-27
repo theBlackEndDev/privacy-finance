@@ -1,5 +1,5 @@
 import { invoke } from './invoke';
-import { Agent, CreateAgentInput, UpdateAgentInput, AgentKey, AgentKeyCreated, ScopeGrant, AuditEntry } from '../types';
+import { Agent, CreateAgentInput, UpdateAgentInput, AgentKey, AgentKeyCreated, ScopeGrant, AuditEntry, ParsedManifest } from '../types';
 
 export const agentsApi = {
   getAll: () => invoke<Agent[]>('get_agents', {}, []),
@@ -19,6 +19,12 @@ export const agentsApi = {
     invoke<AgentKeyCreated>('generate_agent_key', { agentId, scopes, expiresInDays }),
   getKeys: (agentId: string) => invoke<AgentKey[]>('get_agent_keys', { agentId }, []),
   revokeKey: (keyId: string) => invoke<void>('revoke_agent_key', { keyId }),
+
+  // Manifest
+  parseManifest: (manifestJson: string) =>
+    invoke<ParsedManifest>('parse_agent_manifest', { manifestJson }),
+  registerFromManifest: (manifestJson: string) =>
+    invoke<Agent>('register_from_manifest', { manifestJson }),
 
   // Audit
   getAuditLog: (agentId?: string, limit?: number) =>
