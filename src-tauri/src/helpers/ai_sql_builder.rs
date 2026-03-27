@@ -152,7 +152,9 @@ pub fn build_query(intent_match: &IntentMatch) -> Vec<BuiltQuery> {
             let mut idx = 1;
 
             if let Some(ref merchant) = e.merchant {
-                where_clauses.push(format!("LOWER(t.payee) LIKE ?{}", idx));
+                where_clauses.push(format!(
+                    "(LOWER(t.payee) LIKE ?{idx} OR LOWER(t.description) LIKE ?{idx})"
+                ));
                 params.push(format!("%{}%", merchant.to_lowercase()));
                 idx += 1;
             }

@@ -49,6 +49,7 @@ export function GlobalSearch() {
     if (isQuestion(q)) {
       setMode('ai');
       setResults([]);
+      aiClear(); // Clear previous AI result before new search
       aiDoSearch(q);
       setIsOpen(true);
     } else {

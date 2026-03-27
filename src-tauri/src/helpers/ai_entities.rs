@@ -29,6 +29,29 @@ pub fn extract_entities(query: &str, conn: &Connection) -> ExtractedEntities {
 
 // ── Category fuzzy matcher ────────────────────────────────────────
 
+/// Common words that users say → category names they likely mean.
+/// This bridges the gap between natural language and category names.
+const CATEGORY_ALIASES: &[(&str, &[&str])] = &[
+    ("utilities", &["electricity", "electric", "power", "water", "gas", "utility", "internet", "wifi", "cable", "phone", "cell"]),
+    ("food", &["groceries", "grocery", "eating", "meals", "supermarket", "food"]),
+    ("dining", &["restaurants", "restaurant", "eating out", "takeout", "delivery", "dining", "lunch", "dinner", "brunch"]),
+    ("housing", &["rent", "mortgage", "housing", "apartment", "home"]),
+    ("transportation", &["gas", "fuel", "uber", "lyft", "transit", "bus", "subway", "transport", "car", "auto", "parking"]),
+    ("entertainment", &["movies", "games", "gaming", "netflix", "spotify", "streaming", "fun", "entertainment", "music"]),
+    ("shopping", &["amazon", "clothes", "clothing", "retail", "shopping", "online"]),
+    ("health", &["medical", "doctor", "pharmacy", "health", "dental", "vision", "hospital", "prescription", "gym", "fitness"]),
+    ("insurance", &["insurance", "premium", "coverage"]),
+    ("education", &["tuition", "school", "books", "courses", "education", "learning"]),
+    ("subscriptions", &["subscription", "subscriptions", "monthly", "recurring"]),
+    ("travel", &["hotel", "flight", "airfare", "vacation", "travel", "trip"]),
+    ("personal", &["haircut", "personal", "beauty", "spa", "salon"]),
+    ("pets", &["pet", "pets", "vet", "veterinary", "dog", "cat"]),
+    ("gifts", &["gift", "gifts", "donation", "charity", "giving"]),
+    ("salary", &["salary", "paycheck", "wages", "pay"]),
+    ("freelance", &["freelance", "contract", "consulting", "gig", "side hustle"]),
+    ("investments", &["investment", "investments", "stocks", "dividend", "interest", "returns"]),
+];
+
 fn match_category(query: &str, conn: &Connection) -> (Option<String>, Option<String>) {
     let mut stmt = match conn.prepare("SELECT id, name FROM categories") {
         Ok(s) => s,
@@ -40,27 +63,57 @@ fn match_category(query: &str, conn: &Connection) -> (Option<String>, Option<Str
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
 
-    // Try exact word match first (case-insensitive)
+    // 1. Exact substring match (case-insensitive)
     for (id, name) in &cats {
         let lower = name.to_lowercase();
-        // Check if the category name appears as a whole word in the query
         if query.contains(&lower) {
             return (Some(id.clone()), Some(name.clone()));
         }
     }
 
-    // Try fuzzy match (Levenshtein distance)
-    let words: Vec<&str> = query.split_whitespace().collect();
-    let mut best_match: Option<(String, String, usize)> = None;
+    // 2. Alias matching — user said "electricity", we find "Utilities"
+    let query_words: Vec<&str> = query.split_whitespace().collect();
+    for (cat_name, aliases) in CATEGORY_ALIASES {
+        for alias in *aliases {
+            // Check if any alias appears in the query
+            if query.contains(alias) || query_words.iter().any(|w| *w == *alias) {
+                // Find this category in the user's actual categories
+                for (id, name) in &cats {
+                    if name.to_lowercase() == *cat_name
+                        || name.to_lowercase().contains(cat_name)
+                        || cat_name.contains(&name.to_lowercase())
+                    {
+                        return (Some(id.clone()), Some(name.clone()));
+                    }
+                }
+            }
+        }
+    }
 
+    // 3. Fuzzy match (Levenshtein distance) — catches typos
+    let mut best_match: Option<(String, String, usize)> = None;
     for (id, name) in &cats {
         let lower = name.to_lowercase();
-        for word in &words {
+        for word in &query_words {
+            if word.len() < 3 { continue; } // skip short words
             let dist = levenshtein(word, &lower);
-            let threshold = if lower.len() <= 4 { 1 } else { 2 };
+            let threshold = if lower.len() <= 4 { 1 } else if lower.len() <= 6 { 2 } else { 3 };
             if dist <= threshold {
                 if best_match.is_none() || dist < best_match.as_ref().unwrap().2 {
                     best_match = Some((id.clone(), name.clone(), dist));
+                }
+            }
+        }
+        // Also try matching each word against multi-word category names
+        let cat_words: Vec<&str> = lower.split_whitespace().collect();
+        for cat_word in &cat_words {
+            for word in &query_words {
+                if word.len() < 3 { continue; }
+                let dist = levenshtein(word, cat_word);
+                if dist <= 1 {
+                    if best_match.is_none() || dist < best_match.as_ref().unwrap().2 {
+                        best_match = Some((id.clone(), name.clone(), dist));
+                    }
                 }
             }
         }
