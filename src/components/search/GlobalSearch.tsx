@@ -33,7 +33,7 @@ export function GlobalSearch() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mode, setMode] = useState<'keyword' | 'ai'>('keyword');
   const inputRef = useRef<HTMLInputElement>(null);
-  const aiSearch = useAISearch();
+  const { result: aiResult, loading: aiLoading, search: aiDoSearch, clear: aiClear } = useAISearch();
 
   const debouncedQuery = useDebounce(query, 250);
 
@@ -41,7 +41,7 @@ export function GlobalSearch() {
     if (q.trim().length === 0) {
       setResults([]);
       setIsOpen(false);
-      aiSearch.clear();
+      aiClear();
       setMode('keyword');
       return;
     }
@@ -49,11 +49,11 @@ export function GlobalSearch() {
     if (isQuestion(q)) {
       setMode('ai');
       setResults([]);
-      aiSearch.search(q);
+      aiDoSearch(q);
       setIsOpen(true);
     } else {
       setMode('keyword');
-      aiSearch.clear();
+      aiClear();
       try {
         const data = await searchApi.searchFull(q, 10);
         setResults(data);
@@ -63,7 +63,7 @@ export function GlobalSearch() {
         setResults([]);
       }
     }
-  }, [aiSearch]);
+  }, [aiDoSearch, aiClear]);
 
   useEffect(() => {
     doSearch(debouncedQuery);
@@ -127,13 +127,13 @@ export function GlobalSearch() {
 
   // Keep dropdown open when AI results arrive
   useEffect(() => {
-    if (mode === 'ai' && aiSearch.result) {
+    if (mode === 'ai' && aiResult) {
       setIsOpen(true);
     }
-  }, [mode, aiSearch.result]);
+  }, [mode, aiResult]);
 
   const activeOptionId = activeIndex >= 0 ? `search-result-${activeIndex}` : undefined;
-  const showAI = mode === 'ai' && (aiSearch.loading || aiSearch.result);
+  const showAI = mode === 'ai' && (aiLoading || aiResult);
   const showKeyword = mode === 'keyword' && results.length > 0;
 
   return (
@@ -147,7 +147,7 @@ export function GlobalSearch() {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => {
-          if (results.length > 0 || aiSearch.result) setIsOpen(true);
+          if (results.length > 0 || aiResult) setIsOpen(true);
         }}
         role="combobox"
         aria-expanded={isOpen}
@@ -158,10 +158,10 @@ export function GlobalSearch() {
       />
       {isOpen && (
         <div className={`${styles.dropdown} ${showAI ? styles.dropdownWide : ''}`} id={LISTBOX_ID}>
-          {showAI && aiSearch.result && (
-            <AISearchResults result={aiSearch.result} loading={aiSearch.loading} />
+          {showAI && aiResult && (
+            <AISearchResults result={aiResult} loading={aiLoading} />
           )}
-          {showAI && aiSearch.loading && !aiSearch.result && (
+          {showAI && aiLoading && !aiResult && (
             <div className={styles.empty}>Searching...</div>
           )}
           {showKeyword && (
@@ -193,7 +193,7 @@ export function GlobalSearch() {
               ))}
             </div>
           )}
-          {mode === 'keyword' && results.length === 0 && query.trim().length > 0 && !aiSearch.loading && (
+          {mode === 'keyword' && results.length === 0 && query.trim().length > 0 && !aiLoading && (
             <div className={styles.empty}>No results found</div>
           )}
         </div>
