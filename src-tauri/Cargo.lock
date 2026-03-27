@@ -3771,11 +3771,13 @@ dependencies = [
 
 [[package]]
 name = "tauri-app"
-version = "1.0.0"
+version = "0.1.0"
 dependencies = [
  "chrono",
  "csv",
  "encoding_rs",
+ "hex",
+ "rand 0.8.5",
  "regex",
  "rusqlite",
  "serde",
