@@ -116,8 +116,8 @@ pub fn run() {
             commands::encryption::unlock_database,
             commands::encryption::change_password,
             commands::encryption::disable_encryption,
-            // Natural Language Query (template engine)
-            commands::query::ask_question,
+            // AI Search (natural language)
+            commands::ai_search::ai_search,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

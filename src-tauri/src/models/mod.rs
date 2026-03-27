@@ -13,3 +13,4 @@ pub mod report;
 pub mod reconciliation;
 pub mod exchange_rate;
 pub mod encryption;
+pub mod ai_search;

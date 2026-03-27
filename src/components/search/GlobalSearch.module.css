@@ -28,7 +28,7 @@
   top: calc(100% + 4px);
   right: 0;
   width: 400px;
-  max-height: 360px;
+  max-height: 420px;
   overflow-y: auto;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -106,6 +106,10 @@
 .date {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.dropdownWide {
+  width: 480px;
 }
 
 .empty {
