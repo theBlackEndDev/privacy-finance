@@ -68,6 +68,7 @@ pub fn start_gateway(db_path: PathBuf) -> AppResult<GatewayHandle> {
         .route("/v1/agents/register", post(handle_register))
         .route("/v1/agents/{id}/status", get(handle_agent_status))
         .route("/v1/query", get(handle_query))
+        .route("/v1/infer", post(handle_infer))
         .route("/v1/audit", get(handle_audit))
         .route("/v1/health", get(handle_health))
         .layer(cors)
@@ -284,6 +285,53 @@ async fn handle_audit(
         .collect();
 
     Ok(Json(serde_json::json!({ "entries": entries })))
+}
+
+async fn handle_infer(
+    AxumState(state): AxumState<GatewayAppState>,
+    headers: HeaderMap,
+    Json(body): Json<InferInput>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let raw_key = extract_bearer(&headers)?;
+    let conn = state.read_conn.lock().unwrap();
+    let validated = validate_key(&raw_key, &conn)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+
+    // Check insights:generate scope
+    let granted: Vec<Scope> = validated.granted_scopes.iter()
+        .filter_map(|s| Scope::parse(s).ok())
+        .collect();
+
+    if !enforce_scope(&Scope::InsightsGenerate, &granted) {
+        log_audit(
+            &state.write_conn, &validated.agent.id,
+            "insights:generate", "", "denied", Some("scope not granted"),
+        );
+        return Err((StatusCode::FORBIDDEN, "insights:generate scope not granted".to_string()));
+    }
+
+    let result = crate::helpers::template_engine::infer(&body.query, &conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    log_audit(
+        &state.write_conn, &validated.agent.id,
+        "insights:generate", "insights:generate",
+        if result.matched { "approved" } else { "no_match" },
+        result.answer.as_deref(),
+    );
+
+    Ok(Json(serde_json::json!({
+        "matched": result.matched,
+        "templateName": result.template_name,
+        "answer": result.answer,
+        "rawValue": result.raw_value,
+        "suggestions": result.suggestions,
+    })))
+}
+
+#[derive(Deserialize)]
+struct InferInput {
+    query: String,
 }
 
 async fn handle_health() -> Json<serde_json::Value> {
