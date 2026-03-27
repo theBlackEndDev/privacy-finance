@@ -410,6 +410,57 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 );
 
 CREATE INDEX IF NOT EXISTS idx_exchange_rates_pair_date ON exchange_rates(from_currency, to_currency, date);
+
+-- Agent Gateway tables (Phase G1)
+
+CREATE TABLE IF NOT EXISTS agents (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    publisher       TEXT NOT NULL,
+    version         TEXT NOT NULL,
+    description     TEXT,
+    manifest_url    TEXT,
+    icon_url        TEXT,
+    status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending','approved','denied','revoked')),
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_keys (
+    id              TEXT PRIMARY KEY,
+    agent_id        TEXT NOT NULL,
+    key_hash        TEXT NOT NULL UNIQUE,
+    scopes          TEXT NOT NULL,
+    expires_at      TEXT,
+    last_used_at    TEXT,
+    created_at      TEXT NOT NULL,
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS agent_scope_grants (
+    id              TEXT PRIMARY KEY,
+    agent_id        TEXT NOT NULL,
+    scope           TEXT NOT NULL,
+    access_mode     TEXT NOT NULL DEFAULT 'always'
+                    CHECK(access_mode IN ('always','ask_each_time','never')),
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+    UNIQUE(agent_id, scope)
+);
+
+CREATE TABLE IF NOT EXISTS agent_audit_log (
+    id              TEXT PRIMARY KEY,
+    agent_id        TEXT NOT NULL,
+    scope_requested TEXT NOT NULL,
+    scope_granted   TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    result_summary  TEXT,
+    created_at      TEXT NOT NULL,
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_agent ON agent_audit_log(agent_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON agent_audit_log(created_at);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {

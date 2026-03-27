@@ -115,6 +115,15 @@ pub fn run() {
             commands::encryption::unlock_database,
             commands::encryption::change_password,
             commands::encryption::disable_encryption,
+            // Agent Gateway (G1)
+            commands::agents::get_agents,
+            commands::agents::get_agent,
+            commands::agents::create_agent,
+            commands::agents::update_agent,
+            commands::agents::update_agent_status,
+            commands::agents::delete_agent,
+            commands::agent_scopes::get_agent_scopes,
+            commands::agent_scopes::set_agent_scope,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
