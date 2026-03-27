@@ -1,5 +1,5 @@
 import { invoke } from './invoke';
-import { Agent, CreateAgentInput, UpdateAgentInput, AgentKey, AgentKeyCreated, ScopeGrant, AuditEntry, ParsedManifest } from '../types';
+import { Agent, CreateAgentInput, UpdateAgentInput, AgentKey, AgentKeyCreated, ScopeGrant, AuditEntry, ParsedManifest, CuratedAgent } from '../types';
 
 export const agentsApi = {
   getAll: () => invoke<Agent[]>('get_agents', {}, []),
@@ -25,6 +25,10 @@ export const agentsApi = {
     invoke<ParsedManifest>('parse_agent_manifest', { manifestJson }),
   registerFromManifest: (manifestJson: string) =>
     invoke<Agent>('register_from_manifest', { manifestJson }),
+
+  // Curated Directory
+  getCuratedAgents: () => invoke<CuratedAgent[]>('get_curated_agents', {}, []),
+  installCurated: (curatedId: string) => invoke<Agent>('install_curated_agent', { curatedId }),
 
   // Audit
   getAuditLog: (agentId?: string, limit?: number) =>

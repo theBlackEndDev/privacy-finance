@@ -645,6 +645,16 @@ export interface ParsedManifest {
   errors: string[];
 }
 
+export interface CuratedAgent {
+  id: string;
+  name: string;
+  publisher: string;
+  description: string;
+  version: string;
+  verified: boolean;
+  requestedScopes: string[];
+}
+
 // ── Views ─────────────────────────────────────────────────────────
 
 export type View = 'dashboard' | 'accounts' | 'account-detail' | 'transactions' | 'categories' | 'import' | 'recurring' | 'budgets' | 'rules' | 'reports' | 'reconciliation' | 'agents';
