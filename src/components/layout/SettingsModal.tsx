@@ -11,6 +11,7 @@ import { BackupInfo } from '../../types';
 import { ExchangeRateSettings } from '../settings/ExchangeRateSettings';
 import { EncryptionSettings } from '../encryption/EncryptionSettings';
 import { AboutDialog } from '../ui/AboutDialog';
+import { AISearchSettings } from '../settings/AISearchSettings';
 
 interface Props {
   onClose: () => void;
@@ -269,6 +270,9 @@ export function SettingsModal({ onClose }: Props) {
             ))}
           </div>
         </div>
+
+        {/* AI Search */}
+        <AISearchSettings />
 
         {/* Danger Zone */}
         <div>

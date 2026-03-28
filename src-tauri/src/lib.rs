@@ -15,6 +15,15 @@ pub fn run() {
         .setup(|app| {
             let state = init_db(app.handle())
                 .expect("failed to initialize database");
+
+            // Initialize inference server state for Tier 2 AI search
+            let app_data_dir = app.handle().path().app_data_dir()
+                .expect("failed to get app data dir");
+            app.manage(commands::ai_model::InferenceServerState {
+                process: std::sync::Mutex::new(None),
+                app_data_dir,
+            });
+
             app.manage(state);
             Ok(())
         })
@@ -118,6 +127,11 @@ pub fn run() {
             commands::encryption::disable_encryption,
             // AI Search (natural language)
             commands::ai_search::ai_search,
+            commands::ai_model::ai_model_status,
+            commands::ai_model::ai_model_download,
+            commands::ai_model::ai_model_start,
+            commands::ai_model::ai_model_stop,
+            commands::ai_model::ai_model_health,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
