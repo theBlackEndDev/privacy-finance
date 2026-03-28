@@ -58,19 +58,21 @@ pub fn get_model_path(app_data_dir: &PathBuf) -> PathBuf {
 /// Check if the model is installed
 pub fn check_model_status(app_data_dir: &PathBuf) -> ModelStatus {
     let model_path = get_model_path(app_data_dir);
-    let installed = model_path.exists();
-    let size = if installed {
+    let server_path = app_data_dir.join("bin").join("llama-server");
+    let model_installed = model_path.exists();
+    let server_installed = server_path.exists() || which::which("llama-server").is_ok();
+    let size = if model_installed {
         std::fs::metadata(&model_path).ok().map(|m| m.len())
     } else {
         None
     };
 
     ModelStatus {
-        installed,
+        installed: model_installed && server_installed,
         model_name: MODEL_NAME.to_string(),
-        model_path: if installed { Some(model_path.to_string_lossy().to_string()) } else { None },
+        model_path: if model_installed { Some(model_path.to_string_lossy().to_string()) } else { None },
         model_size_bytes: size,
-        ready: installed,
+        ready: model_installed && server_installed,
     }
 }
 
@@ -141,43 +143,102 @@ fn call_inference_server(question: &str) -> AppResult<String> {
     }
 }
 
-/// Download the model file with progress reporting via a callback
+/// Get the llama-server binary URL for the current platform
+fn get_server_url() -> &'static str {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    { "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-macos-arm64" }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    { "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-macos-x64" }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    { "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-linux-x64" }
+    #[cfg(not(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "macos", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+    )))]
+    { "" }
+}
+
+/// Download both the llama-server binary and the GGUF model.
+/// Progress callback receives (downloaded_bytes, total_bytes) for the combined download.
 pub fn download_model(
     app_data_dir: &PathBuf,
     progress_callback: impl Fn(u64, u64) + Send + 'static,
 ) -> AppResult<()> {
     let models_dir = get_models_dir(app_data_dir);
-    std::fs::create_dir_all(&models_dir)
-        .map_err(|e| AppError::Io(e))?;
+    let bin_dir = app_data_dir.join("bin");
+    std::fs::create_dir_all(&models_dir).map_err(AppError::Io)?;
+    std::fs::create_dir_all(&bin_dir).map_err(AppError::Io)?;
 
+    let server_path = bin_dir.join("llama-server");
     let model_path = get_model_path(app_data_dir);
 
-    // Download with progress
-    let response = ureq::get(MODEL_URL)
-        .call()
-        .map_err(|e| AppError::Validation(format!("failed to download model: {e}")))?;
+    // Estimate total size: ~5MB server + ~1GB model
+    let total_estimated = MODEL_SIZE_APPROX + 5_000_000;
+    let mut total_downloaded: u64 = 0;
 
-    let total_size = response.header("Content-Length")
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(MODEL_SIZE_APPROX);
+    // Step 1: Download llama-server binary (if not already present)
+    if !server_path.exists() {
+        let server_url = get_server_url();
+        if server_url.is_empty() {
+            return Err(AppError::Validation("unsupported platform for AI Search".to_string()));
+        }
 
-    let mut file = std::fs::File::create(&model_path)
-        .map_err(|e| AppError::Io(e))?;
+        eprintln!("[AI Search] Downloading llama-server from {}", server_url);
+        let response = ureq::get(server_url)
+            .call()
+            .map_err(|e| AppError::Validation(format!("failed to download llama-server: {e}")))?;
 
-    let mut reader = response.into_reader();
-    let mut downloaded: u64 = 0;
-    let mut buffer = [0u8; 65536]; // 64KB chunks
+        let mut file = std::fs::File::create(&server_path).map_err(AppError::Io)?;
+        let mut reader = response.into_reader();
+        let mut buffer = [0u8; 65536];
 
-    loop {
-        let bytes_read = std::io::Read::read(&mut reader, &mut buffer)
-            .map_err(|e| AppError::Io(e))?;
-        if bytes_read == 0 { break; }
+        loop {
+            let bytes_read = std::io::Read::read(&mut reader, &mut buffer).map_err(AppError::Io)?;
+            if bytes_read == 0 { break; }
+            std::io::Write::write_all(&mut file, &buffer[..bytes_read]).map_err(AppError::Io)?;
+            total_downloaded += bytes_read as u64;
+            progress_callback(total_downloaded, total_estimated);
+        }
 
-        std::io::Write::write_all(&mut file, &buffer[..bytes_read])
-            .map_err(|e| AppError::Io(e))?;
+        // Make executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&server_path).map_err(AppError::Io)?.permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&server_path, perms).map_err(AppError::Io)?;
+        }
 
-        downloaded += bytes_read as u64;
-        progress_callback(downloaded, total_size);
+        eprintln!("[AI Search] llama-server downloaded to {:?}", server_path);
+    }
+
+    // Step 2: Download GGUF model (if not already present)
+    if !model_path.exists() {
+        eprintln!("[AI Search] Downloading model from {}", MODEL_URL);
+        let response = ureq::get(MODEL_URL)
+            .call()
+            .map_err(|e| AppError::Validation(format!("failed to download model: {e}")))?;
+
+        let model_total = response.header("Content-Length")
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(MODEL_SIZE_APPROX);
+
+        let actual_total = total_downloaded + model_total;
+
+        let mut file = std::fs::File::create(&model_path).map_err(AppError::Io)?;
+        let mut reader = response.into_reader();
+        let mut buffer = [0u8; 65536];
+
+        loop {
+            let bytes_read = std::io::Read::read(&mut reader, &mut buffer).map_err(AppError::Io)?;
+            if bytes_read == 0 { break; }
+            std::io::Write::write_all(&mut file, &buffer[..bytes_read]).map_err(AppError::Io)?;
+            total_downloaded += bytes_read as u64;
+            progress_callback(total_downloaded, actual_total);
+        }
+
+        eprintln!("[AI Search] Model downloaded to {:?}", model_path);
     }
 
     Ok(())
@@ -214,7 +275,7 @@ pub fn start_inference_server(app_data_dir: &PathBuf) -> AppResult<std::process:
 }
 
 fn find_llama_server(app_data_dir: &PathBuf) -> AppResult<PathBuf> {
-    // Check in app's binaries directory
+    // Check in app's bin directory (downloaded by install flow)
     let app_binary = app_data_dir.join("bin").join("llama-server");
     if app_binary.exists() {
         return Ok(app_binary);
@@ -225,20 +286,7 @@ fn find_llama_server(app_data_dir: &PathBuf) -> AppResult<PathBuf> {
         return Ok(path);
     }
 
-    // Check common locations
-    let common_paths = [
-        "/usr/local/bin/llama-server",
-        "/usr/bin/llama-server",
-        "/opt/homebrew/bin/llama-server",
-    ];
-    for p in common_paths {
-        let path = PathBuf::from(p);
-        if path.exists() {
-            return Ok(path);
-        }
-    }
-
     Err(AppError::Validation(
-        "llama-server not found. The AI Search runtime needs to be installed.".to_string()
+        "llama-server not found. Please install AI Search from Settings.".to_string()
     ))
 }
