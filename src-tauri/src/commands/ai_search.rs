@@ -84,34 +84,38 @@ pub fn ai_search(
     Ok(result)
 }
 
-/// Start the inference server if it's not already running
+/// Start the inference server if it's not already running. Blocks until healthy.
 fn ensure_server_running(inference_state: &InferenceServerState) {
-    // Quick health check first
+    // Quick health check — if already responsive, nothing to do
     if ureq::get("http://127.0.0.1:8847/health").call().is_ok() {
         return;
     }
 
-    // Server not responding — try to start it
     let mut process = inference_state.process.lock().unwrap();
 
-    // Check if we have a process that's still alive
+    // Check if we have a live process (still loading model)
     if let Some(ref mut child) = *process {
-        match child.try_wait() {
-            Ok(None) => {
-                // Process is running but not responding yet — give it a moment
-                drop(process);
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                return;
+        if let Ok(None) = child.try_wait() {
+            // Process alive but not healthy yet — wait for it
+            drop(process);
+            for _ in 0..20 {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                if ureq::get("http://127.0.0.1:8847/health").call().is_ok() {
+                    return;
+                }
             }
-            _ => {} // Process exited, restart below
+            eprintln!("[AI Search] Existing server process not responding after 20s");
+            return;
         }
+        // Process exited — will restart below
     }
 
-    // Start the server
+    // No live process — start a new one (this blocks until healthy or 30s timeout)
+    eprintln!("[AI Search] Auto-starting inference server for Tier 2 query...");
     match ai_local_model::start_inference_server(&inference_state.app_data_dir) {
         Ok(child) => {
             *process = Some(child);
-            eprintln!("[AI Search] Auto-started inference server for Tier 2 query");
+            eprintln!("[AI Search] Inference server ready");
         }
         Err(e) => {
             eprintln!("[AI Search] Failed to auto-start server: {e}");

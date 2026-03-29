@@ -323,32 +323,72 @@ pub fn download_model(
     Ok(())
 }
 
-/// Start the llama-server process for the local model
+/// Start the llama-server process for the local model.
+/// Polls /health until the server is ready (up to 30s for model loading).
 pub fn start_inference_server(app_data_dir: &PathBuf) -> AppResult<std::process::Child> {
     let model_path = get_model_path(app_data_dir);
     if !model_path.exists() {
         return Err(AppError::Validation("model not installed".to_string()));
     }
 
-    // Try to find llama-server in the app's binaries directory or system PATH
     let server_binary = find_llama_server(app_data_dir)?;
+    eprintln!("[AI Search] Starting llama-server: {:?} -m {:?}", server_binary, model_path);
 
-    let child = std::process::Command::new(server_binary)
+    let mut child = std::process::Command::new(&server_binary)
         .args([
             "-m", &model_path.to_string_lossy(),
             "--host", "127.0.0.1",
             "--port", "8847",
             "-ngl", "0",  // CPU only
             "-c", "2048", // context length
-            "--log-disable",
         ])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| AppError::Validation(format!("failed to start inference server: {e}")))?;
 
-    // Wait a moment for the server to start
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    // Poll /health for up to 30 seconds (model loading can take a while)
+    let mut ready = false;
+    for i in 0..30 {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        // Check if process crashed
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Process exited — read stderr for the error
+                let mut stderr_output = String::new();
+                if let Some(ref mut stderr) = child.stderr {
+                    let _ = std::io::Read::read_to_string(stderr, &mut stderr_output);
+                }
+                return Err(AppError::Validation(format!(
+                    "llama-server exited with {status}. stderr: {stderr_output}"
+                )));
+            }
+            Ok(None) => {} // still running
+            Err(_) => {}
+        }
+
+        // Try health endpoint
+        if ureq::get("http://127.0.0.1:8847/health").call().is_ok() {
+            ready = true;
+            eprintln!("[AI Search] llama-server healthy after {}s", i + 1);
+            break;
+        }
+
+        if i % 5 == 4 {
+            eprintln!("[AI Search] Waiting for llama-server to load model... ({}s)", i + 1);
+        }
+    }
+
+    if !ready {
+        eprintln!("[AI Search] llama-server did not become healthy within 30s");
+        let _ = child.kill();
+        return Err(AppError::Validation("llama-server failed to start within 30 seconds".to_string()));
+    }
+
+    // Detach stderr/stdout so they don't block (we've confirmed health)
+    drop(child.stdout.take());
+    drop(child.stderr.take());
 
     Ok(child)
 }
