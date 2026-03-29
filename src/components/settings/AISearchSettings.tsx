@@ -16,6 +16,11 @@ export function AISearchSettings() {
   useEffect(() => {
     aiModelApi.status().then(setStatus);
     aiModelApi.health().then(setServerRunning);
+    // Poll health every 5s so UI reflects auto-started server
+    const interval = setInterval(() => {
+      aiModelApi.health().then(setServerRunning);
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Set up Tauri event listeners via ESM dynamic import

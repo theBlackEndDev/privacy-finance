@@ -263,14 +263,20 @@ pub fn download_model(
             }
         }
 
-        // Clean up: remove archive and any extra extracted files (keep only llama-server)
+        // Clean up: remove archive and extra binaries (keep llama-server + shared libs)
         let _ = std::fs::remove_file(&archive_path);
-        // Clean up non-llama-server files that may have been extracted
         if let Ok(entries) = std::fs::read_dir(&bin_dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
                 let name_str = name.to_string_lossy();
-                if name_str != "llama-server" {
+                // Keep llama-server binary and all shared libraries it needs
+                let keep = name_str == "llama-server"
+                    || name_str.ends_with(".dylib")
+                    || name_str.ends_with(".so")
+                    || name_str.starts_with("libllama")
+                    || name_str.starts_with("libggml")
+                    || name_str.starts_with("libmtmd");
+                if !keep {
                     let _ = std::fs::remove_file(entry.path());
                 }
             }
