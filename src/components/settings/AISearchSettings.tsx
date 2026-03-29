@@ -1,15 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { aiModelApi, ModelStatus } from '../../api/ai_model';
 import { Button } from '../ui/Button';
-
-// Try to import Tauri event listener — may not be available in browser preview
-let tauriListen: ((event: string, handler: (event: any) => void) => Promise<() => void>) | null = null;
-try {
-  const eventMod = require('@tauri-apps/api/event');
-  tauriListen = eventMod.listen;
-} catch {
-  // Not in Tauri environment
-}
 
 export function AISearchSettings() {
   const [status, setStatus] = useState<ModelStatus | null>(null);
@@ -20,40 +11,84 @@ export function AISearchSettings() {
   const [error, setError] = useState<string | null>(null);
   const [serverRunning, setServerRunning] = useState(false);
   const [starting, setStarting] = useState(false);
+  const eventsReceived = useRef(false);
 
   useEffect(() => {
     aiModelApi.status().then(setStatus);
     aiModelApi.health().then(setServerRunning);
   }, []);
 
+  // Set up Tauri event listeners via ESM dynamic import
   useEffect(() => {
-    if (!tauriListen) return;
-
     let cleanup1: (() => void) | null = null;
     let cleanup2: (() => void) | null = null;
+    let cancelled = false;
 
-    tauriListen('ai-model-download-progress', (event: any) => {
-      const p = event.payload;
-      setProgress(p.percent || 0);
-      setDownloadedMB(Math.round((p.downloaded || 0) / 1024 / 1024));
-      setTotalMB(Math.round((p.total || 0) / 1024 / 1024));
-    }).then(fn => { cleanup1 = fn; });
+    (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        if (cancelled) return;
 
-    tauriListen('ai-model-download-complete', (event: any) => {
-      setDownloading(false);
-      if (event.payload.success) {
-        setProgress(100);
-        aiModelApi.status().then(setStatus);
-      } else {
-        setError(event.payload.error || 'Download failed');
+        const unlisten1 = await listen('ai-model-download-progress', (event: any) => {
+          eventsReceived.current = true;
+          const p = event.payload;
+          setProgress(p.percent || 0);
+          setDownloadedMB(Math.round((p.downloaded || 0) / 1024 / 1024));
+          setTotalMB(Math.round((p.total || 0) / 1024 / 1024));
+        });
+        if (cancelled) { unlisten1(); return; }
+        cleanup1 = unlisten1;
+
+        const unlisten2 = await listen('ai-model-download-complete', (event: any) => {
+          eventsReceived.current = true;
+          setDownloading(false);
+          if (event.payload.success) {
+            setProgress(100);
+            aiModelApi.status().then(setStatus);
+          } else {
+            setError(event.payload.error || 'Download failed');
+          }
+        });
+        if (cancelled) { unlisten2(); return; }
+        cleanup2 = unlisten2;
+      } catch {
+        // Not in Tauri environment — polling fallback will handle it
       }
-    }).then(fn => { cleanup2 = fn; });
+    })();
 
     return () => {
+      cancelled = true;
       cleanup1?.();
       cleanup2?.();
     };
   }, []);
+
+  // Fallback: poll model status every 3s while downloading, in case events don't arrive
+  useEffect(() => {
+    if (!downloading) return;
+
+    const interval = setInterval(async () => {
+      // If we're already getting real events, don't poll
+      if (eventsReceived.current) return;
+
+      const s = await aiModelApi.status();
+      if (s.installed) {
+        setDownloading(false);
+        setProgress(100);
+        setStatus(s);
+        return;
+      }
+      // Check if model file is partially downloaded by checking size
+      if (s.modelSizeBytes && s.modelSizeBytes > 0) {
+        const pct = Math.min(99, Math.round((s.modelSizeBytes / 1_000_000_000) * 100));
+        setProgress(pct);
+        setDownloadedMB(Math.round(s.modelSizeBytes / 1024 / 1024));
+        setTotalMB(1000); // ~1GB estimate
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [downloading]);
 
   async function handleDownload() {
     setDownloading(true);
@@ -61,6 +96,7 @@ export function AISearchSettings() {
     setError(null);
     setDownloadedMB(0);
     setTotalMB(0);
+    eventsReceived.current = false;
     try {
       await aiModelApi.download();
     } catch (e) {
