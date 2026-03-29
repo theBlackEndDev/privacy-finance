@@ -20,7 +20,7 @@ pub fn run() {
             let app_data_dir = app.handle().path().app_data_dir()
                 .expect("failed to get app data dir");
             app.manage(commands::ai_model::InferenceServerState {
-                process: std::sync::Mutex::new(None),
+                process: std::sync::Arc::new(std::sync::Mutex::new(None)),
                 app_data_dir,
             });
 

@@ -45,6 +45,8 @@ export function AISearchSettings() {
           if (event.payload.success) {
             setProgress(100);
             aiModelApi.status().then(setStatus);
+            // Server auto-starts after install — check health after a moment
+            setTimeout(() => aiModelApi.health().then(setServerRunning), 3000);
           } else {
             setError(event.payload.error || 'Download failed');
           }

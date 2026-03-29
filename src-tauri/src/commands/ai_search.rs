@@ -57,6 +57,9 @@ pub fn ai_search(
     // ── Tier 2: Local model (if installed) ───────────────────────
     let model_status = ai_local_model::check_model_status(&inference_state.app_data_dir);
     if model_status.installed {
+        // Ensure the server is running before attempting inference
+        ensure_server_running(&inference_state);
+
         match try_tier2_inference(&query, &conn) {
             Ok(result) => {
                 let mut result = result;
@@ -79,6 +82,41 @@ pub fn ai_search(
     }
     result.query_time_ms = start.elapsed().as_millis() as u64;
     Ok(result)
+}
+
+/// Start the inference server if it's not already running
+fn ensure_server_running(inference_state: &InferenceServerState) {
+    // Quick health check first
+    if ureq::get("http://127.0.0.1:8847/health").call().is_ok() {
+        return;
+    }
+
+    // Server not responding — try to start it
+    let mut process = inference_state.process.lock().unwrap();
+
+    // Check if we have a process that's still alive
+    if let Some(ref mut child) = *process {
+        match child.try_wait() {
+            Ok(None) => {
+                // Process is running but not responding yet — give it a moment
+                drop(process);
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                return;
+            }
+            _ => {} // Process exited, restart below
+        }
+    }
+
+    // Start the server
+    match ai_local_model::start_inference_server(&inference_state.app_data_dir) {
+        Ok(child) => {
+            *process = Some(child);
+            eprintln!("[AI Search] Auto-started inference server for Tier 2 query");
+        }
+        Err(e) => {
+            eprintln!("[AI Search] Failed to auto-start server: {e}");
+        }
+    }
 }
 
 /// Tier 2: Send the question to the local model, get SQL, validate, execute

@@ -1,11 +1,11 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{State, AppHandle, Manager, Emitter};
 use crate::error::AppResult;
 use crate::helpers::ai_local_model::{self, ModelStatus};
 
 /// Managed state for the inference server process
 pub struct InferenceServerState {
-    pub process: Mutex<Option<std::process::Child>>,
+    pub process: Arc<Mutex<Option<std::process::Child>>>,
     pub app_data_dir: std::path::PathBuf,
 }
 
@@ -15,11 +15,12 @@ pub fn ai_model_status(state: State<InferenceServerState>) -> AppResult<ModelSta
     Ok(ai_local_model::check_model_status(&state.app_data_dir))
 }
 
-/// Download the AI model (runs in background, emits progress events)
+/// Download the AI model (runs in background, emits progress events, auto-starts server)
 #[tauri::command]
 pub fn ai_model_download(app: AppHandle, state: State<InferenceServerState>) -> AppResult<()> {
     let app_data_dir = state.app_data_dir.clone();
     let app_clone = app.clone();
+    let process = state.process.clone();
 
     std::thread::spawn(move || {
         let result = ai_local_model::download_model(&app_data_dir, move |downloaded, total| {
@@ -32,6 +33,18 @@ pub fn ai_model_download(app: AppHandle, state: State<InferenceServerState>) -> 
 
         match result {
             Ok(()) => {
+                // Auto-start the inference server after successful download
+                match ai_local_model::start_inference_server(&app_data_dir) {
+                    Ok(child) => {
+                        if let Ok(mut proc) = process.lock() {
+                            *proc = Some(child);
+                        }
+                        eprintln!("[AI Search] Server auto-started after install");
+                    }
+                    Err(e) => {
+                        eprintln!("[AI Search] Server auto-start failed: {e}");
+                    }
+                }
                 let _ = app.emit("ai-model-download-complete", serde_json::json!({ "success": true }));
             }
             Err(e) => {
