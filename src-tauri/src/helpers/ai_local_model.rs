@@ -143,20 +143,59 @@ fn call_inference_server(question: &str) -> AppResult<String> {
     }
 }
 
-/// Get the llama-server binary URL for the current platform
-fn get_server_url() -> &'static str {
+/// Get the platform-specific archive asset name suffix for llama.cpp releases.
+/// Returns (asset_contains, archive_ext) — e.g. ("macos-arm64", ".tar.gz")
+fn get_platform_asset_pattern() -> (&'static str, &'static str) {
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-macos-arm64" }
+    { ("macos-arm64", ".tar.gz") }
     #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-macos-x64" }
+    { ("macos-x64", ".tar.gz") }
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-linux-x64" }
+    { ("ubuntu-x64", ".tar.gz") }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "x86_64"),
     )))]
-    { "" }
+    { ("", "") }
+}
+
+/// Query GitHub API for the latest llama.cpp release and find the right archive URL.
+fn resolve_server_archive_url() -> AppResult<String> {
+    let (pattern, ext) = get_platform_asset_pattern();
+    if pattern.is_empty() {
+        return Err(AppError::Validation("unsupported platform for AI Search".to_string()));
+    }
+
+    let response = ureq::get("https://api.github.com/repos/ggml-org/llama.cpp/releases/latest")
+        .set("User-Agent", "privacy-finance")
+        .call()
+        .map_err(|e| AppError::Validation(format!("failed to query GitHub releases: {e}")))?;
+
+    let body: serde_json::Value = response.into_json()
+        .map_err(|e| AppError::Validation(format!("failed to parse GitHub response: {e}")))?;
+
+    let assets = body["assets"].as_array()
+        .ok_or_else(|| AppError::Validation("no assets in GitHub release".to_string()))?;
+
+    // Find the archive that matches our platform — must contain pattern, end with ext,
+    // and NOT contain cuda/rocm/vulkan/opencl/sycl/hip/openvino/aclgraph (CPU-only)
+    let excluded = ["cuda", "rocm", "vulkan", "opencl", "sycl", "hip", "openvino", "aclgraph"];
+    for asset in assets {
+        if let Some(name) = asset["name"].as_str() {
+            if name.contains(pattern) && name.ends_with(ext)
+                && !excluded.iter().any(|ex| name.contains(ex))
+            {
+                if let Some(url) = asset["browser_download_url"].as_str() {
+                    return Ok(url.to_string());
+                }
+            }
+        }
+    }
+
+    Err(AppError::Validation(format!(
+        "no llama-server archive found for platform '{}' in latest release", pattern
+    )))
 }
 
 /// Download both the llama-server binary and the GGUF model.
@@ -173,32 +212,72 @@ pub fn download_model(
     let server_path = bin_dir.join("llama-server");
     let model_path = get_model_path(app_data_dir);
 
-    // Estimate total size: ~5MB server + ~1GB model
-    let total_estimated = MODEL_SIZE_APPROX + 5_000_000;
+    // Estimate total size: ~50MB server archive + ~1GB model
+    let total_estimated = MODEL_SIZE_APPROX + 50_000_000;
     let mut total_downloaded: u64 = 0;
 
-    // Step 1: Download llama-server binary (if not already present)
+    // Step 1: Download llama-server from GitHub release archive (if not already present)
     if !server_path.exists() {
-        let server_url = get_server_url();
-        if server_url.is_empty() {
-            return Err(AppError::Validation("unsupported platform for AI Search".to_string()));
-        }
+        let archive_url = resolve_server_archive_url()?;
+        eprintln!("[AI Search] Downloading llama-server archive from {}", archive_url);
 
-        eprintln!("[AI Search] Downloading llama-server from {}", server_url);
-        let response = ureq::get(server_url)
+        let response = ureq::get(&archive_url)
             .call()
             .map_err(|e| AppError::Validation(format!("failed to download llama-server: {e}")))?;
 
-        let mut file = std::fs::File::create(&server_path).map_err(AppError::Io)?;
-        let mut reader = response.into_reader();
-        let mut buffer = [0u8; 65536];
+        // Download archive to a temp file
+        let archive_path = bin_dir.join("llama-server-archive.tar.gz");
+        {
+            let mut file = std::fs::File::create(&archive_path).map_err(AppError::Io)?;
+            let mut reader = response.into_reader();
+            let mut buffer = [0u8; 65536];
 
-        loop {
-            let bytes_read = std::io::Read::read(&mut reader, &mut buffer).map_err(AppError::Io)?;
-            if bytes_read == 0 { break; }
-            std::io::Write::write_all(&mut file, &buffer[..bytes_read]).map_err(AppError::Io)?;
-            total_downloaded += bytes_read as u64;
-            progress_callback(total_downloaded, total_estimated);
+            loop {
+                let bytes_read = std::io::Read::read(&mut reader, &mut buffer).map_err(AppError::Io)?;
+                if bytes_read == 0 { break; }
+                std::io::Write::write_all(&mut file, &buffer[..bytes_read]).map_err(AppError::Io)?;
+                total_downloaded += bytes_read as u64;
+                progress_callback(total_downloaded, total_estimated);
+            }
+        }
+
+        // Extract llama-server binary from the archive using system tar
+        // Archive structure: llama-bNNNN/llama-server
+        let extract_result = std::process::Command::new("tar")
+            .args(["xzf", &archive_path.to_string_lossy(), "--strip-components=1",
+                   "-C", &bin_dir.to_string_lossy(), "--include=*/llama-server"])
+            .output()
+            .map_err(|e| AppError::Validation(format!("failed to extract llama-server: {e}")))?;
+
+        if !extract_result.status.success() {
+            // macOS tar doesn't support --include, try wildcard approach
+            let extract_result2 = std::process::Command::new("tar")
+                .args(["xzf", &archive_path.to_string_lossy(), "--strip-components=1",
+                       "-C", &bin_dir.to_string_lossy()])
+                .output()
+                .map_err(|e| AppError::Validation(format!("failed to extract archive: {e}")))?;
+
+            if !extract_result2.status.success() {
+                let stderr = String::from_utf8_lossy(&extract_result2.stderr);
+                return Err(AppError::Validation(format!("tar extraction failed: {stderr}")));
+            }
+        }
+
+        // Clean up: remove archive and any extra extracted files (keep only llama-server)
+        let _ = std::fs::remove_file(&archive_path);
+        // Clean up non-llama-server files that may have been extracted
+        if let Ok(entries) = std::fs::read_dir(&bin_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str != "llama-server" {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+
+        if !server_path.exists() {
+            return Err(AppError::Validation("llama-server binary not found in archive".to_string()));
         }
 
         // Make executable
@@ -210,7 +289,7 @@ pub fn download_model(
             std::fs::set_permissions(&server_path, perms).map_err(AppError::Io)?;
         }
 
-        eprintln!("[AI Search] llama-server downloaded to {:?}", server_path);
+        eprintln!("[AI Search] llama-server extracted to {:?}", server_path);
     }
 
     // Step 2: Download GGUF model (if not already present)
