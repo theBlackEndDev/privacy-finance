@@ -241,26 +241,17 @@ pub fn download_model(
             }
         }
 
-        // Extract llama-server binary from the archive using system tar
-        // Archive structure: llama-bNNNN/llama-server
+        // Extract entire archive (binary + shared libs) then clean up unwanted files.
+        // Archive structure: llama-bNNNN/{llama-server, lib*.dylib, ...}
         let extract_result = std::process::Command::new("tar")
             .args(["xzf", &archive_path.to_string_lossy(), "--strip-components=1",
-                   "-C", &bin_dir.to_string_lossy(), "--include=*/llama-server"])
+                   "-C", &bin_dir.to_string_lossy()])
             .output()
             .map_err(|e| AppError::Validation(format!("failed to extract llama-server: {e}")))?;
 
         if !extract_result.status.success() {
-            // macOS tar doesn't support --include, try wildcard approach
-            let extract_result2 = std::process::Command::new("tar")
-                .args(["xzf", &archive_path.to_string_lossy(), "--strip-components=1",
-                       "-C", &bin_dir.to_string_lossy()])
-                .output()
-                .map_err(|e| AppError::Validation(format!("failed to extract archive: {e}")))?;
-
-            if !extract_result2.status.success() {
-                let stderr = String::from_utf8_lossy(&extract_result2.stderr);
-                return Err(AppError::Validation(format!("tar extraction failed: {stderr}")));
-            }
+            let stderr = String::from_utf8_lossy(&extract_result.stderr);
+            return Err(AppError::Validation(format!("tar extraction failed: {stderr}")));
         }
 
         // Clean up: remove archive and extra binaries (keep llama-server + shared libs)
