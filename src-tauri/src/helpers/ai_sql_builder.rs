@@ -57,6 +57,21 @@ pub fn build_query(intent_match: &IntentMatch) -> Vec<BuiltQuery> {
                 });
             }
 
+            // Grand total for percentage calculation (query index 3 if breakdown present, 2 otherwise)
+            if e.wants_percentage && e.category_id.is_some() {
+                let mut total_clauses = vec!["t.kind = 'expense'".to_string()];
+                let mut total_params = Vec::new();
+                let mut total_idx = 1;
+                add_date_clauses(&mut total_clauses, &mut total_params, &mut total_idx, e);
+                queries.push(BuiltQuery {
+                    sql: format!(
+                        "SELECT COALESCE(SUM(ABS(t.amount)), 0) FROM transactions t WHERE {}",
+                        total_clauses.join(" AND ")
+                    ),
+                    params: total_params,
+                });
+            }
+
             queries
         }
 

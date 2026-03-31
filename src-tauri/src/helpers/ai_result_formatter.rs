@@ -59,13 +59,42 @@ fn format_total_card(queries: &[BuiltQuery], im: &IntentMatch, conn: &Connection
         top_items = execute_breakdown(conn, &q2.sql, &q2.params)?;
     }
 
-    let text = format!(
-        "You spent {} on {}{} ({} transactions)",
-        format_dollars(total),
-        label.to_lowercase(),
-        if period_label != "All time" { format!(" {}", period_label.to_lowercase()) } else { String::new() },
-        count
-    );
+    // Check for grand-total query (appended when wants_percentage + category)
+    let pct_text = if im.entities.wants_percentage {
+        // Grand total query is the last one (index 2 or 3 depending on breakdown)
+        let last = &queries[queries.len() - 1];
+        if let Ok(grand_total) = execute_single_i64(conn, &last.sql, &last.params) {
+            if grand_total > 0 {
+                let pct = (total as f64 / grand_total as f64) * 100.0;
+                Some((pct, grand_total))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let text = if let Some((pct, grand_total)) = pct_text {
+        format!(
+            "{} is {:.1}% of your total spending ({}) {} ({} transactions)",
+            label,
+            pct,
+            format_dollars(grand_total),
+            if period_label != "All time" { period_label.to_lowercase() } else { String::new() },
+            count
+        )
+    } else {
+        format!(
+            "You spent {} on {}{} ({} transactions)",
+            format_dollars(total),
+            label.to_lowercase(),
+            if period_label != "All time" { format!(" {}", period_label.to_lowercase()) } else { String::new() },
+            count
+        )
+    };
 
     Ok((CardData::Total {
         label,

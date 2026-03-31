@@ -13,6 +13,7 @@ pub fn extract_entities(query: &str, conn: &Connection) -> ExtractedEntities {
     let comparison_period = parse_comparison_period(&q);
     let (amount_threshold, amount_operator) = parse_amount(&q);
     let merchant = match_merchant(&q, conn);
+    let wants_percentage = q.contains("percent") || q.contains('%');
 
     ExtractedEntities {
         category_id,
@@ -24,6 +25,7 @@ pub fn extract_entities(query: &str, conn: &Connection) -> ExtractedEntities {
         amount_threshold,
         amount_operator,
         merchant,
+        wants_percentage,
     }
 }
 

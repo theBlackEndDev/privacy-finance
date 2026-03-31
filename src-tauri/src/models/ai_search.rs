@@ -54,6 +54,7 @@ pub struct ExtractedEntities {
     pub amount_threshold: Option<i64>,
     pub amount_operator: Option<String>,
     pub merchant: Option<String>,
+    pub wants_percentage: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
