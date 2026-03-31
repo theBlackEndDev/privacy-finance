@@ -344,25 +344,33 @@ fn match_merchant(query: &str, conn: &Connection) -> Option<String> {
         .filter_map(|r| r.ok())
         .collect();
 
-    // Exact substring match
+    let query_norm = strip_punctuation(query);
+
+    // Exact substring match (punctuation-insensitive)
     for payee in &payees {
-        if query.contains(&payee.to_lowercase()) {
+        let payee_norm = strip_punctuation(&payee.to_lowercase());
+        if query_norm.contains(&payee_norm) || query.contains(&payee.to_lowercase()) {
             return Some(payee.clone());
         }
     }
 
     // Fuzzy match on query words
-    let words: Vec<&str> = query.split_whitespace().collect();
+    let words: Vec<&str> = query_norm.split_whitespace().collect();
     for payee in &payees {
-        let lower = payee.to_lowercase();
+        let payee_norm = strip_punctuation(&payee.to_lowercase());
         for word in &words {
-            if word.len() >= 3 && levenshtein(word, &lower) <= 2 {
+            if word.len() >= 3 && levenshtein(word, &payee_norm) <= 2 {
                 return Some(payee.clone());
             }
         }
     }
 
     None
+}
+
+/// Strip common punctuation so "trader joe's" and "trader joes" compare equal.
+pub fn strip_punctuation(s: &str) -> String {
+    s.chars().filter(|c| !matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '.' | ',' | '!' | '&' | '-')).collect()
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

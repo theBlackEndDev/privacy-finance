@@ -257,11 +257,14 @@ fn try_payee_fallback(query: &str, entities: &mut ExtractedEntities, conn: &rusq
     let q = query.trim().to_lowercase().replace('?', "");
     let subject = extract_subject(&q)?;
 
+    // Match with punctuation stripped so "trader joes" finds "Trader Joe's"
     let mut stmt = conn.prepare(
-        "SELECT DISTINCT payee FROM transactions WHERE payee != '' AND payee IS NOT NULL AND LOWER(payee) LIKE ?1 LIMIT 5"
+        "SELECT DISTINCT payee FROM transactions WHERE payee != '' AND payee IS NOT NULL
+         AND (LOWER(payee) LIKE ?1 OR REPLACE(REPLACE(REPLACE(LOWER(payee), '''', ''), '.', ''), '-', '') LIKE ?2) LIMIT 5"
     ).ok()?;
     let pattern = format!("%{}%", subject);
-    let payees: Vec<String> = stmt.query_map(rusqlite::params![pattern], |row| row.get(0))
+    let pattern_stripped = format!("%{}%", ai_entities::strip_punctuation(&subject));
+    let payees: Vec<String> = stmt.query_map(rusqlite::params![pattern, pattern_stripped], |row| row.get(0))
         .ok()?.filter_map(|r| r.ok()).collect();
 
     if !payees.is_empty() {

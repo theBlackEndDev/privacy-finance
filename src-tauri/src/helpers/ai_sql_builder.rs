@@ -167,11 +167,15 @@ pub fn build_query(intent_match: &IntentMatch) -> Vec<BuiltQuery> {
             let mut idx = 1;
 
             if let Some(ref merchant) = e.merchant {
+                let stripped = crate::helpers::ai_entities::strip_punctuation(&merchant.to_lowercase());
+                let idx2 = idx + 1;
                 where_clauses.push(format!(
-                    "(LOWER(t.payee) LIKE ?{idx} OR LOWER(t.description) LIKE ?{idx})"
+                    "(LOWER(t.payee) LIKE ?{idx} OR LOWER(t.description) LIKE ?{idx} \
+                     OR REPLACE(REPLACE(REPLACE(LOWER(t.payee), '''', ''), '.', ''), '-', '') LIKE ?{idx2})"
                 ));
                 params.push(format!("%{}%", merchant.to_lowercase()));
-                idx += 1;
+                params.push(format!("%{}%", stripped));
+                idx += 2;
             }
             if let Some(ref cat_id) = e.category_id {
                 where_clauses.push(format!("t.category_id = ?{}", idx));
