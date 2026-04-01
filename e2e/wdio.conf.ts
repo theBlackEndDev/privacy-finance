@@ -11,7 +11,7 @@ const appBinary = isMac
 
 export const config = {
   runner: 'local',
-  specs: ['./e2e/specs/**/*.spec.ts'],
+  specs: [join(__dirname, 'specs/**/*.spec.ts')],
   maxInstances: 1,
   capabilities: [{
     'tauri:options': {
