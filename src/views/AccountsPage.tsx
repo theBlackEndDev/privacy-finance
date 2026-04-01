@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Account, CreateAccountInput, UpdateAccountInput } from '../types';
 import { accountsApi } from '../api/accounts';
 import { useApp } from '../context/AppContext';
+import { useAccounts } from '../context/AccountContext';
 import { useConfirmDelete } from '../hooks/useConfirmDelete';
 import { AccountList } from '../components/accounts/AccountList';
 import { AccountForm } from '../components/accounts/AccountForm';
@@ -10,23 +11,11 @@ import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 
 export function AccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { accounts, loading, refresh } = useAccounts();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Account | undefined>();
   const { navigate, setActiveAccountId } = useApp();
   const toast = useToast();
-
-  const load = useCallback(async () => {
-    try {
-      const data = await accountsApi.getAll();
-      setAccounts(data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   async function handleSave(input: CreateAccountInput | UpdateAccountInput) {
     if (editing) {
@@ -36,13 +25,13 @@ export function AccountsPage() {
       await accountsApi.create(input as CreateAccountInput);
       toast('Account created');
     }
-    await load();
+    await refresh();
   }
 
   const deleteFlow = useConfirmDelete<Account>({
     onConfirm: async (account) => {
       await accountsApi.delete(account.id);
-      await load();
+      await refresh();
       toast('Account deleted');
     },
   });

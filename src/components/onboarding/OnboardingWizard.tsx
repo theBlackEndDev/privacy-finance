@@ -29,7 +29,7 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
 
   async function completeOnboarding() {
     await settingsApi.set('onboarding_complete', 'true');
-    onComplete();
+    await onComplete();
   }
 
   async function handleCreateAccount(e: FormEvent) {
