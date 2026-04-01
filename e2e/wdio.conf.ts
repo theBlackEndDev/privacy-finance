@@ -14,6 +14,7 @@ export const config = {
   specs: [join(__dirname, 'specs/**/*.spec.ts')],
   maxInstances: 1,
   capabilities: [{
+    browserName: 'tauri',
     'tauri:options': {
       application: appBinary,
     },
