@@ -13,9 +13,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init());
 
-    #[cfg(all(target_os = "macos", feature = "e2e"))]
+    #[cfg(feature = "e2e")]
     {
-        builder = builder.plugin(tauri_plugin_automation::init());
+        builder = builder.plugin(tauri_plugin_webdriver::init());
     }
 
     builder

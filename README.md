@@ -348,39 +348,44 @@ cargo test
 
 ### E2E Tests (WebdriverIO + Tauri)
 
-End-to-end tests use WebdriverIO with the CrabNebula Tauri driver. The test suite auto-detects the platform and uses the appropriate driver:
-
-- **macOS**: CrabNebula `tauri-plugin-automation` (compiled into the app via the `e2e` Cargo feature)
-- **Linux**: `tauri-driver` binary via WebDriver protocol
+End-to-end tests use [WebdriverIO](https://webdriver.io/) with [tauri-webdriver](https://github.com/Choochmeque/tauri-webdriver) — a cross-platform W3C WebDriver for Tauri apps. Works on macOS, Linux, and Windows.
 
 #### Prerequisites
 
-1. **Install dependencies** (if you haven't already):
+1. **Install npm dependencies:**
    ```bash
    npm install
    ```
 
-2. **Rust toolchain** must be installed (see Installation section above).
+2. **Install the `tauri-webdriver` CLI** (one-time setup):
+   ```bash
+   cargo install tauri-webdriver --locked
+   ```
+   This installs the `tauri-webdriver` binary which acts as the WebDriver server.
+
+3. **Rust toolchain** must be installed (see Installation section above).
 
 #### Running E2E Tests
 
-**Full build + test (macOS):**
-```bash
-npm run test:e2e:mac
-```
-This builds the frontend, compiles the Tauri app with the `e2e` feature flag, then runs all 14 test specs.
-
-**Full build + test (Linux):**
+**Full build + test (recommended first time):**
 ```bash
 npm run test:e2e
 ```
-Same as above but without the `e2e` feature flag (Linux uses `tauri-driver` externally).
+This builds the frontend, compiles the Tauri app with the `e2e` feature flag (which embeds the WebDriver plugin), then runs all 14 test specs.
 
 **Run tests only (skip build):**
 ```bash
 npm run test:e2e:only
 ```
-Use this when the app binary is already compiled. Fastest way to re-run tests after a previous build.
+Use this when the app binary is already compiled. Fastest way to re-run tests.
+
+#### How It Works
+
+1. `npm run test:e2e:build` compiles the app with `--features e2e`, which includes `tauri-plugin-webdriver` — this embeds a W3C WebDriver server (port 4445) inside the app.
+2. WebdriverIO's `beforeSession` hook spawns `tauri-webdriver` on port 4444, which acts as a proxy.
+3. `tauri-webdriver` launches the app binary, discovers the plugin's port, and bridges WebDriver commands to the embedded server.
+4. Tests interact with the app via standard WebDriver protocol.
+5. `afterSession` kills the driver process.
 
 #### What the E2E Tests Cover
 
@@ -404,9 +409,10 @@ Use this when the app binary is already compiled. Fastest way to re-run tests af
 #### Troubleshooting
 
 - **`wdio: command not found`** — Run `npm install` first. The `wdio` binary comes from the `@wdio/cli` dev dependency.
-- **App doesn't launch** — Make sure the app has been built first with `npm run test:e2e:build` (Linux) or `npm run test:e2e:build:mac` (macOS).
-- **Tests time out** — The default timeout is 60 seconds per test. If the app is slow to start, check that the release binary exists at `src-tauri/target/release/`.
-- **Fresh state needed** — Tests automatically reset the database before running. If you need a manual reset, delete the database file (see Database section above).
+- **`tauri-webdriver: command not found`** — Run `cargo install tauri-webdriver --locked`.
+- **App doesn't launch** — Make sure the app has been built with `npm run test:e2e:build` first. The `--features e2e` flag is required to embed the WebDriver plugin.
+- **Tests time out** — The default timeout is 60 seconds per test. Check that the release binary exists at `src-tauri/target/release/`.
+- **Fresh state needed** — Tests automatically reset the database before running. For manual reset, delete the database file (see Database section above).
 
 ---
 

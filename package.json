@@ -9,9 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:e2e": "npm run test:e2e:build && wdio run e2e/wdio.conf.ts",
-    "test:e2e:build": "npm run build && cargo build --release --manifest-path src-tauri/Cargo.toml",
-    "test:e2e:build:mac": "npm run build && cargo build --release --features e2e --manifest-path src-tauri/Cargo.toml",
-    "test:e2e:mac": "npm run test:e2e:build:mac && wdio run e2e/wdio.conf.ts",
+    "test:e2e:build": "npm run build && cargo build --release --features e2e --manifest-path src-tauri/Cargo.toml",
     "test:e2e:only": "wdio run e2e/wdio.conf.ts"
   },
   "dependencies": {
@@ -25,7 +23,6 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
-    "@crabnebula/tauri-driver": "^2.0.9",
     "@tauri-apps/cli": "^2.10.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
