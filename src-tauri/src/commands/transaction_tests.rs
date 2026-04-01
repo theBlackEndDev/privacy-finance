@@ -2,13 +2,14 @@
 mod tests {
     use rusqlite::Connection;
     use uuid::Uuid;
-    use crate::db::migrations::run_migrations;
+    use crate::db::migrations::{run_migrations, seed_test_data};
     use crate::helpers::timestamps::now_utc;
 
     fn setup() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
         run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
         conn
     }
 

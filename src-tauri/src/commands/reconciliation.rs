@@ -219,13 +219,14 @@ pub fn cancel_reconciliation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::migrations::run_migrations;
+    use crate::db::migrations::{run_migrations, seed_test_data};
     use crate::helpers::timestamps::now_utc;
     use rusqlite::Connection;
 
     fn setup_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
         conn
     }
 

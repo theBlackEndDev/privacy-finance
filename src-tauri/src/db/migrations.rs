@@ -581,116 +581,43 @@ fn seed_defaults(conn: &Connection) -> AppResult<()> {
     let cat_personal    = insert_category(conn, "Personal",       "#0ea5e9", "expense",  9, &now)?;
     let _cat_other      = insert_category(conn, "Other",          "#6b7280", "expense", 10, &now)?;
 
-    // ── Accounts ─────────────────────────────────────────────────────────────
+    // No seed accounts or transactions in production — the onboarding wizard
+    // guides users through creating their first account on fresh install.
 
-    let checking = insert_account(conn, "Primary Checking", "checking",    250_000, 0, &now)?; // $2,500 opening
-    let savings  = insert_account(conn, "High-Yield Savings", "savings",  1_200_000, 1, &now)?; // $12,000
-    let cc       = insert_account(conn, "Visa Rewards Card", "credit_card", 0,      2, &now)?;
+    Ok(())
+}
 
-    // ── Transactions — 3 months of realistic data ─────────────────────────────
-    // Month -2 (two months ago)
+/// Seed sample accounts + transactions for unit tests.
+/// Not called in production — only from test setup functions.
+#[cfg(test)]
+pub fn seed_test_data(conn: &Connection) -> AppResult<()> {
+    let now = now_utc();
 
-    // Salaries
+    // Reuse seed categories (already created by run_migrations → seed_defaults)
+    let cat_salary: String = conn.query_row(
+        "SELECT id FROM categories WHERE name = 'Salary'", [], |r| r.get(0)
+    )?;
+    let cat_food: String = conn.query_row(
+        "SELECT id FROM categories WHERE name = 'Food'", [], |r| r.get(0)
+    )?;
+    let cat_housing: String = conn.query_row(
+        "SELECT id FROM categories WHERE name = 'Housing'", [], |r| r.get(0)
+    )?;
+
+    let checking = insert_account(conn, "Primary Checking", "checking", 250_000, 0, &now)?;
+    let savings  = insert_account(conn, "High-Yield Savings", "savings", 1_200_000, 1, &now)?;
+    let cc       = insert_account(conn, "Visa Rewards Card", "credit_card", 0, 2, &now)?;
+
+    // Minimal set of transactions for testing
     insert_tx(conn, &checking, "2026-01-15", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Jan", true, &now)?;
-    insert_tx(conn, &checking, "2026-01-31", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Jan", true, &now)?;
     insert_tx(conn, &checking, "2026-02-14", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Feb", true, &now)?;
-    insert_tx(conn, &checking, "2026-02-28", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Feb", true, &now)?;
     insert_tx(conn, &checking, "2026-03-14", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Mar", true, &now)?;
-    insert_tx(conn, &checking, "2026-03-31", 425_000, "income", Some(&cat_salary), "Acme Corp", "Salary — Mar", false, &now)?;
-
-    // Freelance
-    insert_tx(conn, &checking, "2026-01-20", 120_000, "income", Some(&cat_freelance), "Studio Nine", "Logo design project", true, &now)?;
-    insert_tx(conn, &checking, "2026-03-05", 85_000, "income", Some(&cat_freelance), "Apex Media", "Website audit", true, &now)?;
-
-    // Investment dividends
-    insert_tx(conn, &savings, "2026-01-31", 18_400, "income", Some(&cat_investments), "Vanguard", "Dividend Q4", true, &now)?;
-    insert_tx(conn, &savings, "2026-02-29", 21_200, "income", Some(&cat_investments), "Vanguard", "Dividend", true, &now)?;
-    insert_tx(conn, &savings, "2026-03-31", 19_700, "income", Some(&cat_investments), "Vanguard", "Dividend", false, &now)?;
-
-    // Housing — rent on checking
-    insert_tx(conn, &checking, "2026-01-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent — January", true, &now)?;
-    insert_tx(conn, &checking, "2026-02-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent — February", true, &now)?;
-    insert_tx(conn, &checking, "2026-03-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent — March", true, &now)?;
-
-    // Utilities on CC
-    insert_tx(conn, &cc, "2026-01-08", -9_400, "expense", Some(&cat_utilities), "City Power & Gas", "Electric + gas", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-10", -7_200, "expense", Some(&cat_utilities), "StreamNet ISP", "Internet", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-08", -9_800, "expense", Some(&cat_utilities), "City Power & Gas", "Electric + gas", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-10", -7_200, "expense", Some(&cat_utilities), "StreamNet ISP", "Internet", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-08", -8_900, "expense", Some(&cat_utilities), "City Power & Gas", "Electric + gas", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-10", -7_200, "expense", Some(&cat_utilities), "StreamNet ISP", "Internet", false, &now)?;
-
-    // Food / Groceries on CC
-    insert_tx(conn, &cc, "2026-01-03", -12_400, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-09", -4_200, "expense", Some(&cat_food), "Blue Bottle Coffee", "Coffee & pastries", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-14", -13_100, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-18", -8_700, "expense", Some(&cat_food), "Chipotle", "Team lunch", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-21", -11_900, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-25", -3_500, "expense", Some(&cat_food), "Starbucks", "Coffee runs", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-28", -14_200, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-04", -12_800, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-11", -11_600, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-14", -9_800, "expense", Some(&cat_food), "Nobu", "Valentine's dinner", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-18", -13_400, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-25", -12_100, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-04", -13_700, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-11", -11_200, "expense", Some(&cat_food), "Trader Joe's", "Weekly groceries", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-15", -6_400, "expense", Some(&cat_food), "The French Laundry", "Birthday dinner", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-18", -12_900, "expense", Some(&cat_food), "Whole Foods", "Weekly groceries", false, &now)?;
-
-    // Transportation on CC
-    insert_tx(conn, &cc, "2026-01-05", -6_200, "expense", Some(&cat_transport), "Uber", "Rides", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-15", -5_500, "expense", Some(&cat_transport), "Shell", "Gas", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-05", -7_100, "expense", Some(&cat_transport), "Uber", "Rides", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-20", -5_500, "expense", Some(&cat_transport), "Shell", "Gas", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-05", -6_800, "expense", Some(&cat_transport), "Uber", "Rides", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-20", -5_500, "expense", Some(&cat_transport), "Chevron", "Gas", false, &now)?;
-
-    // Subscriptions on CC
-    insert_tx(conn, &cc, "2026-01-02", -1_599, "expense", Some(&cat_subs), "Netflix", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-02", -1_099, "expense", Some(&cat_subs), "Spotify", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-02", -2_999, "expense", Some(&cat_subs), "iCloud+", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-05", -1_400, "expense", Some(&cat_subs), "New York Times", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-02", -1_599, "expense", Some(&cat_subs), "Netflix", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-02", -1_099, "expense", Some(&cat_subs), "Spotify", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-02", -2_999, "expense", Some(&cat_subs), "iCloud+", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-05", -1_400, "expense", Some(&cat_subs), "New York Times", "Monthly", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-02", -1_599, "expense", Some(&cat_subs), "Netflix", "Monthly", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-02", -1_099, "expense", Some(&cat_subs), "Spotify", "Monthly", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-02", -2_999, "expense", Some(&cat_subs), "iCloud+", "Monthly", false, &now)?;
-    insert_tx(conn, &cc, "2026-03-05", -1_400, "expense", Some(&cat_subs), "New York Times", "Monthly", false, &now)?;
-
-    // Entertainment on CC
-    insert_tx(conn, &cc, "2026-01-12", -8_000, "expense", Some(&cat_entertain), "AMC Theatres", "Movie night", true, &now)?;
-    insert_tx(conn, &cc, "2026-01-22", -15_000, "expense", Some(&cat_entertain), "Ticketmaster", "Jazz concert tickets", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-08", -7_500, "expense", Some(&cat_entertain), "AMC Theatres", "Movie night", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-22", -22_000, "expense", Some(&cat_entertain), "Ticketmaster", "NBA tickets", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-14", -9_000, "expense", Some(&cat_entertain), "AMC Theatres", "Movie night x2", false, &now)?;
-
-    // Shopping on CC
-    insert_tx(conn, &cc, "2026-01-17", -24_900, "expense", Some(&cat_shopping), "Amazon", "Home supplies", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-10", -18_500, "expense", Some(&cat_shopping), "Target", "Household items", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-16", -34_000, "expense", Some(&cat_shopping), "Apple Store", "AirPods Pro", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-07", -22_300, "expense", Some(&cat_shopping), "Amazon", "Misc household", false, &now)?;
-
-    // Healthcare
-    insert_tx(conn, &cc, "2026-01-24", -15_000, "expense", Some(&cat_health), "Dr. Martinez", "Dental cleaning", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-12", -4_200, "expense", Some(&cat_health), "CVS Pharmacy", "Prescriptions", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-22", -20_000, "expense", Some(&cat_health), "Dr. Chen", "Annual physical", false, &now)?;
-
-    // Personal
-    insert_tx(conn, &cc, "2026-01-19", -8_500, "expense", Some(&cat_personal), "Great Clips", "Haircut", true, &now)?;
-    insert_tx(conn, &cc, "2026-02-19", -8_500, "expense", Some(&cat_personal), "Great Clips", "Haircut", true, &now)?;
-    insert_tx(conn, &cc, "2026-03-19", -8_500, "expense", Some(&cat_personal), "Great Clips", "Haircut", false, &now)?;
-
-    // CC payments (transfer checking → CC)
-    insert_transfer(conn, &checking, &cc, 180_000, "2026-02-05", "CC payment — January", &now)?;
-    insert_transfer(conn, &checking, &cc, 195_000, "2026-03-05", "CC payment — February", &now)?;
-
-    // Savings transfers
-    insert_transfer(conn, &checking, &savings, 50_000, "2026-01-31", "Monthly savings transfer", &now)?;
-    insert_transfer(conn, &checking, &savings, 50_000, "2026-02-28", "Monthly savings transfer", &now)?;
-    insert_transfer(conn, &checking, &savings, 50_000, "2026-03-31", "Monthly savings transfer", &now)?;
+    insert_tx(conn, &cc, "2026-01-03", -12_400, "expense", Some(&cat_food), "Whole Foods", "Groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-02-04", -12_800, "expense", Some(&cat_food), "Trader Joe's", "Groceries", true, &now)?;
+    insert_tx(conn, &cc, "2026-03-04", -13_700, "expense", Some(&cat_food), "Whole Foods", "Groceries", false, &now)?;
+    insert_tx(conn, &checking, "2026-01-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent", true, &now)?;
+    insert_tx(conn, &checking, "2026-02-01", -185_000, "expense", Some(&cat_housing), "Sunset Apartments", "Rent", true, &now)?;
+    insert_transfer(conn, &checking, &cc, 180_000, "2026-02-05", "CC payment", &now)?;
 
     Ok(())
 }

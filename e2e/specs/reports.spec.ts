@@ -1,9 +1,8 @@
-import { browser } from '@wdio/globals';
-import { sel } from '../helpers/selectors';
+import { sel, byTestId } from '../helpers/selectors';
 import {
   waitForAppReady,
   navigateTo,
-  selectOption,
+  clickButton,
   isVisible,
 } from '../helpers/app';
 
@@ -13,29 +12,35 @@ describe('Reports', () => {
     await navigateTo('reports');
   });
 
-  it('views income/expense report', async () => {
-    await selectOption(sel.reportTypeSelect, 'Income vs Expense');
+  it('views income/expense report via tab', async () => {
+    const tab = await $('[data-testid="report-tab-income-expense"]');
+    await tab.waitForClickable({ timeout: 5000 });
+    await tab.click();
     await browser.pause(1000);
 
-    const chart = await $(sel.reportIncomeExpense);
+    const chart = await $(sel.reportChart);
     await chart.waitForDisplayed({ timeout: 10000 });
     expect(await chart.isDisplayed()).toBe(true);
   });
 
-  it('views category spending report', async () => {
-    await selectOption(sel.reportTypeSelect, 'Category Spending');
+  it('views category spending report via tab', async () => {
+    const tab = await $('[data-testid="report-tab-categories"]');
+    await tab.waitForClickable({ timeout: 5000 });
+    await tab.click();
     await browser.pause(1000);
 
-    const breakdown = await $(sel.reportCategorySpending);
-    await breakdown.waitForDisplayed({ timeout: 10000 });
-    expect(await breakdown.isDisplayed()).toBe(true);
+    const chart = await $(sel.reportChart);
+    await chart.waitForDisplayed({ timeout: 10000 });
+    expect(await chart.isDisplayed()).toBe(true);
   });
 
-  it('views net worth report', async () => {
-    await selectOption(sel.reportTypeSelect, 'Net Worth');
+  it('views net worth report via tab', async () => {
+    const tab = await $('[data-testid="report-tab-net-worth"]');
+    await tab.waitForClickable({ timeout: 5000 });
+    await tab.click();
     await browser.pause(1000);
 
-    const chart = await $(sel.reportNetWorth);
+    const chart = await $(sel.reportChart);
     await chart.waitForDisplayed({ timeout: 10000 });
     expect(await chart.isDisplayed()).toBe(true);
   });

@@ -1,4 +1,4 @@
-import { sel, byTestIdPrefix } from '../helpers/selectors';
+import { sel } from '../helpers/selectors';
 import {
   waitForAppReady,
   navigateTo,
@@ -6,7 +6,6 @@ import {
   selectOption,
   clickButton,
   confirmAction,
-  waitForToast,
   countElements,
 } from '../helpers/app';
 
@@ -18,17 +17,18 @@ describe('Categories', () => {
 
   it('shows seed categories on fresh launch', async () => {
     const count = await countElements(sel.catRow);
-    expect(count).toBeGreaterThanOrEqual(15); // 4 income + 11 expense seed categories
+    expect(count).toBeGreaterThanOrEqual(15);
   });
 
-  it('creates expense category with color', async () => {
+  it('creates expense category', async () => {
     const initialCount = await countElements(sel.catRow);
 
     await clickButton(sel.createCategoryBtn);
+    await browser.pause(300);
     await fillInput(sel.catNameInput, 'E2E Test Category');
     await selectOption(sel.catTypeSelect, 'Expense');
     await clickButton(sel.catSubmitBtn);
-    await waitForToast();
+    await browser.pause(500);
 
     const updatedCount = await countElements(sel.catRow);
     expect(updatedCount).toBe(initialCount + 1);
@@ -38,10 +38,11 @@ describe('Categories', () => {
     const initialCount = await countElements(sel.catRow);
 
     await clickButton(sel.createCategoryBtn);
+    await browser.pause(300);
     await fillInput(sel.catNameInput, 'E2E Income');
     await selectOption(sel.catTypeSelect, 'Income');
     await clickButton(sel.catSubmitBtn);
-    await waitForToast();
+    await browser.pause(500);
 
     const updatedCount = await countElements(sel.catRow);
     expect(updatedCount).toBe(initialCount + 1);
@@ -59,7 +60,7 @@ describe('Categories', () => {
 
     await fillInput(sel.catNameInput, 'Renamed E2E Category');
     await clickButton(sel.catSubmitBtn);
-    await waitForToast();
+    await browser.pause(500);
 
     const updatedRows = await $$(sel.catRow);
     let found = false;
@@ -83,7 +84,7 @@ describe('Categories', () => {
 
     await clickButton(sel.deleteBtn);
     await confirmAction();
-    await waitForToast();
+    await browser.pause(500);
 
     const updatedCount = await countElements(sel.catRow);
     expect(updatedCount).toBeLessThan(initialCount);

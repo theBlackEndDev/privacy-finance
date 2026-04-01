@@ -1,13 +1,10 @@
-import { browser } from '@wdio/globals';
 import { sel, byTestIdPrefix } from '../helpers/selectors';
 import {
   waitForAppReady,
   navigateTo,
   fillInput,
   clickButton,
-  isVisible,
   countElements,
-  waitForToast,
 } from '../helpers/app';
 
 describe('Tags', () => {
@@ -26,10 +23,17 @@ describe('Tags', () => {
     const editModal = await $(sel.txEditModal);
     await editModal.waitForDisplayed({ timeout: 5000 });
 
-    // Open tag picker within the edit modal
-    await clickButton(sel.tagPicker);
+    // Click "+ Add tag" trigger to open the tag dropdown
+    const addTagBtn = await editModal.$('button*=Add tag');
+    if (await addTagBtn.isExisting()) {
+      await addTagBtn.click();
+      await browser.pause(300);
+    } else {
+      // Fall back to tag-picker testid
+      await clickButton(sel.tagPicker);
+    }
 
-    // Type a new tag name and create it
+    // Now tag-input should be visible
     await fillInput(sel.tagInput, 'vacation');
     await clickButton(sel.tagCreateBtn);
     await browser.pause(500);

@@ -6,7 +6,6 @@ import {
   selectOption,
   clickButton,
   confirmAction,
-  waitForToast,
   countElements,
 } from '../helpers/app';
 
@@ -16,46 +15,50 @@ describe('Transactions', () => {
     await navigateTo('transactions');
   });
 
-  it('shows seed transactions on fresh launch', async () => {
+  it('starts with no transactions on blank database', async () => {
     const count = await countElements(byTestIdPrefix('tx-row-'));
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBe(0);
   });
 
   it('creates expense transaction via quick entry', async () => {
-    const initialCount = await countElements(byTestIdPrefix('tx-row-'));
+    // Select expense kind: click the button with text content minus sign
+    const kindGroup = await $(sel.txKindSelect);
+    await kindGroup.waitForDisplayed({ timeout: 5000 });
+    const expenseBtn = await kindGroup.$('button*=\u2212');
+    if (await expenseBtn.isExisting()) {
+      await expenseBtn.click();
+    }
 
     await fillInput(sel.txPayeeInput, 'E2E Test Store');
     await fillInput(sel.txAmountInput, '42.50');
-
-    // Select expense kind (toggle group)
-    const kindSelect = await $(sel.txKindSelect);
-    const expenseBtn = await kindSelect.$('button*=Expense');
-    if (await expenseBtn.isExisting()) await expenseBtn.click();
-
-    // Use seed category "Food"
     await selectOption(sel.txCategorySelect, 'Food');
     await clickButton(sel.txSubmitBtn);
-
     await browser.pause(500);
-    const updatedCount = await countElements(byTestIdPrefix('tx-row-'));
-    expect(updatedCount).toBeGreaterThan(initialCount);
+
+    const count = await countElements(byTestIdPrefix('tx-row-'));
+    expect(count).toBe(1);
   });
 
   it('creates income transaction', async () => {
+    // Select income kind
+    const kindGroup = await $(sel.txKindSelect);
+    const incomeBtn = await kindGroup.$('button*=+');
+    if (await incomeBtn.isExisting()) {
+      await incomeBtn.click();
+    }
+
     await fillInput(sel.txPayeeInput, 'E2E Employer');
     await fillInput(sel.txAmountInput, '1000');
-
-    const kindSelect = await $(sel.txKindSelect);
-    const incomeBtn = await kindSelect.$('button*=Income');
-    if (await incomeBtn.isExisting()) await incomeBtn.click();
-
     await selectOption(sel.txCategorySelect, 'Salary');
     await clickButton(sel.txSubmitBtn);
     await browser.pause(500);
+
+    const count = await countElements(byTestIdPrefix('tx-row-'));
+    expect(count).toBe(2);
   });
 
   it('edits transaction amount and payee', async () => {
-    // Click on a transaction row to open edit modal
+    // Click first transaction row to open edit modal
     const firstRow = await $(byTestIdPrefix('tx-row-'));
     await firstRow.waitForClickable({ timeout: 5000 });
     await firstRow.click();
@@ -66,7 +69,7 @@ describe('Transactions', () => {
     await fillInput(sel.txEditAmount, '99.99');
     await fillInput(sel.txEditPayee, 'Updated Payee');
     await clickButton(sel.txEditSave);
-    await waitForToast();
+    await browser.pause(500);
   });
 
   it('deletes transaction', async () => {
@@ -81,10 +84,44 @@ describe('Transactions', () => {
 
     await clickButton(sel.txEditDelete);
     await confirmAction();
-    await waitForToast();
+    await browser.pause(500);
 
     const updatedCount = await countElements(byTestIdPrefix('tx-row-'));
     expect(updatedCount).toBe(initialCount - 1);
+  });
+
+  it('creates more transactions for other specs', async () => {
+    // Create a few transactions that subsequent specs (search, tags, etc.) can use
+    const kindGroup = await $(sel.txKindSelect);
+
+    // Expense 1
+    const expenseBtn = await kindGroup.$('button*=\u2212');
+    if (await expenseBtn.isExisting()) await expenseBtn.click();
+    await fillInput(sel.txPayeeInput, 'Grocery Mart');
+    await fillInput(sel.txAmountInput, '55.00');
+    await selectOption(sel.txCategorySelect, 'Food');
+    await clickButton(sel.txSubmitBtn);
+    await browser.pause(500);
+
+    // Expense 2
+    if (await expenseBtn.isExisting()) await expenseBtn.click();
+    await fillInput(sel.txPayeeInput, 'Gas Station');
+    await fillInput(sel.txAmountInput, '40.00');
+    await selectOption(sel.txCategorySelect, 'Transportation');
+    await clickButton(sel.txSubmitBtn);
+    await browser.pause(500);
+
+    // Income
+    const incomeBtn = await kindGroup.$('button*=+');
+    if (await incomeBtn.isExisting()) await incomeBtn.click();
+    await fillInput(sel.txPayeeInput, 'Monthly Salary');
+    await fillInput(sel.txAmountInput, '3000');
+    await selectOption(sel.txCategorySelect, 'Salary');
+    await clickButton(sel.txSubmitBtn);
+    await browser.pause(500);
+
+    const count = await countElements(byTestIdPrefix('tx-row-'));
+    expect(count).toBeGreaterThanOrEqual(3);
   });
 
   it('filters by category', async () => {
@@ -92,10 +129,11 @@ describe('Transactions', () => {
     await browser.pause(500);
 
     const rows = await $$(byTestIdPrefix('tx-row-'));
-    expect(rows.length).toBeGreaterThanOrEqual(0);
+    expect(rows.length).toBeGreaterThanOrEqual(1);
 
     // Reset filter
-    await selectOption(sel.txFilterCategory, '');
+    await selectOption(sel.txFilterCategory, 'All');
+    await browser.pause(500);
   });
 
   it('filters by date range', async () => {
@@ -110,13 +148,23 @@ describe('Transactions', () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it('creates transfer between accounts', async () => {
-    // Check if transfer form is visible or needs toggling
-    const transferAmount = await $(sel.transferAmount);
-    if (await transferAmount.isExisting()) {
-      await fillInput(sel.transferAmount, '100');
-      await clickButton(sel.transferSubmitBtn);
-      await waitForToast();
+  it('opens transfer modal', async () => {
+    // Transfer opens via a button on the transactions page
+    const transferBtn = await $('button*=Transfer');
+    if (await transferBtn.isExisting()) {
+      await transferBtn.click();
+      await browser.pause(500);
+
+      // Verify modal opened with transfer fields
+      const transferAmount = await $(sel.transferAmount);
+      expect(await transferAmount.isDisplayed()).toBe(true);
+
+      // Close the modal without submitting (only one account exists)
+      const closeBtn = await $(sel.modalClose);
+      if (await closeBtn.isDisplayed()) {
+        await closeBtn.click();
+        await browser.pause(300);
+      }
     }
   });
 });

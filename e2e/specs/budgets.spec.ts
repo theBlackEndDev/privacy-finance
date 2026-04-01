@@ -1,13 +1,8 @@
-import { browser } from '@wdio/globals';
-import { sel, byTestIdPrefix } from '../helpers/selectors';
+import { sel } from '../helpers/selectors';
 import {
   waitForAppReady,
   navigateTo,
-  fillInput,
   clickButton,
-  isVisible,
-  waitForToast,
-  countElements,
 } from '../helpers/app';
 
 describe('Budgets', () => {
@@ -24,7 +19,7 @@ describe('Budgets', () => {
     await budgetInput.clearValue();
     await budgetInput.setValue('500');
 
-    // Tab out or click elsewhere to trigger save
+    // Tab out to trigger save
     await browser.keys('Tab');
     await browser.pause(1000);
 

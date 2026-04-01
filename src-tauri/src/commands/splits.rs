@@ -198,12 +198,13 @@ pub fn delete_splits(
 mod tests {
     use super::*;
     use rusqlite::Connection;
-    use crate::db::migrations::run_migrations;
+    use crate::db::migrations::{run_migrations, seed_test_data};
 
     fn setup() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
         run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
         conn
     }
 

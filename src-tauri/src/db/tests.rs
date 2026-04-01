@@ -1,11 +1,12 @@
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
-    use crate::db::migrations::run_migrations;
+    use crate::db::migrations::{run_migrations, seed_test_data};
 
     fn in_memory_db() -> Connection {
         let conn = Connection::open_in_memory().expect("in-memory db");
         run_migrations(&conn).expect("migrations");
+        seed_test_data(&conn).expect("seed test data");
         conn
     }
 
