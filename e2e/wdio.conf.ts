@@ -6,17 +6,13 @@ import { resetDatabase } from './helpers/app.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
-const isMac = process.platform === 'darwin';
 
-// Per tauri-webdriver docs: point to the built binary
-const appBinary = isMac
-  ? join(projectRoot, 'src-tauri/target/release/bundle/macos/PrivacyFinance.app/Contents/MacOS/PrivacyFinance')
-  : join(projectRoot, 'src-tauri/target/release/tauri-app');
+// cargo build --release produces the binary here (not a .app bundle)
+const appBinary = join(projectRoot, 'src-tauri/target/release/tauri-app');
 
 let driverProcess: ChildProcess | null = null;
 let driverKilled = false;
 
-/** Poll a TCP port until something is listening. */
 function waitForPort(host: string, port: number, interval = 200): Promise<void> {
   return new Promise((resolve) => {
     const tryConnect = () => {
@@ -59,12 +55,10 @@ export const config = {
     },
   },
 
-  onPrepare() {
+  // onPrepare runs ONCE before all workers — start driver here
+  async onPrepare() {
     resetDatabase();
-  },
 
-  async beforeSession() {
-    // tauri-webdriver is installed via: cargo install tauri-webdriver --locked
     driverProcess = spawn('tauri-webdriver', ['--port', '4444'], {
       stdio: [null, process.stdout, process.stderr],
     });
@@ -79,11 +73,11 @@ export const config = {
       }
     });
 
-    // Wait for the WebDriver server to be listening
     await waitForPort('127.0.0.1', 4444);
   },
 
-  afterSession() {
+  // onComplete runs ONCE after all workers — kill driver here
+  onComplete() {
     driverKilled = true;
     driverProcess?.kill();
     driverProcess = null;
