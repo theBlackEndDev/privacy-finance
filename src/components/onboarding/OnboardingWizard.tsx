@@ -83,6 +83,7 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
             placeholder="e.g. Primary Checking"
             autoFocus
             error={error && !name.trim() ? error : undefined}
+            data-testid="onboarding-account-name"
           />
 
           <div>
@@ -91,6 +92,7 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
               className={styles.select}
               value={type}
               onChange={(e) => { setType(e.target.value as Account['type']); setError(''); }}
+              data-testid="onboarding-account-type"
             >
               {ACCOUNT_TYPE_OPTIONS.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -103,6 +105,7 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
             value={openingBalance}
             onChange={(e) => { setOpeningBalance(e.target.value); setError(''); }}
             placeholder="0.00"
+            data-testid="onboarding-balance"
           />
 
           {error && name.trim() && <p className={styles.error}>{error}</p>}

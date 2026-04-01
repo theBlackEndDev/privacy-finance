@@ -25,11 +25,61 @@ export function resetDatabase() {
 }
 
 /**
- * Wait for the app to be fully loaded (sidebar visible).
+ * Wait for the app to be fully loaded.
+ * If the onboarding wizard appears (blank DB), complete it automatically
+ * so every spec starts from a ready state with sidebar visible.
  */
 export async function waitForAppReady() {
+  // Wait for either sidebar or onboarding wizard to appear
+  await browser.waitUntil(async () => {
+    const sidebar = await $(sel.sidebar);
+    const wizard = await $(sel.onboardingWizard);
+    return (await sidebar.isDisplayed().catch(() => false))
+        || (await wizard.isDisplayed().catch(() => false));
+  }, { timeout: 30000, timeoutMsg: 'Neither sidebar nor onboarding wizard appeared' });
+
+  // If onboarding wizard is showing, complete it
+  const wizard = await $(sel.onboardingWizard);
+  if (await wizard.isDisplayed().catch(() => false)) {
+    await completeOnboarding();
+  }
+
+  // Now sidebar should be visible
   const sidebar = await $(sel.sidebar);
-  await sidebar.waitForDisplayed({ timeout: 30000 });
+  await sidebar.waitForDisplayed({ timeout: 15000 });
+}
+
+/**
+ * Auto-complete the onboarding wizard to get to the main app.
+ */
+async function completeOnboarding() {
+  // Step 0: Welcome → click "Get started"
+  const nextBtn = await $(sel.onboardingNext);
+  await nextBtn.waitForClickable({ timeout: 5000 });
+  await nextBtn.click();
+  await browser.pause(500);
+
+  // Step 1: Create Account
+  const nameInput = await $('[data-testid="onboarding-account-name"]');
+  await nameInput.waitForDisplayed({ timeout: 5000 });
+  await nameInput.clearValue();
+  await nameInput.setValue('Checking');
+
+  const balanceInput = await $('[data-testid="onboarding-balance"]');
+  await balanceInput.clearValue();
+  await balanceInput.setValue('1000');
+
+  // Submit — the "Create account" button has the same testid as "Get started"
+  const createBtn = await $(sel.onboardingNext);
+  await createBtn.waitForClickable({ timeout: 5000 });
+  await createBtn.click();
+  await browser.pause(1000); // Wait for account creation + step transition
+
+  // Step 2: Categories → click "Start using PrivacyFinance"
+  const finishBtn = await $(sel.onboardingFinish);
+  await finishBtn.waitForClickable({ timeout: 5000 });
+  await finishBtn.click();
+  await browser.pause(500);
 }
 
 /**

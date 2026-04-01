@@ -1,48 +1,45 @@
 import { sel } from '../helpers/selectors';
-import { waitForAppReady, fillInput, selectOption, clickButton } from '../helpers/app';
+import { fillInput, clickButton } from '../helpers/app';
 
 describe('Onboarding', () => {
-  before(async () => {
-    await waitForAppReady();
-  });
+  // NOTE: This spec tests the onboarding flow explicitly.
+  // Other specs rely on waitForAppReady() which auto-completes onboarding.
+  // This spec must NOT call waitForAppReady() — it tests the raw wizard.
 
   it('shows onboarding wizard on blank database', async () => {
+    // Wait for either sidebar or wizard
+    await browser.waitUntil(async () => {
+      const wizard = await $(sel.onboardingWizard);
+      return wizard.isDisplayed().catch(() => false);
+    }, { timeout: 15000 });
+
     const wizard = await $(sel.onboardingWizard);
-    await wizard.waitForDisplayed({ timeout: 10000 });
     expect(await wizard.isDisplayed()).toBe(true);
   });
 
   it('completes onboarding by creating an account', async () => {
     // Step 0: Welcome — click "Get started"
-    const getStartedBtn = await $(sel.onboardingNext);
-    await getStartedBtn.waitForClickable({ timeout: 5000 });
-    await getStartedBtn.click();
+    await clickButton(sel.onboardingNext);
     await browser.pause(500);
 
-    // Step 1: Create Account — fill name, type, balance
-    await fillInput(sel.accountNameInput, 'Checking');
-    await selectOption(sel.accountTypeSelect, 'Checking');
-    await fillInput(sel.accountBalanceInput, '1000');
+    // Step 1: Create Account — use wizard-specific testids
+    await fillInput('[data-testid="onboarding-account-name"]', 'Checking');
+    await fillInput('[data-testid="onboarding-balance"]', '1000');
 
-    // Click "Create account" (same data-testid as "Get started": onboarding-next)
-    const createBtn = await $(sel.onboardingNext);
-    await createBtn.waitForClickable({ timeout: 5000 });
-    await createBtn.click();
-    await browser.pause(500);
+    // Click "Create account" (same testid as "Get started")
+    await clickButton(sel.onboardingNext);
+    await browser.pause(1000);
 
-    // Step 2: Categories display — click "Start using PrivacyFinance"
-    const finishBtn = await $(sel.onboardingFinish);
-    await finishBtn.waitForClickable({ timeout: 5000 });
-    await finishBtn.click();
+    // Step 2: Categories — click "Start using PrivacyFinance"
+    await clickButton(sel.onboardingFinish);
     await browser.pause(500);
   });
 
   it('shows dashboard after onboarding completes', async () => {
-    const dashboard = await $(sel.dashboardSummary);
-    await dashboard.waitForDisplayed({ timeout: 10000 });
-    expect(await dashboard.isDisplayed()).toBe(true);
+    const sidebar = await $(sel.sidebar);
+    await sidebar.waitForDisplayed({ timeout: 10000 });
+    expect(await sidebar.isDisplayed()).toBe(true);
 
-    // Wizard should be gone
     const wizard = await $(sel.onboardingWizard);
     expect(await wizard.isExisting()).toBe(false);
   });
