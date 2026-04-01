@@ -54,31 +54,26 @@ export async function waitForAppReady() {
  */
 async function completeOnboarding() {
   // Step 0: Welcome → click "Get started"
-  const nextBtn = await $(sel.onboardingNext);
-  await nextBtn.waitForClickable({ timeout: 5000 });
-  await nextBtn.click();
-  await browser.pause(500);
+  await (await $(sel.onboardingNext)).waitForClickable({ timeout: 5000 });
+  await (await $(sel.onboardingNext)).click();
 
-  // Step 1: Create Account
+  // Step 1: Create Account — wait for the name input to appear
   const nameInput = await $('[data-testid="onboarding-account-name"]');
   await nameInput.waitForDisplayed({ timeout: 5000 });
-  await nameInput.clearValue();
   await nameInput.setValue('Checking');
 
   const balanceInput = await $('[data-testid="onboarding-balance"]');
-  await balanceInput.clearValue();
   await balanceInput.setValue('1000');
 
-  // Submit — the "Create account" button has the same testid as "Get started"
-  const createBtn = await $(sel.onboardingNext);
-  await createBtn.waitForClickable({ timeout: 5000 });
-  await createBtn.click();
-  await browser.pause(1000); // Wait for account creation + step transition
+  // Re-query the submit button (it's a new element in step 1)
+  await browser.pause(300);
+  await (await $(sel.onboardingNext)).waitForClickable({ timeout: 5000 });
+  await (await $(sel.onboardingNext)).click();
 
-  // Step 2: Categories → click "Start using PrivacyFinance"
-  const finishBtn = await $(sel.onboardingFinish);
-  await finishBtn.waitForClickable({ timeout: 5000 });
-  await finishBtn.click();
+  // Step 2: Categories → wait for finish button, then click
+  await browser.pause(1000);
+  await (await $(sel.onboardingFinish)).waitForClickable({ timeout: 10000 });
+  await (await $(sel.onboardingFinish)).click();
   await browser.pause(500);
 }
 
