@@ -49,15 +49,20 @@ describe('Categories', () => {
   });
 
   it('edits category name', async () => {
+    // CategoryRow has Edit and Delete buttons directly in the row.
+    // Click the Edit button within the row that contains "E2E Test Category".
     const rows = await $$(sel.catRow);
     for (const row of rows) {
       if ((await row.getText()).includes('E2E Test Category')) {
-        await row.click();
+        const editBtn = await row.$('button*=Edit');
+        await editBtn.waitForClickable({ timeout: 5000 });
+        await editBtn.click();
         break;
       }
     }
     await browser.pause(300);
 
+    // The CategoryForm modal should now be open
     await fillInput(sel.catNameInput, 'Renamed E2E Category');
     await clickButton(sel.catSubmitBtn);
     await browser.pause(500);
@@ -73,16 +78,19 @@ describe('Categories', () => {
   it('deletes category', async () => {
     const initialCount = await countElements(sel.catRow);
 
+    // Click the Delete button within the "E2E Income" row
     const rows = await $$(sel.catRow);
     for (const row of rows) {
       if ((await row.getText()).includes('E2E Income')) {
-        await row.click();
+        const deleteBtn = await row.$('button*=Delete');
+        await deleteBtn.waitForClickable({ timeout: 5000 });
+        await deleteBtn.click();
         break;
       }
     }
     await browser.pause(300);
 
-    await clickButton(sel.deleteBtn);
+    // Confirm the deletion via ConfirmDialog
     await confirmAction();
     await browser.pause(500);
 

@@ -32,17 +32,10 @@ describe('Accounts', () => {
   it('creates a new savings account', async () => {
     const initialCount = await countElements(byTestIdPrefix('account-row-'));
 
-    // Try the Add Account button first, fall back to create-account-btn
+    // Click the "+ Add Account" button in the header
     const addBtn = await $('button*=Add Account');
-    if (await addBtn.isExisting()) {
-      await addBtn.click();
-    } else {
-      // Look for a "+" or create button
-      const plusBtn = await $('button*=+');
-      if (await plusBtn.isExisting()) {
-        await plusBtn.click();
-      }
-    }
+    await addBtn.waitForClickable({ timeout: 5000 });
+    await addBtn.click();
     await browser.pause(500);
 
     await fillInput(sel.accountNameInput, 'E2E Test Account');
@@ -56,31 +49,22 @@ describe('Accounts', () => {
   });
 
   it('edits account name', async () => {
-    // Click the E2E Test Account row to select it
+    // Find the E2E Test Account row and click the Edit button WITHIN the row
+    // (clicking the row itself navigates to account detail)
     const rows = await $$(byTestIdPrefix('account-row-'));
     for (const row of rows) {
       const text = await row.getText();
       if (text.includes('E2E Test Account')) {
-        await row.click();
+        // Click the Edit button inside this row (stops propagation, won't navigate)
+        const editBtn = await row.$('button*=Edit');
+        await editBtn.waitForClickable({ timeout: 5000 });
+        await editBtn.click();
         break;
       }
     }
     await browser.pause(500);
 
-    // Look for an edit button/icon to open the edit form
-    const editBtn = await $('button*=Edit');
-    if (await editBtn.isExisting()) {
-      await editBtn.click();
-      await browser.pause(500);
-    } else {
-      // Try a pencil/edit icon button
-      const editIcon = await $('[data-testid="edit-account-btn"]');
-      if (await editIcon.isExisting()) {
-        await editIcon.click();
-        await browser.pause(500);
-      }
-    }
-
+    // The AccountForm modal should now be open
     await fillInput(sel.accountNameInput, 'Renamed E2E Account');
     await clickButton(sel.createAccountBtn);
     await browser.pause(500);
@@ -98,25 +82,20 @@ describe('Accounts', () => {
   it('deletes account', async () => {
     const initialCount = await countElements(byTestIdPrefix('account-row-'));
 
-    // Click the renamed account row
+    // Find the renamed account row and click the Delete button WITHIN the row
     const rows = await $$(byTestIdPrefix('account-row-'));
     for (const row of rows) {
       const text = await row.getText();
       if (text.includes('Renamed E2E Account')) {
-        await row.click();
+        const deleteBtn = await row.$('button*=Delete');
+        await deleteBtn.waitForClickable({ timeout: 5000 });
+        await deleteBtn.click();
         break;
       }
     }
-    await browser.pause(500);
+    await browser.pause(300);
 
-    // Look for edit button first if needed
-    const editBtn = await $('button*=Edit');
-    if (await editBtn.isExisting()) {
-      await editBtn.click();
-      await browser.pause(500);
-    }
-
-    await clickButton(sel.deleteBtn);
+    // Confirm the deletion in the ConfirmDialog
     await confirmAction();
     await browser.pause(500);
 
@@ -125,8 +104,12 @@ describe('Accounts', () => {
   });
 
   it('views account detail by clicking row', async () => {
-    const firstAccount = await $(byTestIdPrefix('account-row-'));
-    await firstAccount.click();
+    // After delete, there should still be the Checking account
+    const rows = await $$(byTestIdPrefix('account-row-'));
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+
+    // Click the row itself (not an action button) to navigate to detail
+    await rows[0].click();
     await browser.pause(500);
     const mainContent = await $(sel.mainContent);
     expect(await mainContent.isDisplayed()).toBe(true);

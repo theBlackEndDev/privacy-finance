@@ -43,18 +43,20 @@ describe('Recurring Transactions', () => {
   });
 
   it('toggles recurring active status', async () => {
-    // Find the first recurring toggle (checkbox-like control)
+    // The toggle is a <button> element (not a checkbox), so isSelected() won't work.
+    // Instead, check the button's text content or title attribute to determine state.
     const toggle = await $(sel.recurringToggle);
     await toggle.waitForDisplayed({ timeout: 5000 });
 
-    // Read current checked state
-    const wasChecked = await toggle.isSelected();
+    // Read current state from the title attribute (e.g., "Pause" when active, "Resume" when paused)
+    const titleBefore = await toggle.getAttribute('title');
 
     await toggle.click();
     await browser.pause(500);
 
-    const isChecked = await toggle.isSelected();
-    expect(isChecked).not.toBe(wasChecked);
+    const titleAfter = await toggle.getAttribute('title');
+    // The title should have flipped between "Pause" and "Resume"
+    expect(titleAfter).not.toBe(titleBefore);
 
     // Toggle back to original state
     await toggle.click();

@@ -15,6 +15,7 @@ pub fn run() {
 
     #[cfg(feature = "e2e")]
     {
+        eprintln!("[E2E] Registering tauri-plugin-webdriver on port 4445");
         builder = builder.plugin(tauri_plugin_webdriver::init());
     }
 

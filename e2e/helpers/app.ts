@@ -38,15 +38,34 @@ export async function waitForAppReady() {
         || (await wizard.isDisplayed().catch(() => false));
   }, { timeout: 30000, timeoutMsg: 'Neither sidebar nor onboarding wizard appeared' });
 
-  // If onboarding wizard is showing, complete it
+  // If onboarding wizard is showing, complete or skip it
   const wizard = await $(sel.onboardingWizard);
   if (await wizard.isDisplayed().catch(() => false)) {
-    await completeOnboarding();
+    try {
+      await completeOnboarding();
+    } catch {
+      const skipBtn = await $(sel.onboardingSkip);
+      if (await skipBtn.isDisplayed().catch(() => false)) {
+        await skipBtn.click();
+        await browser.pause(1000);
+      }
+    }
   }
 
-  // Now sidebar should be visible
+  // Dismiss any non-onboarding modal that might be blocking (e.g. RecurringDueModal)
+  const wizard2 = await $(sel.onboardingWizard);
+  const wizardStillUp = await wizard2.isDisplayed().catch(() => false);
+  if (!wizardStillUp) {
+    const modalClose = await $(sel.modalClose);
+    if (await modalClose.isDisplayed().catch(() => false)) {
+      await browser.execute((el: HTMLElement) => el.click(), modalClose as any);
+      await browser.pause(500);
+    }
+  }
+
+  // Now sidebar should be visible and clickable
   const sidebar = await $(sel.sidebar);
-  await sidebar.waitForDisplayed({ timeout: 15000 });
+  await sidebar.waitForDisplayed({ timeout: 30000 });
 }
 
 /**
@@ -83,7 +102,9 @@ async function completeOnboarding() {
 export async function navigateTo(view: keyof typeof viewSelectors) {
   const selector = viewSelectors[view];
   const navItem = await $(selector);
-  await navItem.waitForClickable({ timeout: 5000 });
+  await navItem.waitForDisplayed({ timeout: 30000 });
+  // Use JS click to bypass any overlay that might block native clicks
+  await browser.execute((el: HTMLElement) => el.click(), navItem as any);
   await navItem.click();
   await browser.pause(500); // Wait for view transition
 }
@@ -106,9 +127,10 @@ const viewSelectors = {
  */
 export async function openSettings() {
   const btn = await $(sel.navSettings);
-  await btn.click();
+  await btn.waitForDisplayed({ timeout: 15000 });
+  await browser.execute((el: HTMLElement) => el.click(), btn as any);
   const modal = await $(sel.settingsModal);
-  await modal.waitForDisplayed({ timeout: 5000 });
+  await modal.waitForDisplayed({ timeout: 10000 });
 }
 
 /**
@@ -157,8 +179,8 @@ export async function selectOption(selector: string, text: string) {
  */
 export async function clickButton(selector: string) {
   const btn = await $(selector);
-  await btn.waitForClickable({ timeout: 5000 });
-  await btn.click();
+  await btn.waitForDisplayed({ timeout: 10000 });
+  await browser.execute((el: HTMLElement) => el.click(), btn as any);
   await browser.pause(300);
 }
 

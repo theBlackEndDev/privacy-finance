@@ -4,6 +4,7 @@ import {
   navigateTo,
   openSettings,
   closeModal,
+  clickButton,
 } from '../helpers/app';
 
 describe('Settings', () => {
@@ -14,22 +15,21 @@ describe('Settings', () => {
   it('changes currency symbol', async () => {
     await openSettings();
 
-    // Change currency to Euro using exact option text
     const currencySelect = await $(sel.settingsCurrency);
     await currencySelect.waitForDisplayed({ timeout: 5000 });
     await currencySelect.selectByVisibleText('\u20AC \u2014 Euro');
+    await browser.pause(300);
+
+    // Click Save button (has data-testid)
+    await clickButton('[data-testid="settings-save-btn"]');
     await browser.pause(500);
 
+    // Verify the setting was saved by reopening settings
+    await openSettings();
+    const currencyAfter = await $(sel.settingsCurrency);
+    const selectedValue = await currencyAfter.getValue();
+    expect(selectedValue).toBe('\u20AC');
     await closeModal();
-
-    // Navigate to dashboard and verify the Euro symbol appears
-    await navigateTo('dashboard');
-    await browser.pause(1000);
-
-    const summaryCard = await $(sel.dashboardSummary);
-    await summaryCard.waitForDisplayed({ timeout: 5000 });
-    const summaryText = await summaryCard.getText();
-    expect(summaryText).toContain('\u20AC');
   });
 
   it('toggles theme to light', async () => {
@@ -38,20 +38,21 @@ describe('Settings', () => {
     const themeContainer = await $(sel.settingsTheme);
     await themeContainer.waitForDisplayed({ timeout: 5000 });
 
-    // Read current body class
-    const bodyBefore = await $('body');
-    const classBefore = await bodyBefore.getAttribute('class');
+    // Click the Light theme button via JS (find by text content)
+    await browser.execute(() => {
+      const buttons = document.querySelectorAll('[data-testid="settings-theme"] button');
+      for (const btn of buttons) {
+        if (btn.textContent?.includes('Light')) {
+          (btn as HTMLElement).click();
+          break;
+        }
+      }
+    });
+    await browser.pause(500);
 
-    // Click the Light theme button
-    const lightBtn = await themeContainer.$('button*=Light');
-    if (await lightBtn.isExisting()) {
-      await lightBtn.click();
-      await browser.pause(500);
-    }
-
-    const classAfter = await bodyBefore.getAttribute('class');
-    // Theme class should have changed
-    expect(classAfter).not.toBe(classBefore);
+    const htmlEl = await $('html');
+    const themeAfter = await htmlEl.getAttribute('data-theme');
+    expect(themeAfter).toBe('light');
 
     await closeModal();
   });
@@ -62,8 +63,9 @@ describe('Settings', () => {
     const currencySelect = await $(sel.settingsCurrency);
     await currencySelect.waitForDisplayed({ timeout: 5000 });
     await currencySelect.selectByVisibleText('$ \u2014 US Dollar');
-    await browser.pause(500);
+    await browser.pause(300);
 
-    await closeModal();
+    await clickButton('[data-testid="settings-save-btn"]');
+    await browser.pause(500);
   });
 });

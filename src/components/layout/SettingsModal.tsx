@@ -353,7 +353,7 @@ export function SettingsModal({ onClose }: Props) {
           </Button>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" onClick={handleSave} disabled={saving}>
+            <Button variant="primary" onClick={handleSave} disabled={saving} data-testid="settings-save-btn">
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>

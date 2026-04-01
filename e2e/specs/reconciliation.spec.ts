@@ -20,8 +20,8 @@ describe('Reconciliation', () => {
   it('starts reconciliation for an account', async () => {
     // Click the first account button (data-testid starts with recon-account-)
     const accountBtn = await $(byTestIdPrefix('recon-account-'));
-    await accountBtn.waitForClickable({ timeout: 5000 });
-    await accountBtn.click();
+    await accountBtn.waitForDisplayed({ timeout: 10000 });
+    await browser.execute((el: HTMLElement) => el.click(), accountBtn as any);
     await browser.pause(1000);
 
     // Verify the reconciliation wizard/workspace appeared

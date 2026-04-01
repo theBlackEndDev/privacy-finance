@@ -6,9 +6,15 @@ import { resetDatabase } from './helpers/app.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
+const isMac = process.platform === 'darwin';
 
-// cargo build --release produces the binary here (not a .app bundle)
-const appBinary = join(projectRoot, 'src-tauri/target/release/tauri-app');
+// tauri build --debug --no-bundle produces the binary here
+const appBinary = join(projectRoot, 'src-tauri/target/debug/tauri-app');
+
+// Linux: official tauri-driver (uses WebKitWebDriver under the hood)
+// macOS: tauri-webdriver (uses tauri-plugin-webdriver embedded in app)
+const driverBin = isMac ? 'tauri-webdriver' : 'tauri-driver';
+const driverArgs = isMac ? ['--port', '4444'] : [];
 
 let driverProcess: ChildProcess | null = null;
 let driverKilled = false;
@@ -55,28 +61,25 @@ export const config = {
     },
   },
 
-  // onPrepare runs ONCE before all workers — start driver here
   async onPrepare() {
     resetDatabase();
 
-    driverProcess = spawn('tauri-webdriver', ['--port', '4444'], {
+    driverProcess = spawn(driverBin, driverArgs, {
       stdio: [null, process.stdout, process.stderr],
     });
 
     driverProcess.on('error', (err: Error) => {
-      console.error('[E2E] tauri-webdriver error:', err.message);
-      console.error('[E2E] Install it with: cargo install tauri-webdriver --locked');
+      console.error(`[E2E] ${driverBin} error:`, err.message);
     });
     driverProcess.on('exit', (code: number | null) => {
       if (!driverKilled) {
-        console.error('[E2E] tauri-webdriver exited unexpectedly with code:', code);
+        console.error(`[E2E] ${driverBin} exited unexpectedly with code:`, code);
       }
     });
 
     await waitForPort('127.0.0.1', 4444);
   },
 
-  // onComplete runs ONCE after all workers — kill driver here
   onComplete() {
     driverKilled = true;
     driverProcess?.kill();

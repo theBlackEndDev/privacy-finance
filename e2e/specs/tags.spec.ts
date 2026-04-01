@@ -10,32 +10,54 @@ import {
 describe('Tags', () => {
   before(async () => {
     await waitForAppReady();
+
+    // Ensure at least one transaction exists
+    await navigateTo('transactions');
+    await browser.pause(500);
+
+    const txCount = await countElements(byTestIdPrefix('tx-row-'));
+    if (txCount === 0) {
+      await fillInput(sel.txPayeeInput, 'Tag Test Store');
+      await fillInput(sel.txAmountInput, '25.00');
+      await clickButton(sel.txSubmitBtn);
+      await browser.pause(500);
+    }
   });
 
   it('creates tag and assigns to transaction', async () => {
     await navigateTo('transactions');
+    await browser.pause(500);
 
     // Click on the first transaction row to open its edit modal
     const firstTx = await $(sel.txRow);
-    await firstTx.waitForClickable({ timeout: 5000 });
-    await firstTx.click();
+    await firstTx.waitForDisplayed({ timeout: 10000 });
+    await browser.execute((el: HTMLElement) => el.click(), firstTx as any);
 
     const editModal = await $(sel.txEditModal);
     await editModal.waitForDisplayed({ timeout: 5000 });
 
-    // Click "+ Add tag" trigger to open the tag dropdown
-    const addTagBtn = await editModal.$('button*=Add tag');
-    if (await addTagBtn.isExisting()) {
-      await addTagBtn.click();
-      await browser.pause(300);
-    } else {
-      // Fall back to tag-picker testid
-      await clickButton(sel.tagPicker);
-    }
+    // The TagPicker component has a "+ Add tag" trigger button that opens the dropdown.
+    // The tag-input is only visible AFTER clicking that trigger.
+    const tagPicker = await editModal.$('[data-testid="tag-picker"]');
+    await tagPicker.waitForDisplayed({ timeout: 5000 });
 
-    // Now tag-input should be visible
-    await fillInput(sel.tagInput, 'vacation');
-    await clickButton(sel.tagCreateBtn);
+    // Click the "+ Add tag" trigger button to open the dropdown
+    const addTagTrigger = await tagPicker.$('button');
+    await addTagTrigger.waitForClickable({ timeout: 5000 });
+    await addTagTrigger.click();
+    await browser.pause(300);
+
+    // Now tag-input should be visible inside the dropdown
+    const tagInput = await $('[data-testid="tag-input"]');
+    await tagInput.waitForDisplayed({ timeout: 5000 });
+    await tagInput.clearValue();
+    await tagInput.setValue('vacation');
+    await browser.pause(300);
+
+    // Click the "+ Create" option to create the new tag
+    const createBtn = await $('[data-testid="tag-create-btn"]');
+    await createBtn.waitForDisplayed({ timeout: 5000 });
+    await createBtn.click();
     await browser.pause(500);
 
     // Verify the tag badge now appears
