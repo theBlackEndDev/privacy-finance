@@ -328,6 +328,9 @@ pub fn start_inference_server(app_data_dir: &PathBuf) -> AppResult<std::process:
         return Err(AppError::Validation("model not installed".to_string()));
     }
 
+    // Kill any orphaned llama-server still holding the port from a previous session
+    kill_existing_server();
+
     let server_binary = find_llama_server(app_data_dir)?;
     eprintln!("[AI Search] Starting llama-server: {:?} -m {:?}", server_binary, model_path);
 
@@ -388,6 +391,31 @@ pub fn start_inference_server(app_data_dir: &PathBuf) -> AppResult<std::process:
     drop(child.stderr.take());
 
     Ok(child)
+}
+
+/// Kill any process listening on the llama-server port (8847).
+/// Handles orphaned servers from crashed or force-quit app sessions.
+fn kill_existing_server() {
+    let output = std::process::Command::new("lsof")
+        .args(["-ti", "tcp:8847"])
+        .output();
+
+    if let Ok(output) = output {
+        let pids = String::from_utf8_lossy(&output.stdout);
+        let mut killed = false;
+        for pid_str in pids.split_whitespace() {
+            if let Ok(_pid) = pid_str.trim().parse::<u32>() {
+                eprintln!("[AI Search] Killing orphaned server process (PID {})", pid_str.trim());
+                let _ = std::process::Command::new("kill")
+                    .args(["-9", pid_str.trim()])
+                    .output();
+                killed = true;
+            }
+        }
+        if killed {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
 }
 
 fn find_llama_server(app_data_dir: &PathBuf) -> AppResult<PathBuf> {
