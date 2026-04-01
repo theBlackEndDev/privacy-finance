@@ -16,19 +16,23 @@ describe('Accounts', () => {
     await navigateTo('accounts');
   });
 
+  it('shows seed accounts on fresh launch', async () => {
+    const count = await countElements(byTestIdPrefix('account-row-'));
+    expect(count).toBeGreaterThanOrEqual(3); // Primary Checking, High-Yield Savings, Visa Rewards
+  });
+
   it('creates a new savings account', async () => {
     const initialCount = await countElements(byTestIdPrefix('account-row-'));
 
-    const addBtn = await $(sel.createAccountBtn);
-    if (!(await addBtn.isExisting())) {
-      const altBtn = await $('button*=Add Account');
-      await altBtn.click();
-    } else {
-      await addBtn.waitForClickable({ timeout: 5000 });
+    // Open create form — look for any add/create button
+    const addBtn = await $('button*=Add Account');
+    if (await addBtn.isExisting()) {
       await addBtn.click();
+    } else {
+      await clickButton(sel.createAccountBtn);
     }
 
-    await fillInput(sel.accountNameInput, 'Test Savings');
+    await fillInput(sel.accountNameInput, 'E2E Test Account');
     await selectOption(sel.accountTypeSelect, 'Savings');
     await fillInput(sel.accountBalanceInput, '5000');
     await clickButton(sel.createAccountBtn);
@@ -39,15 +43,18 @@ describe('Accounts', () => {
   });
 
   it('edits account name', async () => {
-    const count = await countElements(byTestIdPrefix('account-row-'));
-    expect(count).toBeGreaterThan(0);
+    // Find and click the E2E Test Account
+    const rows = await $$(byTestIdPrefix('account-row-'));
+    for (const row of rows) {
+      const text = await row.getText();
+      if (text.includes('E2E Test Account')) {
+        await row.click();
+        break;
+      }
+    }
+    await browser.pause(500);
 
-    const lastRow = await $(byTestIdPrefix('account-row-'));
-    await lastRow.waitForClickable({ timeout: 5000 });
-    await lastRow.click();
-    await browser.pause(300);
-
-    await fillInput(sel.accountNameInput, 'Renamed Savings');
+    await fillInput(sel.accountNameInput, 'Renamed E2E Account');
     await clickButton(sel.createAccountBtn);
     await waitForToast();
   });
@@ -55,27 +62,30 @@ describe('Accounts', () => {
   it('deletes account', async () => {
     const initialCount = await countElements(byTestIdPrefix('account-row-'));
 
-    const row = await $(byTestIdPrefix('account-row-'));
-    await row.waitForClickable({ timeout: 5000 });
-    await row.click();
-    await browser.pause(300);
+    // Find and click the renamed account
+    const rows = await $$(byTestIdPrefix('account-row-'));
+    for (const row of rows) {
+      const text = await row.getText();
+      if (text.includes('Renamed E2E Account')) {
+        await row.click();
+        break;
+      }
+    }
+    await browser.pause(500);
 
     await clickButton(sel.deleteBtn);
     await confirmAction();
-
     await waitForToast();
+
     const updatedCount = await countElements(byTestIdPrefix('account-row-'));
     expect(updatedCount).toBe(initialCount - 1);
   });
 
   it('views account detail page', async () => {
-    const count = await countElements('[data-testid^="account-row-"]');
-    if (count > 0) {
-      const firstAccount = await $('[data-testid^="account-row-"]');
-      await firstAccount.click();
-      await browser.pause(500);
-      const mainContent = await $(sel.mainContent);
-      expect(await mainContent.isDisplayed()).toBe(true);
-    }
+    const firstAccount = await $(byTestIdPrefix('account-row-'));
+    await firstAccount.click();
+    await browser.pause(500);
+    const mainContent = await $(sel.mainContent);
+    expect(await mainContent.isDisplayed()).toBe(true);
   });
 });

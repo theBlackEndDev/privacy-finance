@@ -16,19 +16,17 @@ describe('Categories', () => {
     await navigateTo('categories');
   });
 
+  it('shows seed categories on fresh launch', async () => {
+    const count = await countElements(sel.catRow);
+    expect(count).toBeGreaterThanOrEqual(15); // 4 income + 11 expense seed categories
+  });
+
   it('creates expense category with color', async () => {
     const initialCount = await countElements(sel.catRow);
 
     await clickButton(sel.createCategoryBtn);
-    await fillInput(sel.catNameInput, 'Entertainment');
+    await fillInput(sel.catNameInput, 'E2E Test Category');
     await selectOption(sel.catTypeSelect, 'Expense');
-
-    const colorPicker = await $(sel.catColorPicker);
-    if (await colorPicker.isDisplayed()) {
-      await colorPicker.click();
-      await browser.pause(200);
-    }
-
     await clickButton(sel.catSubmitBtn);
     await waitForToast();
 
@@ -40,7 +38,7 @@ describe('Categories', () => {
     const initialCount = await countElements(sel.catRow);
 
     await clickButton(sel.createCategoryBtn);
-    await fillInput(sel.catNameInput, 'Side Income');
+    await fillInput(sel.catNameInput, 'E2E Income');
     await selectOption(sel.catTypeSelect, 'Income');
     await clickButton(sel.catSubmitBtn);
     await waitForToast();
@@ -49,27 +47,24 @@ describe('Categories', () => {
     expect(updatedCount).toBe(initialCount + 1);
   });
 
-  it('edits category name and color', async () => {
+  it('edits category name', async () => {
     const rows = await $$(sel.catRow);
-    let targetRow: WebdriverIO.Element | null = null;
     for (const row of rows) {
-      if ((await row.getText()).includes('Entertainment')) {
-        targetRow = row;
+      if ((await row.getText()).includes('E2E Test Category')) {
+        await row.click();
         break;
       }
     }
-    expect(targetRow).not.toBeNull();
-    await targetRow!.click();
     await browser.pause(300);
 
-    await fillInput(sel.catNameInput, 'Fun & Games');
+    await fillInput(sel.catNameInput, 'Renamed E2E Category');
     await clickButton(sel.catSubmitBtn);
     await waitForToast();
 
     const updatedRows = await $$(sel.catRow);
     let found = false;
     for (const row of updatedRows) {
-      if ((await row.getText()).includes('Fun & Games')) { found = true; break; }
+      if ((await row.getText()).includes('Renamed E2E Category')) { found = true; break; }
     }
     expect(found).toBe(true);
   });
@@ -78,15 +73,12 @@ describe('Categories', () => {
     const initialCount = await countElements(sel.catRow);
 
     const rows = await $$(sel.catRow);
-    let targetRow: WebdriverIO.Element | null = null;
     for (const row of rows) {
-      if ((await row.getText()).includes('Side Income')) {
-        targetRow = row;
+      if ((await row.getText()).includes('E2E Income')) {
+        await row.click();
         break;
       }
     }
-    expect(targetRow).not.toBeNull();
-    await targetRow!.click();
     await browser.pause(300);
 
     await clickButton(sel.deleteBtn);

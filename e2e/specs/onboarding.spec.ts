@@ -1,39 +1,25 @@
 import { sel } from '../helpers/selectors';
-import { waitForAppReady, fillInput, clickButton } from '../helpers/app';
+import { waitForAppReady } from '../helpers/app';
 
 describe('Onboarding', () => {
   before(async () => {
     await waitForAppReady();
   });
 
-  it('shows onboarding wizard on fresh app', async () => {
-    const wizard = await $(sel.onboardingWizard);
-    await wizard.waitForDisplayed({ timeout: 10000 });
-    expect(await wizard.isDisplayed()).toBe(true);
-  });
-
-  it('completes onboarding creating first account', async () => {
-    // Step 1: Welcome — click Get Started / Next
-    await clickButton(sel.onboardingNext);
-
-    // Step 2: Create account
-    await fillInput(sel.accountNameInput, 'Checking');
-    await fillInput(sel.accountBalanceInput, '1000');
-    await clickButton(sel.onboardingNext);
-
-    // Step 3: Categories — finish
-    const finishBtn = await $(sel.onboardingFinish);
-    await finishBtn.waitForDisplayed({ timeout: 5000 });
-    await clickButton(sel.onboardingFinish);
-  });
-
-  it('shows dashboard after onboarding', async () => {
+  // The app seeds default accounts/categories on fresh DB, so onboarding
+  // wizard only shows if the user has never created an account. With seed
+  // data, it goes straight to dashboard. This test verifies that flow.
+  it('shows dashboard with seed data on fresh launch', async () => {
     const dashboard = await $(sel.dashboardSummary);
     await dashboard.waitForDisplayed({ timeout: 10000 });
     expect(await dashboard.isDisplayed()).toBe(true);
+  });
 
-    // Wizard should be gone
-    const wizard = await $(sel.onboardingWizard);
-    expect(await wizard.isExisting()).toBe(false);
+  it('sidebar is visible with navigation items', async () => {
+    const sidebar = await $(sel.sidebar);
+    expect(await sidebar.isDisplayed()).toBe(true);
+
+    const navDashboard = await $(sel.navDashboard);
+    expect(await navDashboard.isDisplayed()).toBe(true);
   });
 });
