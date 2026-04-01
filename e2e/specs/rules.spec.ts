@@ -24,16 +24,39 @@ describe('Rules', () => {
     // Fill rule name
     await fillInput('[data-testid="rule-name-input"]', 'Netflix Rule');
 
-    await selectOption(sel.ruleFieldSelect, 'Payee');
-    await selectOption(sel.ruleMatchTypeSelect, 'Contains');
+    // Use JS to set select values (WebKit selectByVisibleText can fail on some elements)
+    await browser.execute((s: string, v: string) => {
+      const el = document.querySelector(s) as HTMLSelectElement;
+      if (el) { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }
+    }, sel.ruleFieldSelect, 'payee');
+
+    await browser.execute((s: string, v: string) => {
+      const el = document.querySelector(s) as HTMLSelectElement;
+      if (el) { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }
+    }, sel.ruleMatchTypeSelect, 'contains');
+
     await fillInput(sel.rulePatternInput, 'netflix');
 
-    // Select target category
-    const categorySelect = await $(sel.ruleCategorySelect);
-    await categorySelect.waitForDisplayed({ timeout: 5000 });
-    await categorySelect.selectByVisibleText('Entertainment');
+    // Select category by value (find Entertainment's option value)
+    await browser.execute((s: string) => {
+      const el = document.querySelector(s) as HTMLSelectElement;
+      if (el) {
+        const opt = Array.from(el.options).find(o => o.text.includes('Entertainment'));
+        if (opt) { el.value = opt.value; el.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
+    }, sel.ruleCategorySelect);
 
-    await clickButton(sel.ruleSubmitBtn);
+    await browser.pause(300);
+
+    // Submit via form.submit() to avoid potential JS click issues with type=submit
+    await browser.execute((s: string) => {
+      const btn = document.querySelector(s) as HTMLElement;
+      if (btn) {
+        const form = btn.closest('form');
+        if (form) form.requestSubmit(btn as HTMLButtonElement);
+        else btn.click();
+      }
+    }, sel.ruleSubmitBtn);
     await browser.pause(1000);
 
     const newCount = await countElements(sel.ruleRow);
