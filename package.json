@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:e2e": "npm run test:e2e:build && wdio run e2e/wdio.conf.ts",
-    "test:e2e:build": "tauri build --debug --no-bundle",
+    "test:e2e:build": "tauri build --debug --no-bundle --features e2e",
     "test:e2e:only": "wdio run e2e/wdio.conf.ts"
   },
   "dependencies": {
