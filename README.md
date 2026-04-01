@@ -337,12 +337,76 @@ This is more aggressive than deleting just `privacyfinance.db`.
 
 ## Running Tests
 
+### Unit Tests (Rust)
+
 ```bash
 cd src-tauri
 cargo test
 ```
 
 113 tests covering migrations, account/category/transaction CRUD, transfers, dashboard aggregation, CSV import, encryption, and edge cases.
+
+### E2E Tests (WebdriverIO + Tauri)
+
+End-to-end tests use WebdriverIO with the CrabNebula Tauri driver. The test suite auto-detects the platform and uses the appropriate driver:
+
+- **macOS**: CrabNebula `tauri-plugin-automation` (compiled into the app via the `e2e` Cargo feature)
+- **Linux**: `tauri-driver` binary via WebDriver protocol
+
+#### Prerequisites
+
+1. **Install dependencies** (if you haven't already):
+   ```bash
+   npm install
+   ```
+
+2. **Rust toolchain** must be installed (see Installation section above).
+
+#### Running E2E Tests
+
+**Full build + test (macOS):**
+```bash
+npm run test:e2e:mac
+```
+This builds the frontend, compiles the Tauri app with the `e2e` feature flag, then runs all 14 test specs.
+
+**Full build + test (Linux):**
+```bash
+npm run test:e2e
+```
+Same as above but without the `e2e` feature flag (Linux uses `tauri-driver` externally).
+
+**Run tests only (skip build):**
+```bash
+npm run test:e2e:only
+```
+Use this when the app binary is already compiled. Fastest way to re-run tests after a previous build.
+
+#### What the E2E Tests Cover
+
+| Spec File | Tests |
+|-----------|-------|
+| `navigation` | Sidebar navigation to all views, keyboard shortcuts |
+| `onboarding` | First-run wizard, account creation, dashboard redirect |
+| `accounts` | Create, edit, delete accounts, detail view |
+| `transactions` | Create expense/income, edit, delete, filter by category/date, transfers |
+| `categories` | Create expense/income categories, edit, delete |
+| `search` | Keyword search, AI natural language search |
+| `budgets` | Set budget amounts, copy from previous month, progress bar |
+| `recurring` | Create recurring transactions, generate due items, toggle active |
+| `rules` | Create categorization rules, test matches, apply to uncategorized |
+| `tags` | Create and assign tags, remove tags |
+| `import-export` | CSV import wizard steps, CSV export |
+| `reports` | Income/expense, category spending, net worth reports |
+| `settings` | Currency symbol change, theme toggle |
+| `reconciliation` | Start account reconciliation |
+
+#### Troubleshooting
+
+- **`wdio: command not found`** — Run `npm install` first. The `wdio` binary comes from the `@wdio/cli` dev dependency.
+- **App doesn't launch** — Make sure the app has been built first with `npm run test:e2e:build` (Linux) or `npm run test:e2e:build:mac` (macOS).
+- **Tests time out** — The default timeout is 60 seconds per test. If the app is slow to start, check that the release binary exists at `src-tauri/target/release/`.
+- **Fresh state needed** — Tests automatically reset the database before running. If you need a manual reset, delete the database file (see Database section above).
 
 ---
 
