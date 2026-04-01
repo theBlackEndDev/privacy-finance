@@ -72,28 +72,58 @@ export async function waitForAppReady() {
  * Auto-complete the onboarding wizard to get to the main app.
  */
 async function completeOnboarding() {
-  // Step 0: Welcome → click "Get started"
-  await (await $(sel.onboardingNext)).waitForClickable({ timeout: 5000 });
-  await (await $(sel.onboardingNext)).click();
-
-  // Step 1: Create Account — wait for the name input to appear
-  const nameInput = await $('[data-testid="onboarding-account-name"]');
-  await nameInput.waitForDisplayed({ timeout: 5000 });
-  await nameInput.setValue('Checking');
-
-  const balanceInput = await $('[data-testid="onboarding-balance"]');
-  await balanceInput.setValue('1000');
-
-  // Re-query the submit button (it's a new element in step 1)
-  await browser.pause(300);
-  await (await $(sel.onboardingNext)).waitForClickable({ timeout: 5000 });
-  await (await $(sel.onboardingNext)).click();
-
-  // Step 2: Categories → wait for finish button, then click
+  // Step 0: Welcome → click "Get started" via JS
+  await browser.execute((s: string) => {
+    const btn = document.querySelector(s);
+    if (btn) (btn as HTMLElement).click();
+  }, sel.onboardingNext);
   await browser.pause(1000);
-  await (await $(sel.onboardingFinish)).waitForClickable({ timeout: 10000 });
-  await (await $(sel.onboardingFinish)).click();
+
+  // Step 1: Create Account — fill via JS to avoid WebKit input issues
+  await browser.waitUntil(async () => {
+    const el = await $('[data-testid="onboarding-account-name"]');
+    return el.isDisplayed().catch(() => false);
+  }, { timeout: 5000 });
+
+  await browser.execute(() => {
+    const name = document.querySelector('[data-testid="onboarding-account-name"]') as HTMLInputElement;
+    const balance = document.querySelector('[data-testid="onboarding-balance"]') as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (name && setter) {
+      setter.call(name, 'Checking');
+      name.dispatchEvent(new Event('input', { bubbles: true }));
+      name.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (balance && setter) {
+      setter.call(balance, '1000');
+      balance.dispatchEvent(new Event('input', { bubbles: true }));
+      balance.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
   await browser.pause(500);
+
+  // Click "Create account" via JS (button re-renders, so query by selector)
+  await browser.execute((s: string) => {
+    const btn = document.querySelector(s);
+    if (btn) {
+      const form = btn.closest('form');
+      if (form) form.requestSubmit(btn as HTMLButtonElement);
+      else (btn as HTMLElement).click();
+    }
+  }, sel.onboardingNext);
+  await browser.pause(2000);
+
+  // Step 2: Categories → click "Start using PrivacyFinance" via JS
+  await browser.waitUntil(async () => {
+    const el = await $(sel.onboardingFinish);
+    return el.isDisplayed().catch(() => false);
+  }, { timeout: 10000 });
+
+  await browser.execute((s: string) => {
+    const btn = document.querySelector(s);
+    if (btn) (btn as HTMLElement).click();
+  }, sel.onboardingFinish);
+  await browser.pause(1000);
 }
 
 /**
@@ -171,7 +201,16 @@ export async function fillInput(selector: string, value: string) {
 export async function selectOption(selector: string, text: string) {
   const select = await $(selector);
   await select.waitForDisplayed({ timeout: 5000 });
-  await select.selectByVisibleText(text);
+  // Use JS to find option by text and set value — avoids WebKit selectByVisibleText issues
+  await browser.execute((sel: string, txt: string) => {
+    const el = document.querySelector(sel) as HTMLSelectElement;
+    if (!el) return;
+    const opt = Array.from(el.options).find(o => o.text === txt || o.text.includes(txt));
+    if (opt) {
+      el.value = opt.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, selector, text);
 }
 
 /**
