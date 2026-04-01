@@ -15,16 +15,22 @@ describe('Settings', () => {
   it('changes currency symbol', async () => {
     await openSettings();
 
+    // Change currency via JS to avoid WebKit selectByVisibleText unicode issues
     const currencySelect = await $(sel.settingsCurrency);
     await currencySelect.waitForDisplayed({ timeout: 5000 });
-    await currencySelect.selectByVisibleText('\u20AC \u2014 Euro');
+    await browser.execute((sel: string) => {
+      const select = document.querySelector(sel) as HTMLSelectElement;
+      if (select) {
+        select.value = '\u20AC';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, sel.settingsCurrency);
     await browser.pause(300);
 
-    // Click Save button (has data-testid)
     await clickButton('[data-testid="settings-save-btn"]');
     await browser.pause(500);
 
-    // Verify the setting was saved by reopening settings
+    // Verify saved by reopening
     await openSettings();
     const currencyAfter = await $(sel.settingsCurrency);
     const selectedValue = await currencyAfter.getValue();
@@ -62,7 +68,13 @@ describe('Settings', () => {
 
     const currencySelect = await $(sel.settingsCurrency);
     await currencySelect.waitForDisplayed({ timeout: 5000 });
-    await currencySelect.selectByVisibleText('$ \u2014 US Dollar');
+    await browser.execute((sel: string) => {
+      const select = document.querySelector(sel) as HTMLSelectElement;
+      if (select) {
+        select.value = '$';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, sel.settingsCurrency);
     await browser.pause(300);
 
     await clickButton('[data-testid="settings-save-btn"]');

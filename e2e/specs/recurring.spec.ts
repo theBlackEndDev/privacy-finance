@@ -43,24 +43,36 @@ describe('Recurring Transactions', () => {
   });
 
   it('toggles recurring active status', async () => {
-    // The toggle is a <button> element (not a checkbox), so isSelected() won't work.
-    // Instead, check the button's text content or title attribute to determine state.
-    const toggle = await $(sel.recurringToggle);
+    const toggleSel = sel.recurringToggle;
+    const toggle = await $(toggleSel);
     await toggle.waitForDisplayed({ timeout: 5000 });
 
-    // Read current state from the title attribute (e.g., "Pause" when active, "Resume" when paused)
-    const titleBefore = await toggle.getAttribute('title');
+    // Read state via JS using the selector to avoid stale element issues
+    const textBefore = await browser.execute(
+      (s: string) => {
+        const el = document.querySelector(s);
+        return el ? (el.textContent || el.getAttribute('title') || '') : '';
+      },
+      toggleSel
+    );
 
-    await toggle.click();
+    // Click via selector-based JS to avoid stale ref
+    await browser.execute(
+      (s: string) => { const el = document.querySelector(s); if (el) (el as HTMLElement).click(); },
+      toggleSel
+    );
     await browser.pause(500);
 
-    const titleAfter = await toggle.getAttribute('title');
-    // The title should have flipped between "Pause" and "Resume"
-    expect(titleAfter).not.toBe(titleBefore);
+    // Re-query after click (DOM likely re-rendered)
+    const textAfter = await browser.execute(
+      (s: string) => {
+        const el = document.querySelector(s);
+        return el ? (el.textContent || el.getAttribute('title') || '') : '';
+      },
+      toggleSel
+    );
 
-    // Toggle back to original state
-    await toggle.click();
-    await browser.pause(500);
+    expect(textAfter).not.toBe(textBefore);
   });
 
   it('generates due recurring transactions when available', async () => {

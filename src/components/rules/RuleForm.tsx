@@ -35,6 +35,7 @@ export function RuleForm({ initial, categories, onSubmit, onCancel }: RuleFormPr
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Netflix → Subscriptions"
           required
+          data-testid="rule-name-input"
         />
       </div>
 

@@ -19,14 +19,10 @@ describe('Rules', () => {
     const initialCount = await countElements(sel.ruleRow);
 
     await clickButton(sel.ruleCreateBtn);
-    await browser.pause(300);
+    await browser.pause(500);
 
-    // Rule name input has no data-testid, use CSS selector
-    const nameInput = await $('form input[type="text"]');
-    if (await nameInput.isExisting()) {
-      await nameInput.clearValue();
-      await nameInput.setValue('Netflix Rule');
-    }
+    // Fill rule name
+    await fillInput('[data-testid="rule-name-input"]', 'Netflix Rule');
 
     await selectOption(sel.ruleFieldSelect, 'Payee');
     await selectOption(sel.ruleMatchTypeSelect, 'Contains');
