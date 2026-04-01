@@ -51,6 +51,7 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
           placeholder="e.g. Primary Checking"
           autoFocus
           error={error && !name.trim() ? error : undefined}
+          data-testid="account-name-input"
         />
 
         <div>
@@ -58,7 +59,7 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
             Account Type{' '}
             <Tooltip text="Checking for daily spending, savings for reserves, credit card for tracking debt, cash for physical money, investment for brokerage or retirement accounts." />
           </label>
-          <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])}>
+          <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])} data-testid="account-type-select">
             {ACCOUNT_TYPE_OPTIONS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
@@ -70,13 +71,14 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
           value={openingBalance}
           onChange={(e) => setOpeningBalance(e.target.value)}
           placeholder="0.00"
+          data-testid="account-balance-input"
         />
 
         {error && name.trim() && <p style={{ color: 'var(--color-expense)', fontSize: 13 }}>{error}</p>}
 
         <div className={styles.footer}>
           <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button type="submit" disabled={saving} data-testid="create-account-btn">{saving ? 'Saving…' : 'Save'}</Button>
         </div>
       </form>
     </Modal>

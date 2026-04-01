@@ -10,7 +10,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className={styles.main}>
         <Header />
-        <main id="main-content" className={styles.content}>
+        <main id="main-content" className={styles.content} data-testid="main-content">
           {children}
         </main>
       </div>

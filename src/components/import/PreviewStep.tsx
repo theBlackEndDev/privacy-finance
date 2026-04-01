@@ -66,7 +66,7 @@ export function PreviewStep({ preview, filePath, onBack, onNext }: Props) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <Button variant="ghost" onClick={onBack}>← Back</Button>
-        <Button variant="primary" onClick={onNext}>Map Columns →</Button>
+        <Button variant="primary" onClick={onNext} data-testid="import-preview-btn">Map Columns →</Button>
       </div>
     </div>
   );

@@ -43,6 +43,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             className={`${styles.toast} ${styles[t.type]}`}
             role={t.type === 'error' ? 'alert' : 'status'}
+            data-testid="toast"
           >
             <span className={styles.icon} aria-hidden="true">{ICONS[t.type]}</span>
             <span className={styles.message}>{t.message}</span>

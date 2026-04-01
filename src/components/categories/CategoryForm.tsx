@@ -43,23 +43,26 @@ export function CategoryForm({ category, onSave, onClose }: CategoryFormProps) {
           placeholder="e.g. Groceries"
           autoFocus
           error={error && !name.trim() ? error : undefined}
+          data-testid="cat-name-input"
         />
 
         <div>
           <label className={styles.selectLabel}>Type</label>
-          <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as 'income' | 'expense')}>
+          <select className={styles.select} value={type} data-testid="cat-type-select" onChange={(e) => setType(e.target.value as 'income' | 'expense')}>
             <option value="expense">Expense</option>
             <option value="income">Income</option>
           </select>
         </div>
 
-        <ColorPicker label="Color" value={color} onChange={setColor} />
+        <div data-testid="cat-color-picker">
+          <ColorPicker label="Color" value={color} onChange={setColor} />
+        </div>
 
         {error && name.trim() && <p style={{ color: 'var(--color-expense)', fontSize: 13 }}>{error}</p>}
 
         <div className={styles.footer}>
           <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button type="submit" disabled={saving} data-testid="cat-submit-btn">{saving ? 'Saving…' : 'Save'}</Button>
         </div>
       </form>
     </Modal>

@@ -81,6 +81,7 @@ export function ExportModal({ onClose }: Props) {
             className={styles.select}
             value={format}
             onChange={e => setFormat(e.target.value as ExportFormat)}
+            data-testid="export-format-select"
           >
             {FORMAT_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -136,7 +137,7 @@ export function ExportModal({ onClose }: Props) {
         {/* Actions */}
         <div className={styles.actions}>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleExport} disabled={exporting}>
+          <Button variant="primary" onClick={handleExport} disabled={exporting} data-testid="export-download-btn">
             {exporting ? 'Exporting...' : 'Export'}
           </Button>
         </div>

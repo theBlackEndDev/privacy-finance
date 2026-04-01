@@ -52,7 +52,7 @@ export function NetWorthReport({ startDate, endDate, onData }: Props) {
   });
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-testid="report-net-worth">
       <div className={styles.controls}>
         <label className={styles.toggle}>
           <input

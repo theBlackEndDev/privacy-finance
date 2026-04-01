@@ -61,7 +61,7 @@ export function CategoryList({ categories, onAdd, onEdit, onDelete }: CategoryLi
             </button>
           </div>
         </div>
-        <Button onClick={onAdd} size="sm">+ Add Category</Button>
+        <Button onClick={onAdd} size="sm" data-testid="create-category-btn">+ Add Category</Button>
       </div>
 
       {categories.length === 0 ? (

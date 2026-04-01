@@ -35,7 +35,7 @@ export function RecurringList({ items, onEdit, onDelete, onToggleActive }: Recur
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id}>
+            <tr key={item.id} data-testid={`recurring-row-${item.id}`}>
               <td>{item.payee || item.description || '(no payee)'}</td>
               <td>
                 <span className={cx(styles.amount, styles[item.kind])}>
@@ -56,6 +56,7 @@ export function RecurringList({ items, onEdit, onDelete, onToggleActive }: Recur
                     className={styles.actionBtn}
                     onClick={() => onToggleActive(item.id)}
                     title={item.isActive ? 'Pause' : 'Resume'}
+                    data-testid={`recurring-toggle-${item.id}`}
                   >
                     {item.isActive ? '⏸' : '▶'}
                   </button>

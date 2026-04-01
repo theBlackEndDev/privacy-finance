@@ -53,20 +53,20 @@ export function TransferForm({ accounts, onSaved, onClose }: TransferFormProps) 
         <div className={styles.row}>
           <div>
             <label className={styles.selectLabel}>From</label>
-            <select className={styles.select} value={fromId} onChange={(e) => setFromId(e.target.value)}>
+            <select className={styles.select} value={fromId} data-testid="transfer-from-account" onChange={(e) => setFromId(e.target.value)}>
               {active.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
           <div className={styles.arrow}>→</div>
           <div>
             <label className={styles.selectLabel}>To</label>
-            <select className={styles.select} value={toId} onChange={(e) => setToId(e.target.value)}>
+            <select className={styles.select} value={toId} data-testid="transfer-to-account" onChange={(e) => setToId(e.target.value)}>
               {active.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
         </div>
 
-        <Input label="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus />
+        <Input label="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" autoFocus data-testid="transfer-amount" />
         <Input label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <Input label="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Monthly savings transfer" />
 
@@ -74,7 +74,7 @@ export function TransferForm({ accounts, onSaved, onClose }: TransferFormProps) 
 
         <div className={styles.footer}>
           <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Transferring…' : 'Transfer'}</Button>
+          <Button type="submit" disabled={saving} data-testid="transfer-submit-btn">{saving ? 'Transferring…' : 'Transfer'}</Button>
         </div>
       </form>
     </Modal>

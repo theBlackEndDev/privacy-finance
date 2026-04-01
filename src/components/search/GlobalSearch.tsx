@@ -138,11 +138,12 @@ export function GlobalSearch() {
   const showKeyword = mode === 'keyword' && results.length > 0;
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-testid="global-search">
       <input
         ref={inputRef}
         type="text"
         className={styles.input}
+        data-testid="search-input"
         placeholder="Search or ask a question… (Ctrl+F)"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -158,7 +159,7 @@ export function GlobalSearch() {
         aria-autocomplete="list"
       />
       {isOpen && (
-        <div className={`${styles.dropdown} ${showAI ? styles.dropdownWide : ''}`} id={LISTBOX_ID}>
+        <div className={`${styles.dropdown} ${showAI ? styles.dropdownWide : ''}`} id={LISTBOX_ID} data-testid="search-results">
           {showAI && aiResult && (
             <AISearchResults result={aiResult} loading={aiLoading} />
           )}

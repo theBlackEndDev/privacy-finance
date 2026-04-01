@@ -19,10 +19,12 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal title={title} onClose={onCancel}>
-      <p className={styles.message}>{message}</p>
-      <div className={styles.actions}>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button variant="danger" onClick={onConfirm}>{confirmLabel}</Button>
+      <div data-testid="confirm-dialog">
+        <p className={styles.message}>{message}</p>
+        <div className={styles.actions}>
+          <Button variant="ghost" onClick={onCancel} data-testid="confirm-no">Cancel</Button>
+          <Button variant="danger" onClick={onConfirm} data-testid="confirm-yes">{confirmLabel}</Button>
+        </div>
       </div>
     </Modal>
   );

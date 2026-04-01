@@ -89,7 +89,7 @@ export function RecurringPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1>Recurring Transactions</h1>
-        <Button onClick={() => { setEditing(undefined); setShowForm(true); }}>+ New Recurring</Button>
+        <Button onClick={() => { setEditing(undefined); setShowForm(true); }} data-testid="recurring-create-btn">+ New Recurring</Button>
       </div>
 
       {items.length === 0 ? (

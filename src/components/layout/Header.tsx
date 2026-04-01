@@ -21,7 +21,7 @@ export function Header() {
   const { currentView } = useApp();
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-testid="header">
       <h1 className={styles.title}>{VIEW_TITLES[currentView]}</h1>
       <div className={styles.right}>
         <GlobalSearch />

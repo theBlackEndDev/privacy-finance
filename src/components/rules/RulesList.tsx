@@ -42,7 +42,7 @@ export function RulesList({ rules, onEdit, onDelete, onToggleActive, onMove, onT
         </thead>
         <tbody>
           {rules.map((rule, idx) => (
-            <tr key={rule.id}>
+            <tr key={rule.id} data-testid={`rule-row-${rule.id}`}>
               <td>
                 <div className={styles.orderBtns}>
                   <button
@@ -90,7 +90,7 @@ export function RulesList({ rules, onEdit, onDelete, onToggleActive, onMove, onT
               </td>
               <td>
                 <div className={styles.actions}>
-                  <button className={styles.actionBtn} onClick={() => onTest(rule)} title="Test rule">
+                  <button className={styles.actionBtn} onClick={() => onTest(rule)} title="Test rule" data-testid="rule-test-btn">
                     🔍
                   </button>
                   <button className={styles.actionBtn} onClick={() => onEdit(rule)} title="Edit">

@@ -83,11 +83,11 @@ export function RecurringForm({ initial, onSubmit, onCancel }: RecurringFormProp
       <div className={styles.row}>
         <div className={styles.field}>
           <label>Payee</label>
-          <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="e.g. Netflix" />
+          <input type="text" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="e.g. Netflix" data-testid="recurring-payee-input" />
         </div>
         <div className={styles.field}>
           <label>Amount</label>
-          <input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+          <input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required data-testid="recurring-amount-input" />
         </div>
       </div>
 
@@ -121,7 +121,7 @@ export function RecurringForm({ initial, onSubmit, onCancel }: RecurringFormProp
       <div className={styles.row}>
         <div className={styles.field}>
           <label>Frequency</label>
-          <select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}>
+          <select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)} data-testid="recurring-freq-select">
             {FREQUENCIES.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
@@ -149,7 +149,7 @@ export function RecurringForm({ initial, onSubmit, onCancel }: RecurringFormProp
 
       <div className={styles.actions}>
         <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{initial ? 'Update' : 'Create'}</Button>
+        <Button type="submit" data-testid="recurring-submit-btn">{initial ? 'Update' : 'Create'}</Button>
       </div>
     </form>
   );

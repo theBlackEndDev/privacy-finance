@@ -62,7 +62,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
   }, [handleKeyDown]);
 
   return (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()} data-testid="modal">
       <div
         className={styles.content}
         ref={contentRef}
@@ -73,7 +73,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
       >
         <div className={styles.header}>
           <span id={titleIdRef.current} className={styles.title}>{title}</span>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close dialog">&times;</button>
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Close dialog" data-testid="modal-close">&times;</button>
         </div>
         <div className={styles.body}>{children}</div>
       </div>

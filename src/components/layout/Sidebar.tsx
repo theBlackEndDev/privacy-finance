@@ -34,7 +34,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className={styles.sidebar}>
+      <aside className={styles.sidebar} data-testid="sidebar">
         <div className={styles.logo}>
           <BrandWordmark compact />
         </div>
@@ -45,6 +45,7 @@ export function Sidebar() {
               key={view}
               className={cx(styles.navItem, currentView === view && styles.navItemActive)}
               onClick={() => navigate(view)}
+              data-testid={`nav-${view}`}
               aria-current={currentView === view ? 'page' : undefined}
             >
               <span className={styles.navIcon} aria-hidden="true">{icon}</span>
@@ -70,7 +71,7 @@ export function Sidebar() {
           </div>
         )}
 
-        <button className={styles.settingsBtn} onClick={() => setShowSettings(true)}>
+        <button className={styles.settingsBtn} onClick={() => setShowSettings(true)} data-testid="nav-settings">
           <span className={styles.navIcon}>⚙</span>
           Settings
         </button>

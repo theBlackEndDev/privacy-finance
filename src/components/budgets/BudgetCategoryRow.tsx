@@ -62,6 +62,7 @@ export function BudgetCategoryRow({ row, onUpdateBudgeted, onToggleRollover, onS
           onBlur={handleBlur}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
           aria-label={`Budgeted amount for ${row.categoryName}`}
+          data-testid={`budget-amount-${row.itemId}`}
         />
         <span className={styles.amount} role="cell">{formatCurrency(row.spent)}</span>
         <span className={cx(styles.available, availableClass)} role="cell">
@@ -78,7 +79,7 @@ export function BudgetCategoryRow({ row, onUpdateBudgeted, onToggleRollover, onS
           aria-label={`Rollover for ${row.categoryName}`}
         />
       </div>
-      <div className={styles.progressCell}>
+      <div className={styles.progressCell} data-testid={`budget-progress-${row.itemId}`}>
         <BudgetProgressBar spent={row.spent} budgeted={row.budgeted} />
       </div>
     </>

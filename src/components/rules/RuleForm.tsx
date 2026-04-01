@@ -41,7 +41,7 @@ export function RuleForm({ initial, categories, onSubmit, onCancel }: RuleFormPr
       <div className={styles.row}>
         <div className={styles.field}>
           <label>Match Field</label>
-          <select value={matchField} onChange={(e) => setMatchField(e.target.value as MatchField)}>
+          <select value={matchField} onChange={(e) => setMatchField(e.target.value as MatchField)} data-testid="rule-field-select">
             <option value="payee">Payee</option>
             <option value="description">Description</option>
             <option value="amount">Amount</option>
@@ -50,7 +50,7 @@ export function RuleForm({ initial, categories, onSubmit, onCancel }: RuleFormPr
 
         <div className={styles.field}>
           <label>Match Type</label>
-          <select value={matchType} onChange={(e) => setMatchType(e.target.value as MatchType)}>
+          <select value={matchType} onChange={(e) => setMatchType(e.target.value as MatchType)} data-testid="rule-match-type-select">
             <option value="contains">Contains</option>
             <option value="starts_with">Starts With</option>
             <option value="ends_with">Ends With</option>
@@ -68,12 +68,13 @@ export function RuleForm({ initial, categories, onSubmit, onCancel }: RuleFormPr
           onChange={(e) => setPattern(e.target.value)}
           placeholder={matchType === 'regex' ? 'e.g. netflix\\s*\\d+' : 'e.g. NETFLIX'}
           required
+          data-testid="rule-pattern-input"
         />
       </div>
 
       <div className={styles.field}>
         <label>Assign Category</label>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
+        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required data-testid="rule-category-select">
           <option value="">Select a category...</option>
           {expenseCategories.map((cat) => (
             <option key={cat.id} value={cat.id}>
@@ -87,7 +88,7 @@ export function RuleForm({ initial, categories, onSubmit, onCancel }: RuleFormPr
         <Button type="button" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">
+        <Button type="submit" data-testid="rule-submit-btn">
           {initial ? 'Update Rule' : 'Create Rule'}
         </Button>
       </div>

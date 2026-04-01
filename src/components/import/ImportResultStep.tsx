@@ -38,7 +38,7 @@ export function ImportResultStep({ result, onViewTransactions, onImportAnother }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }} data-testid="import-result-summary">
         <StatCard label="Imported" value={result.imported} color="var(--color-income)" />
         <StatCard label="Duplicates" value={result.duplicates} color="var(--text-muted)" />
         <StatCard label="Errors" value={result.errors.length} color={result.errors.length > 0 ? 'var(--color-expense)' : 'var(--text-muted)'} />

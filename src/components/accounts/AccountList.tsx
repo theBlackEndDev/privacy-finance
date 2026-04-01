@@ -83,6 +83,7 @@ function AccountRow({ account, onEdit, onDelete, onClick }: AccountRowProps) {
   return (
     <div
       className={cx(styles.row, account.isArchived && styles.archived, onClick && styles.clickable)}
+      data-testid={`account-row-${account.id}`}
       onClick={onClick ? () => onClick(account) : undefined}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

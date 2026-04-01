@@ -26,9 +26,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div className={styles.sectionTitle}>{children}</div>;
 }
 
-function Card({ children, className }: { children: React.ReactNode; className?: string }) {
+function Card({ children, className, testId }: { children: React.ReactNode; className?: string; testId?: string }) {
   return (
-    <div className={cx(styles.card, className)}>
+    <div className={cx(styles.card, className)} data-testid={testId}>
       {children}
     </div>
   );
@@ -65,7 +65,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-testid="dashboard-summary">
 
       {/* Header row */}
       <div className={styles.headerRow}>
@@ -82,7 +82,7 @@ export function DashboardPage() {
           <SectionTitle>Spending by Category</SectionTitle>
           <SpendingPieChart data={data?.byCategory ?? []} />
         </Card>
-        <Card>
+        <Card testId="dashboard-chart">
           <SectionTitle>Monthly Trend</SectionTitle>
           <MonthlyTrendChart data={trend} />
         </Card>
@@ -94,7 +94,7 @@ export function DashboardPage() {
           <SectionTitle>Account Balances</SectionTitle>
           <AccountBalances balances={balances} />
         </Card>
-        <Card>
+        <Card testId="dashboard-recent-tx">
           <SectionTitle>Recent Transactions</SectionTitle>
           <RecentTransactions transactions={recent} />
         </Card>

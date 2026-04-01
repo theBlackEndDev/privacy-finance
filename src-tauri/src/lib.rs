@@ -9,9 +9,16 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+
+    #[cfg(all(target_os = "macos", feature = "e2e"))]
+    {
+        builder = builder.plugin(tauri_plugin_automation::init());
+    }
+
+    builder
         .setup(|app| {
             let state = init_db(app.handle())
                 .expect("failed to initialize database");

@@ -40,7 +40,7 @@ export function CategorySpendingReport({ startDate, endDate, onData }: Props) {
   }));
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-testid="report-category-spending">
       <ResponsiveContainer width="100%" height={Math.max(200, data.length * 40 + 40)}>
         <BarChart data={chartData} layout="vertical" barSize={20}>
           <XAxis

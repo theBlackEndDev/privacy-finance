@@ -18,7 +18,7 @@ const AMOUNT_PREFIX: Record<string, string> = {
 
 export function TransactionRow({ transaction: t, onClick }: TransactionRowProps) {
   return (
-    <div className={styles.row} role="row" onClick={() => onClick(t)}>
+    <div className={styles.row} role="row" data-testid={`tx-row-${t.id}`} onClick={() => onClick(t)}>
       <span className={styles.date}>{formatDate(t.date)}</span>
 
       <div>

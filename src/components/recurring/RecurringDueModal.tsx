@@ -48,7 +48,7 @@ export function RecurringDueModal({ dueItems, onGenerateAll, onDismiss, loading 
 
       <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
         <Button variant="ghost" onClick={onDismiss}>Dismiss</Button>
-        <Button onClick={onGenerateAll} disabled={loading}>
+        <Button onClick={onGenerateAll} disabled={loading} data-testid="recurring-generate-btn">
           {loading ? 'Generating...' : `Generate All (${totalTransactions})`}
         </Button>
       </div>

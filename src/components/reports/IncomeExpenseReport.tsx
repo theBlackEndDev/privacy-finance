@@ -50,7 +50,7 @@ export function IncomeExpenseReport({ startDate, endDate, onData }: Props) {
     : null;
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-testid="report-income-expense">
       <div className={styles.summary}>
         <div className={styles.summaryCard}>
           <div className={styles.summaryLabel}>Total Income</div>

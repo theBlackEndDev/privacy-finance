@@ -128,8 +128,8 @@ export function RulesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1>Auto-Categorization Rules</h1>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <Button onClick={handleApplyAll}>Apply Rules</Button>
-          <Button onClick={() => { setEditing(undefined); setShowForm(true); }}>+ New Rule</Button>
+          <Button onClick={handleApplyAll} data-testid="rule-apply-all-btn">Apply Rules</Button>
+          <Button onClick={() => { setEditing(undefined); setShowForm(true); }} data-testid="rule-create-btn">+ New Rule</Button>
         </div>
       </div>
 

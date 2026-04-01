@@ -201,7 +201,7 @@ export function ColumnMappingStep({ headers, profiles, onBack, onNext, onProfile
 
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         <Button variant="ghost" onClick={onBack}>← Back</Button>
-        <Button variant="primary" onClick={handleNext}>Import →</Button>
+        <Button variant="primary" onClick={handleNext} data-testid="import-mapping-next">Import →</Button>
       </div>
     </div>
   );

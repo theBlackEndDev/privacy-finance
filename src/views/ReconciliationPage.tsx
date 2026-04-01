@@ -33,7 +33,7 @@ export function ReconciliationPage() {
         Select an account to reconcile against your bank statement.{' '}
         <Tooltip text="Reconciliation verifies your records match your bank's. Compare your statement balance, mark matching transactions, and catch any discrepancies." />
       </p>
-      <div className={styles.accountList}>
+      <div className={styles.accountList} data-testid="recon-account-select">
         {accounts
           .filter((a) => !a.isArchived)
           .map((account) => (
@@ -41,6 +41,7 @@ export function ReconciliationPage() {
               key={account.id}
               className={styles.accountCard}
               onClick={() => setSelectedAccount(account)}
+              data-testid={`recon-account-${account.id}`}
             >
               <span className={styles.accountName}>{account.name}</span>
               <span className={styles.accountType}>{account.type}</span>

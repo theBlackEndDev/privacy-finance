@@ -11,7 +11,7 @@ interface CategoryRowProps {
 
 export function CategoryRow({ category, onEdit, onDelete }: CategoryRowProps) {
   return (
-    <div className={cx(styles.row, category.isArchived && styles.archived)}>
+    <div className={cx(styles.row, category.isArchived && styles.archived)} data-testid={`cat-row-${category.id}`}>
       <span className={styles.dot} style={{ background: category.color }} />
       <span className={styles.name}>{category.name}</span>
       <span className={styles.type}>{category.type}</span>

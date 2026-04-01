@@ -74,12 +74,12 @@ export function SettingsModal({ onClose }: Props) {
 
   return (<>
     <Modal title="Settings" onClose={onClose}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 340 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 340 }} data-testid="settings-modal">
 
         {/* Currency */}
         <div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 500 }}>Currency Symbol</div>
-          <select style={selectStyle} value={currencySymbol} onChange={e => setCurrencySymbol(e.target.value)}>
+          <select style={selectStyle} value={currencySymbol} onChange={e => setCurrencySymbol(e.target.value)} data-testid="settings-currency">
             <option value="$">$ — US Dollar</option>
             <option value="€">€ — Euro</option>
             <option value="£">£ — British Pound</option>
@@ -95,7 +95,7 @@ export function SettingsModal({ onClose }: Props) {
         {/* Date format */}
         <div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 500 }}>Date Display Format</div>
-          <select style={selectStyle} value={dateFormat} onChange={e => setDateFormat(e.target.value)}>
+          <select style={selectStyle} value={dateFormat} onChange={e => setDateFormat(e.target.value)} data-testid="settings-date-format">
             <option value="MMM D">Jan 5</option>
             <option value="MMM D, YYYY">Jan 5, 2024</option>
             <option value="MM/DD/YYYY">01/05/2024</option>
@@ -107,7 +107,7 @@ export function SettingsModal({ onClose }: Props) {
         {/* Theme */}
         <div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 500 }}>Appearance</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }} data-testid="settings-theme">
             {(['dark', 'light'] as const).map(t => (
               <button
                 key={t}

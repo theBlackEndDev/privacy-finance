@@ -75,13 +75,13 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   return (
     <>
     <Modal title="Edit Transaction" onClose={onClose}>
-      <form className={styles.form} onSubmit={handleSubmit}>
+      <form className={styles.form} onSubmit={handleSubmit} data-testid="tx-edit-modal">
         <div className={styles.row}>
           <Input label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <Input label="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+          <Input label="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" data-testid="tx-edit-amount" />
         </div>
 
-        <Input label="Payee" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="Payee" autoFocus />
+        <Input label="Payee" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="Payee" autoFocus data-testid="tx-edit-payee" />
 
         <div className={styles.row}>
           <div>
@@ -145,10 +145,10 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
         {error && <p style={{ color: 'var(--color-expense)', fontSize: 13 }}>{error}</p>}
 
         <div className={styles.footer}>
-          <Button variant="danger" type="button" size="sm" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
+          <Button variant="danger" type="button" size="sm" data-testid="tx-edit-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
           <div className={styles.footerRight}>
             <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+            <Button type="submit" disabled={saving} data-testid="tx-edit-save">{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </form>

@@ -40,7 +40,7 @@ export function AISearchResults({ result, loading }: Props) {
       {result.textAnswer && (
         <div className={styles.textAnswer}>{result.textAnswer}</div>
       )}
-      {result.cardData && renderCard(result.cardData)}
+      {result.cardData && <div data-testid="ai-search-card">{renderCard(result.cardData)}</div>}
       {result.queryTimeMs > 0 && (
         <div className={styles.timing}>Answered in {result.queryTimeMs}ms</div>
       )}

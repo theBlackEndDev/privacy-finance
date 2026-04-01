@@ -56,6 +56,7 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
 
   return (
     <Modal title="Welcome to PrivacyFinance" onClose={completeOnboarding}>
+      <div data-testid="onboarding-wizard">
       <StepIndicator current={step} total={TOTAL_STEPS} />
 
       {step === STEPS.WELCOME && (
@@ -67,8 +68,8 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
             your first account to get started.
           </p>
           <div className={styles.footer}>
-            <Button variant="ghost" onClick={completeOnboarding}>Skip setup</Button>
-            <Button onClick={() => setStep(STEPS.CREATE_ACCOUNT)}>Get started</Button>
+            <Button variant="ghost" onClick={completeOnboarding} data-testid="onboarding-skip">Skip setup</Button>
+            <Button onClick={() => setStep(STEPS.CREATE_ACCOUNT)} data-testid="onboarding-next">Get started</Button>
           </div>
         </div>
       )}
@@ -107,10 +108,10 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
           {error && name.trim() && <p className={styles.error}>{error}</p>}
 
           <div className={styles.footer}>
-            <Button variant="ghost" type="button" onClick={completeOnboarding}>Skip setup</Button>
+            <Button variant="ghost" type="button" onClick={completeOnboarding} data-testid="onboarding-skip">Skip setup</Button>
             <div className={styles.footerRight}>
               <Button variant="ghost" type="button" onClick={() => setStep(STEPS.WELCOME)}>Back</Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving} data-testid="onboarding-next">
                 {saving ? 'Creating...' : 'Create account'}
               </Button>
             </div>
@@ -136,10 +137,11 @@ export function OnboardingWizard({ categories, onComplete }: OnboardingWizardPro
             You can add, edit, or remove categories anytime from the Categories page.
           </p>
           <div className={styles.footerEnd}>
-            <Button onClick={completeOnboarding}>Start using PrivacyFinance</Button>
+            <Button onClick={completeOnboarding} data-testid="onboarding-finish">Start using PrivacyFinance</Button>
           </div>
         </div>
       )}
+      </div>
     </Modal>
   );
 }

@@ -35,6 +35,7 @@ export function TransactionFiltersBar({ filters, accounts, categories, onChange 
         <select
           className={styles.select}
           value={filters.accountId ?? ''}
+          data-testid="tx-filter-account"
           onChange={(e) => onChange({ ...filters, accountId: e.target.value || undefined, page: 0 })}
         >
           <option value="">All Accounts</option>
@@ -63,6 +64,7 @@ export function TransactionFiltersBar({ filters, accounts, categories, onChange 
         <select
           className={styles.select}
           value={filters.categoryId ?? ''}
+          data-testid="tx-filter-category"
           onChange={(e) => onChange({ ...filters, categoryId: e.target.value || undefined, page: 0 })}
         >
           <option value="">All</option>
@@ -78,6 +80,7 @@ export function TransactionFiltersBar({ filters, accounts, categories, onChange 
           type="date"
           className={styles.dateInput}
           value={filters.dateFrom ?? ''}
+          data-testid="tx-filter-date-from"
           onChange={(e) => onChange({ ...filters, dateFrom: e.target.value || undefined, page: 0 })}
         />
       </div>
@@ -88,6 +91,7 @@ export function TransactionFiltersBar({ filters, accounts, categories, onChange 
           type="date"
           className={styles.dateInput}
           value={filters.dateTo ?? ''}
+          data-testid="tx-filter-date-to"
           onChange={(e) => onChange({ ...filters, dateTo: e.target.value || undefined, page: 0 })}
         />
       </div>

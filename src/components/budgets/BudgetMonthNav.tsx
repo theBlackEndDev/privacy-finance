@@ -37,13 +37,13 @@ export function BudgetMonthNav({ year, month, onNavigate, onCopy, onRollover, co
   }
 
   return (
-    <div className={styles.nav}>
+    <div className={styles.nav} data-testid="budget-month-nav">
       <div className={styles.actions}>
-        <button className={styles.navBtn} onClick={goPrev}>◀</button>
+        <button className={styles.navBtn} onClick={goPrev} data-testid="budget-prev-month">◀</button>
       </div>
       <span className={styles.monthDisplay}>{MONTH_NAMES[month - 1]} {year}</span>
       <div className={styles.actions}>
-        <button className={styles.navBtn} onClick={goNext}>▶</button>
+        <button className={styles.navBtn} onClick={goNext} data-testid="budget-next-month">▶</button>
         {onUndo && (
           <button
             className={styles.navBtn}
@@ -66,7 +66,7 @@ export function BudgetMonthNav({ year, month, onNavigate, onCopy, onRollover, co
             ↪
           </button>
         )}
-        <Button variant="ghost" size="sm" onClick={onCopy} disabled={copyDisabled}>
+        <Button variant="ghost" size="sm" onClick={onCopy} disabled={copyDisabled} data-testid="budget-copy-btn">
           Copy Last Month
         </Button>
         <Button variant="ghost" size="sm" onClick={onRollover}>

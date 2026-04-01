@@ -120,6 +120,7 @@ export function ReconciliationWizard({ accountId, accountName, onClose }: Props)
                 className={styles.input}
                 value={statementDate}
                 onChange={(e) => setStatementDate(e.target.value)}
+                data-testid="recon-date-input"
               />
             </div>
             <div className={styles.fieldGroup}>
@@ -130,12 +131,13 @@ export function ReconciliationWizard({ accountId, accountName, onClose }: Props)
                 value={statementBalance}
                 onChange={(e) => setStatementBalance(e.target.value)}
                 placeholder="0.00"
+                data-testid="recon-balance-input"
               />
             </div>
           </div>
           <div className={styles.actions}>
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" onClick={handleStart} disabled={loading}>
+            <Button variant="primary" onClick={handleStart} disabled={loading} data-testid="recon-start-btn">
               {loading ? 'Starting...' : 'Start Reconciliation'}
             </Button>
           </div>

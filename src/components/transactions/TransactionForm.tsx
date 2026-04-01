@@ -90,7 +90,7 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
       <div className={styles.field}>
         <label htmlFor="txn-date" className={styles.label}>Date</label>
         <input id="txn-date" ref={dateRef} type="date" className={styles.input} value={date}
-          onChange={(e) => setDate(e.target.value)} />
+          data-testid="tx-date-input" onChange={(e) => setDate(e.target.value)} />
       </div>
 
       {/* Payee with autocomplete */}
@@ -103,6 +103,7 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
             placeholder="Payee…"
             value={payee}
             style={{ width: 160 }}
+            data-testid="tx-payee-input"
             onChange={(e) => { setPayee(e.target.value); fetchSuggestions(e.target.value); setShowSuggestions(true); }}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           />
@@ -119,7 +120,7 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
       {/* Kind toggle */}
       <div className={styles.field}>
         <span className={styles.label} id="txn-kind-label">Kind</span>
-        <div className={styles.kindToggle} role="group" aria-labelledby="txn-kind-label">
+        <div className={styles.kindToggle} role="group" aria-labelledby="txn-kind-label" data-testid="tx-kind-select">
           {(['income', 'expense', 'transfer'] as Kind[]).map((k) => (
             <button
               key={k}
@@ -139,7 +140,7 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
       {kind !== 'transfer' && (
         <div className={styles.field}>
           <label htmlFor="txn-category" className={styles.label}>Category</label>
-          <select id="txn-category" className={styles.select} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <select id="txn-category" className={styles.select} value={categoryId} data-testid="tx-category-select" onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">None</option>
             {filteredCategories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -157,12 +158,13 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
           placeholder="0.00"
           value={amount}
           style={{ width: 90 }}
+          data-testid="tx-amount-input"
           onChange={(e) => setAmount(e.target.value)}
           aria-required="true"
         />
       </div>
 
-      <Button type="submit" disabled={saving} size="sm" style={{ marginBottom: 1 }}>
+      <Button type="submit" disabled={saving} size="sm" style={{ marginBottom: 1 }} data-testid="tx-submit-btn">
         {saving ? '\u2026' : 'Add'}
       </Button>
     </form>

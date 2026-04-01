@@ -22,7 +22,7 @@ type Variant = 'income' | 'expense';
 
 function SummaryCard({ label, value, variant }: { label: string; value: number; variant: Variant }) {
   return (
-    <div className={styles.card}>
+    <div className={styles.card} data-testid={`dashboard-${label.toLowerCase()}-card`}>
       <div className={styles.label}>{label}</div>
       <div className={cx(styles.value, styles[variant])}>{formatCurrency(value)}</div>
     </div>

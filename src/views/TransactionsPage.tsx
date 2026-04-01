@@ -74,7 +74,7 @@ function TransactionsInner() {
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-sidebar)' }}>
-          <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>Export</Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowExport(true)} data-testid="export-btn">Export</Button>
           <Button variant="ghost" size="sm" onClick={() => setShowTransfer(true)}>⇅ Transfer</Button>
         </div>
       </div>

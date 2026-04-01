@@ -79,7 +79,7 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
   }
 
   return (
-    <div className={styles.wrapper} ref={wrapperRef}>
+    <div className={styles.wrapper} ref={wrapperRef} data-testid="tag-picker">
       <span className={styles.label}>Tags</span>
 
       {selectedTags.length > 0 && (
@@ -104,6 +104,7 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
               aria-label="Search tags"
+              data-testid="tag-input"
             />
 
             <div role="listbox" aria-multiselectable="true" aria-label="Available tags">
@@ -128,7 +129,7 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
             )}
 
             {canCreate && (
-              <div className={styles.createOption} onClick={handleCreate}>
+              <div className={styles.createOption} onClick={handleCreate} data-testid="tag-create-btn">
                 + Create &ldquo;{search.trim()}&rdquo;
               </div>
             )}

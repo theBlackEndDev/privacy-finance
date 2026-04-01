@@ -8,11 +8,11 @@ interface TagBadgeProps {
 
 export function TagBadge({ tag, onRemove }: TagBadgeProps) {
   return (
-    <span className={styles.badge}>
+    <span className={styles.badge} data-testid={`tag-badge-${tag.id}`}>
       {tag.color && <span className={styles.dot} style={{ background: tag.color }} />}
       {tag.name}
       {onRemove && (
-        <button className={styles.remove} onClick={onRemove} type="button" title="Remove tag">
+        <button className={styles.remove} onClick={onRemove} type="button" title="Remove tag" data-testid={`tag-remove-${tag.id}`}>
           &times;
         </button>
       )}

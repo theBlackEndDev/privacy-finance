@@ -72,13 +72,14 @@ export function ReportsPage() {
             key={key}
             className={`${styles.tab} ${activeTab === key ? styles.tabActive : ''}`}
             onClick={() => handleTabChange(key)}
+            data-testid={`report-tab-${key}`}
           >
             {label}
           </button>
         ))}
       </div>
 
-      <div className={styles.content}>
+      <div className={styles.content} data-testid="report-chart">
         {activeTab === 'income-expense' && <IncomeExpenseReport startDate={startDate} endDate={endDate} onData={handleData} />}
         {activeTab === 'categories' && <CategorySpendingReport startDate={startDate} endDate={endDate} onData={handleData} />}
         {activeTab === 'cash-flow' && <CashFlowReport startDate={startDate} endDate={endDate} onData={handleData} />}
