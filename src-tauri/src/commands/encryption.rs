@@ -4,6 +4,7 @@ use crate::models::encryption::EncryptionStatus;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
+use zeroize::Zeroize;
 
 /// Resolves the DB path from the Tauri app data directory.
 fn db_path(app: &AppHandle) -> AppResult<PathBuf> {
@@ -70,7 +71,7 @@ pub fn check_encryption_status(app: AppHandle) -> AppResult<EncryptionStatus> {
 }
 
 #[tauri::command]
-pub fn enable_encryption(app: AppHandle, password: String) -> AppResult<()> {
+pub fn enable_encryption(app: AppHandle, mut password: String) -> AppResult<()> {
     if password.is_empty() {
         return Err(AppError::Validation("Password cannot be empty".into()));
     }
@@ -78,11 +79,13 @@ pub fn enable_encryption(app: AppHandle, password: String) -> AppResult<()> {
     let path = db_path(&app)?;
 
     if is_db_encrypted(&path)? {
+        password.zeroize();
         return Err(AppError::Validation("Database is already encrypted".into()));
     }
 
     let tmp_path = path.with_extension("db.enc");
-    let escaped_pw = escape_pragma(&password);
+    let mut escaped_pw = escape_pragma(&password);
+    password.zeroize();
 
     // Open the plaintext DB and export to an encrypted copy
     let plain_conn = Connection::open(&path)?;
@@ -99,78 +102,99 @@ pub fn enable_encryption(app: AppHandle, password: String) -> AppResult<()> {
     std::fs::rename(&tmp_path, &path)?;
 
     let state: State<DbState> = app.state();
-    replace_connections(&state, &path, Some(&escaped_pw))?;
+    let result = replace_connections(&state, &path, Some(&escaped_pw));
+    escaped_pw.zeroize();
 
-    Ok(())
+    result
 }
 
 #[tauri::command]
-pub fn unlock_database(app: AppHandle, password: String) -> AppResult<()> {
+pub fn unlock_database(app: AppHandle, mut password: String) -> AppResult<()> {
     let path = db_path(&app)?;
 
     if !is_db_encrypted(&path)? {
+        password.zeroize();
         return Err(AppError::Validation("Database is not encrypted".into()));
     }
 
-    let escaped_pw = escape_pragma(&password);
+    let mut escaped_pw = escape_pragma(&password);
+    password.zeroize();
 
     // Verify the password works before replacing connections
     let test_conn = Connection::open(&path)?;
     test_conn.execute_batch(&format!("PRAGMA key = '{}';", escaped_pw))?;
     test_conn
         .execute_batch("SELECT count(*) FROM sqlite_master;")
-        .map_err(|_| AppError::Validation("Incorrect password".into()))?;
+        .map_err(|_| {
+            escaped_pw.zeroize();
+            AppError::Validation("Incorrect password".into())
+        })?;
     drop(test_conn);
 
     let state: State<DbState> = app.state();
-    replace_connections(&state, &path, Some(&escaped_pw))?;
+    let result = replace_connections(&state, &path, Some(&escaped_pw));
+    escaped_pw.zeroize();
 
-    Ok(())
+    result
 }
 
 #[tauri::command]
-pub fn change_password(app: AppHandle, current_password: String, new_password: String) -> AppResult<()> {
+pub fn change_password(app: AppHandle, mut current_password: String, mut new_password: String) -> AppResult<()> {
     if new_password.is_empty() {
+        current_password.zeroize();
+        new_password.zeroize();
         return Err(AppError::Validation("New password cannot be empty".into()));
     }
 
     let path = db_path(&app)?;
 
     if !is_db_encrypted(&path)? {
+        current_password.zeroize();
+        new_password.zeroize();
         return Err(AppError::Validation("Database is not encrypted".into()));
     }
 
-    let escaped_current = escape_pragma(&current_password);
-    let escaped_new = escape_pragma(&new_password);
+    let mut escaped_current = escape_pragma(&current_password);
+    let mut escaped_new = escape_pragma(&new_password);
+    current_password.zeroize();
+    new_password.zeroize();
 
     // Open with current password, verify, and rekey
     let conn = Connection::open(&path)?;
     conn.execute_batch(&format!("PRAGMA key = '{}';", escaped_current))?;
+    escaped_current.zeroize();
     conn.execute_batch("SELECT count(*) FROM sqlite_master;")
-        .map_err(|_| AppError::Validation("Current password is incorrect".into()))?;
+        .map_err(|_| {
+            escaped_new.zeroize();
+            AppError::Validation("Current password is incorrect".into())
+        })?;
     conn.execute_batch(&format!("PRAGMA rekey = '{}';", escaped_new))?;
     drop(conn);
 
     let state: State<DbState> = app.state();
-    replace_connections(&state, &path, Some(&escaped_new))?;
+    let result = replace_connections(&state, &path, Some(&escaped_new));
+    escaped_new.zeroize();
 
-    Ok(())
+    result
 }
 
 #[tauri::command]
-pub fn disable_encryption(app: AppHandle, password: String) -> AppResult<()> {
+pub fn disable_encryption(app: AppHandle, mut password: String) -> AppResult<()> {
     let path = db_path(&app)?;
 
     if !is_db_encrypted(&path)? {
+        password.zeroize();
         return Err(AppError::Validation("Database is not encrypted".into()));
     }
 
-    let escaped_pw = escape_pragma(&password);
+    let mut escaped_pw = escape_pragma(&password);
+    password.zeroize();
     let tmp_path = path.with_extension("db.plain");
 
     // Open encrypted DB and export to plaintext
     let enc_conn = Connection::open(&path)?;
     enc_conn.execute_batch(&format!("PRAGMA key = '{}';", escaped_pw))?;
+    escaped_pw.zeroize();
     enc_conn.execute_batch("SELECT count(*) FROM sqlite_master;")
         .map_err(|_| AppError::Validation("Incorrect password".into()))?;
 

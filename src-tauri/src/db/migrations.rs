@@ -442,7 +442,7 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 
 CREATE INDEX IF NOT EXISTS idx_exchange_rates_pair_date ON exchange_rates(from_currency, to_currency, date);
 
--- Agent Gateway tables (Phase G1)
+-- Agent Gateway tables: planned feature (see AGENT-GATEWAY-SPEC.md), not yet implemented in backend commands
 
 CREATE TABLE IF NOT EXISTS agents (
     id              TEXT PRIMARY KEY,

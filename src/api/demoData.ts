@@ -22,7 +22,25 @@ import {
   TransactionPage,
 } from '../types';
 
-const now = '2026-03-22T00:00:00Z';
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function dateStr(daysBack: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysBack);
+  return d.toISOString().slice(0, 10);
+}
+
+function monthStr(monthsBack: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - monthsBack);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+const now = daysAgo(0);
 
 const accounts: Account[] = [
   {
@@ -80,37 +98,37 @@ const tagWork: TagBrief = { id: 'tag-work', name: 'Work', color: '#0ea5e9' };
 const tagTravel: TagBrief = { id: 'tag-travel', name: 'Travel', color: '#7c3aed' };
 
 const transactions: Transaction[] = [
-  tx('txn-001', 'acct-checking', '2026-03-31', 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — Mar', false, []),
-  tx('txn-002', 'acct-checking', '2026-03-14', 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — Mar', true, []),
-  tx('txn-003', 'acct-checking', '2026-03-05', 85000, 'income', 'cat-freelance', 'Apex Media', 'Website audit', true, [tagWork]),
-  tx('txn-004', 'acct-savings', '2026-03-31', 19700, 'income', 'cat-investments', 'Vanguard', 'Dividend', false, []),
-  tx('txn-005', 'acct-checking', '2026-03-01', 185000, 'expense', 'cat-housing', 'Sunset Apartments', 'Rent — March', true, []),
-  tx('txn-006', 'acct-card', '2026-03-04', 13700, 'expense', 'cat-food', 'Whole Foods', 'Weekly groceries', false, []),
-  tx('txn-007', 'acct-card', '2026-03-05', 6800, 'expense', 'cat-transport', 'Uber', 'Rides', false, [tagTravel]),
-  tx('txn-008', 'acct-card', '2026-03-05', 1400, 'expense', 'cat-subs', 'New York Times', 'Monthly', false, []),
-  tx('txn-009', 'acct-card', '2026-03-08', 8900, 'expense', 'cat-utilities', 'City Power & Gas', 'Electric + gas', false, []),
-  tx('txn-010', 'acct-card', '2026-03-10', 7200, 'expense', 'cat-utilities', 'StreamNet ISP', 'Internet', false, []),
-  tx('txn-011', 'acct-card', '2026-03-11', 11200, 'expense', 'cat-food', "Trader Joe's", 'Weekly groceries', false, []),
-  tx('txn-012', 'acct-card', '2026-03-14', 9000, 'expense', 'cat-entertainment', 'AMC Theatres', 'Movie night x2', false, []),
-  tx('txn-013', 'acct-card', '2026-03-15', 6400, 'expense', 'cat-food', 'The French Laundry', 'Birthday dinner', false, []),
-  tx('txn-014', 'acct-card', '2026-03-18', 12900, 'expense', 'cat-food', 'Whole Foods', 'Weekly groceries', false, [tagCoffee]),
-  tx('txn-015', 'acct-card', '2026-03-19', 8500, 'expense', 'cat-personal', 'Great Clips', 'Haircut', false, []),
-  tx('txn-016', 'acct-card', '2026-03-20', 5500, 'expense', 'cat-transport', 'Chevron', 'Gas', false, []),
-  tx('txn-017', 'acct-card', '2026-03-22', 20000, 'expense', 'cat-health', 'Dr. Chen', 'Annual physical', false, []),
-  tx('txn-018', 'acct-card', '2026-03-07', 22300, 'expense', 'cat-shopping', 'Amazon', 'Misc household', false, []),
-  tx('txn-019', 'acct-checking', '2026-03-05', 195000, 'transfer', null, 'Transfer', 'CC payment — February', true, [] , 'grp-cc-pay'),
-  tx('txn-020', 'acct-card', '2026-03-05', 195000, 'transfer', null, 'Transfer', 'CC payment — February', true, [] , 'grp-cc-pay'),
-  tx('txn-021', 'acct-checking', '2026-03-31', 50000, 'transfer', null, 'Transfer', 'Monthly savings transfer', false, [] , 'grp-save'),
-  tx('txn-022', 'acct-savings', '2026-03-31', 50000, 'transfer', null, 'Transfer', 'Monthly savings transfer', false, [] , 'grp-save'),
-  tx('txn-023', 'acct-card', '2026-02-25', 12100, 'expense', 'cat-food', "Trader Joe's", 'Weekly groceries', true, []),
-  tx('txn-024', 'acct-checking', '2026-02-28', 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — Feb', true, []),
-  tx('txn-025', 'acct-checking', '2026-02-14', 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — Feb', true, []),
-  tx('txn-026', 'acct-checking', '2026-01-31', 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — Jan', true, []),
-  tx('txn-027', 'acct-checking', '2026-01-15', 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — Jan', true, []),
+  tx('txn-001', 'acct-checking', dateStr(0), 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — this month', false, []),
+  tx('txn-002', 'acct-checking', dateStr(17), 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — this month', true, []),
+  tx('txn-003', 'acct-checking', dateStr(26), 85000, 'income', 'cat-freelance', 'Apex Media', 'Website audit', true, [tagWork]),
+  tx('txn-004', 'acct-savings', dateStr(0), 19700, 'income', 'cat-investments', 'Vanguard', 'Dividend', false, []),
+  tx('txn-005', 'acct-checking', dateStr(30), 185000, 'expense', 'cat-housing', 'Sunset Apartments', 'Rent', true, []),
+  tx('txn-006', 'acct-card', dateStr(27), 13700, 'expense', 'cat-food', 'Whole Foods', 'Weekly groceries', false, []),
+  tx('txn-007', 'acct-card', dateStr(26), 6800, 'expense', 'cat-transport', 'Uber', 'Rides', false, [tagTravel]),
+  tx('txn-008', 'acct-card', dateStr(26), 1400, 'expense', 'cat-subs', 'New York Times', 'Monthly', false, []),
+  tx('txn-009', 'acct-card', dateStr(23), 8900, 'expense', 'cat-utilities', 'City Power & Gas', 'Electric + gas', false, []),
+  tx('txn-010', 'acct-card', dateStr(21), 7200, 'expense', 'cat-utilities', 'StreamNet ISP', 'Internet', false, []),
+  tx('txn-011', 'acct-card', dateStr(20), 11200, 'expense', 'cat-food', "Trader Joe's", 'Weekly groceries', false, []),
+  tx('txn-012', 'acct-card', dateStr(17), 9000, 'expense', 'cat-entertainment', 'AMC Theatres', 'Movie night x2', false, []),
+  tx('txn-013', 'acct-card', dateStr(16), 6400, 'expense', 'cat-food', 'The French Laundry', 'Birthday dinner', false, []),
+  tx('txn-014', 'acct-card', dateStr(13), 12900, 'expense', 'cat-food', 'Whole Foods', 'Weekly groceries', false, [tagCoffee]),
+  tx('txn-015', 'acct-card', dateStr(12), 8500, 'expense', 'cat-personal', 'Great Clips', 'Haircut', false, []),
+  tx('txn-016', 'acct-card', dateStr(11), 5500, 'expense', 'cat-transport', 'Chevron', 'Gas', false, []),
+  tx('txn-017', 'acct-card', dateStr(9), 20000, 'expense', 'cat-health', 'Dr. Chen', 'Annual physical', false, []),
+  tx('txn-018', 'acct-card', dateStr(24), 22300, 'expense', 'cat-shopping', 'Amazon', 'Misc household', false, []),
+  tx('txn-019', 'acct-checking', dateStr(26), 195000, 'transfer', null, 'Transfer', 'CC payment — last month', true, [] , 'grp-cc-pay'),
+  tx('txn-020', 'acct-card', dateStr(26), 195000, 'transfer', null, 'Transfer', 'CC payment — last month', true, [] , 'grp-cc-pay'),
+  tx('txn-021', 'acct-checking', dateStr(0), 50000, 'transfer', null, 'Transfer', 'Monthly savings transfer', false, [] , 'grp-save'),
+  tx('txn-022', 'acct-savings', dateStr(0), 50000, 'transfer', null, 'Transfer', 'Monthly savings transfer', false, [] , 'grp-save'),
+  tx('txn-023', 'acct-card', dateStr(36), 12100, 'expense', 'cat-food', "Trader Joe's", 'Weekly groceries', true, []),
+  tx('txn-024', 'acct-checking', dateStr(33), 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — last month', true, []),
+  tx('txn-025', 'acct-checking', dateStr(47), 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — last month', true, []),
+  tx('txn-026', 'acct-checking', dateStr(61), 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — 2 months ago', true, []),
+  tx('txn-027', 'acct-checking', dateStr(77), 425000, 'income', 'cat-salary', 'Acme Corp', 'Salary — 2 months ago', true, []),
 ];
 
 const dashboardByMonth: Record<string, DashboardData> = {
-  '2026-03': {
+  [monthStr(0)]: {
     income: 954700,
     expense: -288800,
     net: 665900,
@@ -124,7 +142,7 @@ const dashboardByMonth: Record<string, DashboardData> = {
       { categoryId: 'cat-entertainment', categoryName: 'Entertainment', categoryColor: '#6366f1', total: -9000 },
     ],
   },
-  '2026-02': {
+  [monthStr(1)]: {
     income: 871200,
     expense: -254800,
     net: 616400,
@@ -134,7 +152,7 @@ const dashboardByMonth: Record<string, DashboardData> = {
       { categoryId: 'cat-shopping', categoryName: 'Shopping', categoryColor: '#ec4899', total: -52500 },
     ],
   },
-  '2026-01': {
+  [monthStr(2)]: {
     income: 988400,
     expense: -301700,
     net: 686700,
@@ -147,12 +165,12 @@ const dashboardByMonth: Record<string, DashboardData> = {
 };
 
 const monthlyTrend: MonthSummary[] = [
-  { month: '2025-10', income: 812000, expense: -246000, net: 566000 },
-  { month: '2025-11', income: 825000, expense: -258000, net: 567000 },
-  { month: '2025-12', income: 841000, expense: -272000, net: 569000 },
-  { month: '2026-01', income: 988400, expense: -301700, net: 686700 },
-  { month: '2026-02', income: 871200, expense: -254800, net: 616400 },
-  { month: '2026-03', income: 954700, expense: -288800, net: 665900 },
+  { month: monthStr(5), income: 812000, expense: -246000, net: 566000 },
+  { month: monthStr(4), income: 825000, expense: -258000, net: 567000 },
+  { month: monthStr(3), income: 841000, expense: -272000, net: 569000 },
+  { month: monthStr(2), income: 988400, expense: -301700, net: 686700 },
+  { month: monthStr(1), income: 871200, expense: -254800, net: 616400 },
+  { month: monthStr(0), income: 954700, expense: -288800, net: 665900 },
 ];
 
 const balances: AccountBalance[] = [
@@ -163,9 +181,9 @@ const balances: AccountBalance[] = [
 
 const incomeExpenseReport: IncomeExpenseReport = {
   months: [
-    { month: '2026-01', income: 988400, expense: -301700, net: 686700 },
-    { month: '2026-02', income: 871200, expense: -254800, net: 616400 },
-    { month: '2026-03', income: 954700, expense: -288800, net: 665900 },
+    { month: monthStr(2), income: 988400, expense: -301700, net: 686700 },
+    { month: monthStr(1), income: 871200, expense: -254800, net: 616400 },
+    { month: monthStr(0), income: 954700, expense: -288800, net: 665900 },
   ],
   previousIncome: 812000,
   previousExpense: 246000,
@@ -181,17 +199,17 @@ const categorySpending: CategorySpendingRow[] = [
 ];
 
 const cashFlow: CashFlowPoint[] = [
-  { date: '2026-03-01', income: 0, expense: -185000, net: -185000, cumulative: 815000 },
-  { date: '2026-03-05', income: 85000, expense: -30500, net: 54500, cumulative: 869500 },
-  { date: '2026-03-08', income: 0, expense: -8900, net: -8900, cumulative: 860600 },
-  { date: '2026-03-14', income: 425000, expense: -9000, net: 416000, cumulative: 1276600 },
-  { date: '2026-03-18', income: 0, expense: -12900, net: -12900, cumulative: 1263700 },
-  { date: '2026-03-31', income: 444700, expense: 0, net: 444700, cumulative: 1708400 },
+  { date: dateStr(30), income: 0, expense: -185000, net: -185000, cumulative: 815000 },
+  { date: dateStr(26), income: 85000, expense: -30500, net: 54500, cumulative: 869500 },
+  { date: dateStr(23), income: 0, expense: -8900, net: -8900, cumulative: 860600 },
+  { date: dateStr(17), income: 425000, expense: -9000, net: 416000, cumulative: 1276600 },
+  { date: dateStr(13), income: 0, expense: -12900, net: -12900, cumulative: 1263700 },
+  { date: dateStr(0), income: 444700, expense: 0, net: 444700, cumulative: 1708400 },
 ];
 
 const netWorth: NetWorthPoint[] = [
   {
-    month: '2026-01',
+    month: monthStr(2),
     total: 2135200,
     accounts: [
       { accountId: 'acct-checking', accountName: 'Primary Checking', balance: 915000 },
@@ -200,7 +218,7 @@ const netWorth: NetWorthPoint[] = [
     ],
   },
   {
-    month: '2026-02',
+    month: monthStr(1),
     total: 2269400,
     accounts: [
       { accountId: 'acct-checking', accountName: 'Primary Checking', balance: 1002500 },
@@ -209,7 +227,7 @@ const netWorth: NetWorthPoint[] = [
     ],
   },
   {
-    month: '2026-03',
+    month: monthStr(0),
     total: 2314400,
     accounts: [
       { accountId: 'acct-checking', accountName: 'Primary Checking', balance: 1068500 },
@@ -342,10 +360,10 @@ const budgetItems: BudgetCategoryRow[] = [
 
 const budgetData: BudgetWithItems = {
   budget: {
-    id: 'budget-2026-03',
-    year: 2026,
-    month: 3,
-    notes: 'March plan for household spending and savings targets',
+    id: `budget-${monthStr(0)}`,
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    notes: 'Monthly plan for household spending and savings targets',
     createdAt: now,
     updatedAt: now,
   },
@@ -439,9 +457,9 @@ const recurringItems: RecurringTransaction[] = [
     categoryId: 'cat-housing',
     transferToAccountId: null,
     frequency: 'monthly',
-    startDate: '2025-01-01',
+    startDate: dateStr(365),
     endDate: null,
-    nextDate: '2026-04-01',
+    nextDate: dateStr(-1),
     isActive: true,
     autoPost: true,
     createdAt: now,
@@ -457,9 +475,9 @@ const recurringItems: RecurringTransaction[] = [
     categoryId: 'cat-salary',
     transferToAccountId: null,
     frequency: 'biweekly',
-    startDate: '2025-01-03',
+    startDate: dateStr(365),
     endDate: null,
-    nextDate: '2026-03-28',
+    nextDate: dateStr(3),
     isActive: true,
     autoPost: true,
     createdAt: now,
@@ -475,9 +493,9 @@ const recurringItems: RecurringTransaction[] = [
     categoryId: 'cat-subs',
     transferToAccountId: null,
     frequency: 'monthly',
-    startDate: '2025-08-01',
+    startDate: dateStr(240),
     endDate: null,
-    nextDate: '2026-04-05',
+    nextDate: dateStr(-5),
     isActive: true,
     autoPost: false,
     createdAt: now,
@@ -493,9 +511,9 @@ const recurringItems: RecurringTransaction[] = [
     categoryId: null,
     transferToAccountId: 'acct-savings',
     frequency: 'monthly',
-    startDate: '2025-06-30',
+    startDate: dateStr(280),
     endDate: null,
-    nextDate: '2026-03-31',
+    nextDate: dateStr(0),
     isActive: true,
     autoPost: true,
     createdAt: now,
@@ -588,8 +606,8 @@ export function getDemoInvokeFallback(cmd: string, args?: Record<string, unknown
     case 'get_categories':
       return categories;
     case 'get_dashboard_data': {
-      const month = String((args?.month as string | undefined) ?? '2026-03');
-      return dashboardByMonth[month] ?? dashboardByMonth['2026-03'];
+      const month = String((args?.month as string | undefined) ?? monthStr(0));
+      return dashboardByMonth[month] ?? dashboardByMonth[monthStr(0)];
     }
     case 'get_monthly_trend': {
       const months = Number((args?.months as number | undefined) ?? 12);

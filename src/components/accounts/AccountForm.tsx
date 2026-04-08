@@ -55,11 +55,11 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
         />
 
         <div>
-          <label className={styles.selectLabel}>
+          <label htmlFor="account-type" className={styles.selectLabel}>
             Account Type{' '}
             <Tooltip text="Checking for daily spending, savings for reserves, credit card for tracking debt, cash for physical money, investment for brokerage or retirement accounts." />
           </label>
-          <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])} data-testid="account-type-select">
+          <select id="account-type" className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])} data-testid="account-type-select">
             {ACCOUNT_TYPE_OPTIONS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}

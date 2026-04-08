@@ -53,7 +53,7 @@ export function AccountDetailPage() {
         if (!cancelled) setLoadingAccount(false);
       });
     return () => { cancelled = true; };
-  }, [activeAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeAccountId, navigate]);
 
   // Load transactions (on mount, page change, or after edit)
   const loadTransactions = useCallback((pageNum: number) => {

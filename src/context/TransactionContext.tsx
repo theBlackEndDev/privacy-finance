@@ -6,7 +6,7 @@ interface TransactionContextValue {
   page: TransactionPage | null;
   filters: TransactionFilters;
   loading: boolean;
-  setFilters: (filters: TransactionFilters) => void;
+  setFilters: (filters: TransactionFilters | ((prev: TransactionFilters) => TransactionFilters)) => void;
   refresh: () => Promise<void>;
 }
 
@@ -39,8 +39,12 @@ export function TransactionProvider({ children, initialAccountId }: TransactionP
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const setFilters = useCallback((f: TransactionFilters) => {
-    setFiltersState({ ...DEFAULT_FILTERS, ...f });
+  const setFilters = useCallback((f: TransactionFilters | ((prev: TransactionFilters) => TransactionFilters)) => {
+    if (typeof f === 'function') {
+      setFiltersState(prev => ({ ...DEFAULT_FILTERS, ...f(prev) }));
+    } else {
+      setFiltersState({ ...DEFAULT_FILTERS, ...f });
+    }
   }, []);
 
   return (

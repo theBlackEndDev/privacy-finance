@@ -1,7 +1,15 @@
 use std::io::Write;
 use tauri::State;
 use crate::db::DbState;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
+
+/// Validate that a path does not contain directory traversal sequences.
+fn validate_path(path: &str) -> AppResult<()> {
+    if path.contains("..") {
+        return Err(AppError::Validation("Path must not contain '..' traversal".into()));
+    }
+    Ok(())
+}
 
 // ── Export filters ──────────────────────────────────────────────────
 
@@ -21,6 +29,7 @@ pub fn export_transactions_csv(
     filters: ExportFilters,
     state: State<DbState>,
 ) -> AppResult<u64> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
     let (where_clause, params) = build_filter_clause(&filters);
 
@@ -78,6 +87,7 @@ pub fn export_transactions_json(
     filters: ExportFilters,
     state: State<DbState>,
 ) -> AppResult<u64> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
     let (where_clause, params) = build_filter_clause(&filters);
 
@@ -138,6 +148,7 @@ pub fn export_all_data_json(
     path: String,
     state: State<DbState>,
 ) -> AppResult<()> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
     let file = std::fs::File::create(&path)?;
     let mut wtr = std::io::BufWriter::new(file);

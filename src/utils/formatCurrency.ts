@@ -2,7 +2,7 @@
  * Format integer cents as a currency string.
  * e.g. 4299 → "$42.99", -4299 → "-$42.99"
  */
-export function formatCurrency(cents: number, _currencyCode = 'USD'): string {
+export function formatCurrency(cents: number): string {
   const negative = cents < 0;
   const abs = Math.abs(cents);
   const dollars = Math.floor(abs / 100);

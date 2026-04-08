@@ -33,6 +33,7 @@ pub fn validate_sql(sql: &str) -> AppResult<String> {
         "DROP ", "DELETE ", "INSERT ", "UPDATE ", "ALTER ", "CREATE ",
         "TRUNCATE ", "REPLACE ", "ATTACH ", "DETACH ",
         "PRAGMA ", "VACUUM", "REINDEX",
+        "LOAD_EXTENSION", "EXEC ", "GRANT ", "WRITEFILE", "READFILE",
         "; DROP", ";DROP", "; DELETE", ";DELETE",
         "; INSERT", ";INSERT", "; UPDATE", ";UPDATE",
     ];
@@ -108,11 +109,29 @@ fn strip_string_literals(sql: &str) -> String {
     let mut result = String::new();
     let mut in_single_quote = false;
     let mut in_double_quote = false;
+    let chars: Vec<char> = sql.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
 
-    for ch in sql.chars() {
+    while i < len {
+        let ch = chars[i];
         match ch {
             '\'' if !in_double_quote => {
-                in_single_quote = !in_single_quote;
+                if in_single_quote {
+                    // Check for escaped quote ('') inside a single-quoted string
+                    if i + 1 < len && chars[i + 1] == '\'' {
+                        // Escaped quote — stays inside the string
+                        result.push('_');
+                        result.push('_');
+                        i += 2;
+                        continue;
+                    }
+                    // Closing quote
+                    in_single_quote = false;
+                } else {
+                    // Opening quote
+                    in_single_quote = true;
+                }
                 result.push(ch);
             }
             '"' if !in_single_quote => {
@@ -124,6 +143,7 @@ fn strip_string_literals(sql: &str) -> String {
             }
             _ => result.push(ch),
         }
+        i += 1;
     }
     result
 }
@@ -199,5 +219,44 @@ mod tests {
     #[test]
     fn test_reject_update() {
         assert!(validate_sql("UPDATE transactions SET amount = 0").is_err());
+    }
+
+    #[test]
+    fn test_reject_load_extension() {
+        let result = validate_sql("SELECT load_extension('evil.so')");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reject_writefile() {
+        let result = validate_sql("SELECT writefile('/tmp/evil', data) FROM transactions");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reject_readfile() {
+        let result = validate_sql("SELECT readfile('/etc/passwd')");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reject_grant() {
+        let result = validate_sql("GRANT ALL ON transactions TO public");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_escaped_quote_in_string() {
+        // SQL escaped quote ('') inside a string should not break parsing
+        let result = validate_sql("SELECT * FROM transactions WHERE payee = 'it''s okay'");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_escaped_quote_does_not_leak_forbidden() {
+        // Ensure escaped quote doesn't cause the rest of the string to be unquoted
+        // allowing a forbidden keyword to be detected
+        let result = validate_sql("SELECT * FROM transactions WHERE payee = 'it''s DROP TABLE'");
+        assert!(result.is_ok(), "Forbidden keyword inside a string with escaped quotes should be safe");
     }
 }

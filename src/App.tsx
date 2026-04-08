@@ -15,6 +15,7 @@ import { ReportsPage } from './views/ReportsPage';
 import { ReconciliationPage } from './views/ReconciliationPage';
 
 import { ToastProvider } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
 import { KeyboardShortcutHelp } from './components/ui/KeyboardShortcutHelp';
@@ -50,7 +51,7 @@ function AppShell() {
     settingsApi.get('onboarding_complete').then(val => {
       setOnboarding(val !== 'true' ? 'visible' : 'hidden');
     }).catch(() => setOnboarding('hidden'));
-  }, [accountsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountsLoading, accounts.length]);
 
   async function handleOnboardingComplete() {
     setOnboarding('hidden');
@@ -84,18 +85,18 @@ function AppShell() {
 
   const view = (() => {
     switch (currentView) {
-      case 'accounts':        return <AccountsPage />;
-      case 'account-detail':  return <AccountDetailPage />;
-      case 'categories':      return <CategoriesPage />;
-      case 'dashboard':    return <DashboardPage />;
-      case 'transactions': return <TransactionsPage />;
-      case 'import':       return <ImportPage />;
-      case 'recurring':    return <RecurringPage />;
-      case 'budgets':      return <BudgetsPage />;
-      case 'rules':        return <RulesPage />;
-      case 'reports':      return <ReportsPage />;
-      case 'reconciliation': return <ReconciliationPage />;
-
+      case 'accounts':        return <ErrorBoundary><AccountsPage /></ErrorBoundary>;
+      case 'account-detail':  return <ErrorBoundary><AccountDetailPage /></ErrorBoundary>;
+      case 'categories':      return <ErrorBoundary><CategoriesPage /></ErrorBoundary>;
+      case 'dashboard':    return <ErrorBoundary><DashboardPage /></ErrorBoundary>;
+      case 'transactions': return <ErrorBoundary><TransactionsPage /></ErrorBoundary>;
+      case 'import':       return <ErrorBoundary><ImportPage /></ErrorBoundary>;
+      case 'recurring':    return <ErrorBoundary><RecurringPage /></ErrorBoundary>;
+      case 'budgets':      return <ErrorBoundary><BudgetsPage /></ErrorBoundary>;
+      case 'rules':        return <ErrorBoundary><RulesPage /></ErrorBoundary>;
+      case 'reports':      return <ErrorBoundary><ReportsPage /></ErrorBoundary>;
+      case 'reconciliation': return <ErrorBoundary><ReconciliationPage /></ErrorBoundary>;
+      default: return <ErrorBoundary><DashboardPage /></ErrorBoundary>;
     }
   })();
 

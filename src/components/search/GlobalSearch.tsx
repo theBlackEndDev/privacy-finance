@@ -15,12 +15,19 @@ const AMOUNT_PREFIX: Record<string, string> = {
   transfer: '',
 };
 
-function sanitizeSnippet(html: string): string {
-  const div = document.createElement('div');
-  div.textContent = html;
-  return div.innerHTML
-    .replace(/&lt;mark&gt;/g, '<mark>')
-    .replace(/&lt;\/mark&gt;/g, '</mark>');
+function HighlightedText({ text }: { text: string }) {
+  const parts = text.split(/(<mark>.*?<\/mark>)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const match = part.match(/^<mark>(.*)<\/mark>$/);
+        if (match) {
+          return <mark key={i}>{match[1]}</mark>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 const LISTBOX_ID = 'global-search-results';
@@ -180,10 +187,9 @@ export function GlobalSearch() {
                 >
                   <div className={styles.itemLeft}>
                     <span className={styles.payee}>{r.payee || 'No payee'}</span>
-                    <span
-                      className={styles.snippet}
-                      dangerouslySetInnerHTML={{ __html: sanitizeSnippet(r.snippet) }}
-                    />
+                    <span className={styles.snippet}>
+                      <HighlightedText text={r.snippet} />
+                    </span>
                   </div>
                   <div className={styles.meta}>
                     <span className={styles.amount}>

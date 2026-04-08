@@ -17,6 +17,14 @@ pub struct BackupInfo {
     pub date_range_to: Option<String>,
 }
 
+/// Validate that a path does not contain directory traversal sequences.
+fn validate_path(path: &str) -> AppResult<()> {
+    if path.contains("..") {
+        return Err(AppError::Validation("Path must not contain '..' traversal".into()));
+    }
+    Ok(())
+}
+
 // ── create_backup ───────────────────────────────────────────────────
 
 #[tauri::command]
@@ -24,6 +32,7 @@ pub fn create_backup(
     path: String,
     state: State<DbState>,
 ) -> AppResult<()> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
 
     // Verify source integrity before backup
@@ -51,6 +60,7 @@ pub fn restore_backup(
     path: String,
     state: State<DbState>,
 ) -> AppResult<()> {
+    validate_path(&path)?;
     // First validate the backup file
     let src = rusqlite::Connection::open(&path)?;
     let integrity: String = src.query_row(
@@ -76,6 +86,7 @@ pub fn restore_backup(
 
 #[tauri::command]
 pub fn get_backup_info(path: String) -> AppResult<BackupInfo> {
+    validate_path(&path)?;
     let metadata = std::fs::metadata(&path)?;
     let file_size_bytes = metadata.len();
 

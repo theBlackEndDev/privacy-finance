@@ -45,14 +45,6 @@ export interface Category {
   updatedAt: string;
 }
 
-export interface CategoryGroup {
-  id: string;
-  name: string;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CreateCategoryInput {
   name: string;
   type: Category['type'];

@@ -33,6 +33,7 @@ sha2 = "0.10"
 regex = "1"
 ureq = { version = "2", features = ["json"] }
 which = "6"
+zeroize = "1"
 
 [features]
 e2e = ["tauri-plugin-webdriver"]

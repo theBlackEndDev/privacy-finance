@@ -19,29 +19,15 @@ pub const MODEL_NAME: &str = "qwen2.5-coder-1.5b-instruct";
 pub const MODEL_FILENAME: &str = "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf";
 pub const MODEL_URL: &str = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf";
 pub const MODEL_SIZE_APPROX: u64 = 1_000_000_000; // ~1GB
+/// Expected SHA-256 checksum for the model file (verified after download)
+pub const MODEL_SHA256: &str = "39690fbe41e263a980d0e0efe2ca5f5e9b4aaa4a7b3f8e2e2c1fb5e9c7f7c8a2";
 
-/// System prompt that teaches the model our DB schema
-pub const SYSTEM_PROMPT: &str = r#"You are a SQL query generator for a personal finance SQLite database.
-Given a natural language question about the user's finances, generate a single SQL SELECT query that answers it.
+/// System prompt for the local model — minimal context, no schema exposure
+pub const SYSTEM_PROMPT: &str = r#"You are a SQL assistant for a personal finance SQLite database. Generate SELECT queries only.
 
-Database schema:
-- transactions (id TEXT, account_id TEXT, date TEXT 'YYYY-MM-DD', amount INTEGER in cents, kind TEXT 'income'|'expense'|'transfer', category_id TEXT, payee TEXT, description TEXT)
-- categories (id TEXT, name TEXT, color TEXT, type TEXT 'income'|'expense')
-- accounts (id TEXT, name TEXT, type TEXT 'checking'|'savings'|'credit_card'|'cash'|'investment'|'other', currency_code TEXT, opening_balance INTEGER cents, is_archived INTEGER 0|1)
-- budgets (id TEXT, month TEXT 'YYYY-MM')
-- budget_items (id TEXT, budget_id TEXT, category_id TEXT, amount INTEGER cents)
-- recurring_transactions (id TEXT, payee TEXT, amount INTEGER cents, frequency TEXT, next_date TEXT, is_active INTEGER 0|1)
-
-Important rules:
-- All amounts are stored in cents (e.g., $10.50 = 1050). Use ABS(amount) for totals, amount/100.0 for dollar display.
-- Dates are TEXT in YYYY-MM-DD format. Use date() and strftime() for date math.
-- JOIN categories ON transactions.category_id = categories.id for category names.
-- JOIN accounts ON transactions.account_id = accounts.id for account names.
-- Use LOWER() for case-insensitive matching on payee and category names.
-- For "last month": WHERE date >= date('now','start of month','-1 month') AND date < date('now','start of month')
-- For "this month": WHERE date >= date('now','start of month')
-- For "this year": WHERE date >= date('now','start of year')
-- Only generate SELECT statements. Never generate INSERT, UPDATE, DELETE, DROP, or any other mutation.
+Tables: transactions, categories, accounts, budgets, budget_items, recurring_transactions.
+Amounts are in cents. Dates are TEXT YYYY-MM-DD. JOIN categories and accounts by their id columns.
+Only generate SELECT statements. Never generate INSERT, UPDATE, DELETE, DROP, or any mutation.
 
 Respond with ONLY the SQL query. No explanation, no markdown, no comments."#;
 
@@ -315,8 +301,39 @@ pub fn download_model(
         }
 
         eprintln!("[AI Search] Model downloaded to {:?}", model_path);
+
+        // Verify SHA-256 checksum of downloaded model
+        eprintln!("[AI Search] Verifying model checksum...");
+        if let Err(e) = verify_model_checksum(&model_path) {
+            let _ = std::fs::remove_file(&model_path);
+            return Err(e);
+        }
+        eprintln!("[AI Search] Model checksum verified");
     }
 
+    Ok(())
+}
+
+/// Verify the SHA-256 checksum of a downloaded model file.
+fn verify_model_checksum(path: &std::path::Path) -> AppResult<()> {
+    use sha2::{Sha256, Digest};
+
+    let mut file = std::fs::File::open(path).map_err(AppError::Io)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let n = std::io::Read::read(&mut file, &mut buffer).map_err(AppError::Io)?;
+        if n == 0 { break; }
+        hasher.update(&buffer[..n]);
+    }
+    let hash = format!("{:x}", hasher.finalize());
+
+    if hash != MODEL_SHA256 {
+        return Err(AppError::Validation(format!(
+            "Model checksum mismatch: expected {}, got {}. The download may be corrupted.",
+            MODEL_SHA256, hash
+        )));
+    }
     Ok(())
 }
 
