@@ -126,7 +126,7 @@ fn ensure_server_running(inference_state: &InferenceServerState) {
 /// Tier 2: Send the question to the local model, get SQL, validate, execute
 fn try_tier2_inference(query: &str, conn: &rusqlite::Connection) -> AppResult<AISearchResult> {
     // Call the local model
-    let engine = ai_local_model::InferenceEngine::new(std::path::PathBuf::new());
+    let _engine = ai_local_model::InferenceEngine::new(std::path::PathBuf::new());
     let raw_sql = ai_local_model::call_inference_server_public(query)?;
 
     // Validate the generated SQL
@@ -140,7 +140,7 @@ fn try_tier2_inference(query: &str, conn: &rusqlite::Connection) -> AppResult<AI
     );
 
     // If json_group_array doesn't work, try direct execution
-    let (rows_json, text_answer) = match result {
+    let (_rows_json, text_answer) = match result {
         Ok(json) => {
             let answer = format_tier2_answer(&validated_sql, &json);
             (json, answer)
@@ -200,7 +200,7 @@ fn try_tier2_inference(query: &str, conn: &rusqlite::Connection) -> AppResult<AI
     })
 }
 
-fn format_tier2_answer(sql: &str, json: &str) -> String {
+fn format_tier2_answer(_sql: &str, json: &str) -> String {
     // Try to extract a meaningful answer from the JSON result
     if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(json) {
         if arr.len() == 1 {
@@ -218,7 +218,7 @@ fn format_tier2_answer(sql: &str, json: &str) -> String {
     "Query executed successfully".to_string()
 }
 
-fn format_tier2_rows(columns: &[String], rows: &[serde_json::Value]) -> String {
+fn format_tier2_rows(_columns: &[String], rows: &[serde_json::Value]) -> String {
     if rows.is_empty() {
         return "No results found".to_string();
     }

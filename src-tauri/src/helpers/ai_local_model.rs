@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use crate::error::{AppError, AppResult};
 
@@ -63,11 +62,13 @@ pub fn check_model_status(app_data_dir: &PathBuf) -> ModelStatus {
 }
 
 /// Shared state for the loaded model inference engine
+#[allow(dead_code)]
 pub struct InferenceEngine {
     pub loaded: bool,
     pub app_data_dir: PathBuf,
 }
 
+#[allow(dead_code)]
 impl InferenceEngine {
     pub fn new(app_data_dir: PathBuf) -> Self {
         Self { loaded: false, app_data_dir }

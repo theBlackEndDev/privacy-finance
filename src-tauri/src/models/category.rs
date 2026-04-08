@@ -17,6 +17,7 @@ pub struct Category {
     pub updated_at: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryGroup {

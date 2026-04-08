@@ -504,6 +504,7 @@ fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort:
     Ok(id)
 }
 
+#[cfg(test)]
 fn insert_account(conn: &Connection, name: &str, kind: &str, opening_balance: i64, sort: i64, now: &str) -> AppResult<String> {
     let id = uuid::Uuid::new_v4().to_string();
     conn.execute(
@@ -514,6 +515,7 @@ fn insert_account(conn: &Connection, name: &str, kind: &str, opening_balance: i6
     Ok(id)
 }
 
+#[cfg(test)]
 fn insert_tx(
     conn: &Connection,
     account_id: &str,
@@ -536,6 +538,7 @@ fn insert_tx(
     Ok(())
 }
 
+#[cfg(test)]
 fn insert_transfer(conn: &Connection, from_id: &str, to_id: &str, amount: i64, date: &str, desc: &str, now: &str) -> AppResult<()> {
     let group_id = uuid::Uuid::new_v4().to_string();
     let id1 = uuid::Uuid::new_v4().to_string();
@@ -564,21 +567,21 @@ fn seed_defaults(conn: &Connection) -> AppResult<()> {
 
     // ── Categories ───────────────────────────────────────────────────────────
 
-    let cat_salary      = insert_category(conn, "Salary",        "#22c55e", "income",  0, &now)?;
-    let cat_freelance   = insert_category(conn, "Freelance",     "#3b82f6", "income",  1, &now)?;
-    let cat_investments = insert_category(conn, "Investments",   "#8b5cf6", "income",  2, &now)?;
+    let _cat_salary     = insert_category(conn, "Salary",        "#22c55e", "income",  0, &now)?;
+    let _cat_freelance  = insert_category(conn, "Freelance",     "#3b82f6", "income",  1, &now)?;
+    let _cat_investments = insert_category(conn, "Investments",   "#8b5cf6", "income",  2, &now)?;
     let _cat_oi         = insert_category(conn, "Other Income",  "#06b6d4", "income",  3, &now)?;
 
-    let cat_housing     = insert_category(conn, "Housing",        "#ef4444", "expense",  0, &now)?;
-    let cat_food        = insert_category(conn, "Food",           "#f97316", "expense",  1, &now)?;
-    let cat_transport   = insert_category(conn, "Transportation", "#eab308", "expense",  2, &now)?;
-    let cat_utilities   = insert_category(conn, "Utilities",      "#14b8a6", "expense",  3, &now)?;
-    let cat_health      = insert_category(conn, "Healthcare",     "#ec4899", "expense",  4, &now)?;
-    let cat_entertain   = insert_category(conn, "Entertainment",  "#8b5cf6", "expense",  5, &now)?;
-    let cat_shopping    = insert_category(conn, "Shopping",       "#f43f5e", "expense",  6, &now)?;
+    let _cat_housing    = insert_category(conn, "Housing",        "#ef4444", "expense",  0, &now)?;
+    let _cat_food       = insert_category(conn, "Food",           "#f97316", "expense",  1, &now)?;
+    let _cat_transport  = insert_category(conn, "Transportation", "#eab308", "expense",  2, &now)?;
+    let _cat_utilities  = insert_category(conn, "Utilities",      "#14b8a6", "expense",  3, &now)?;
+    let _cat_health     = insert_category(conn, "Healthcare",     "#ec4899", "expense",  4, &now)?;
+    let _cat_entertain  = insert_category(conn, "Entertainment",  "#8b5cf6", "expense",  5, &now)?;
+    let _cat_shopping   = insert_category(conn, "Shopping",       "#f43f5e", "expense",  6, &now)?;
     let _cat_education  = insert_category(conn, "Education",      "#6366f1", "expense",  7, &now)?;
-    let cat_subs        = insert_category(conn, "Subscriptions",  "#a855f7", "expense",  8, &now)?;
-    let cat_personal    = insert_category(conn, "Personal",       "#0ea5e9", "expense",  9, &now)?;
+    let _cat_subs       = insert_category(conn, "Subscriptions",  "#a855f7", "expense",  8, &now)?;
+    let _cat_personal   = insert_category(conn, "Personal",       "#0ea5e9", "expense",  9, &now)?;
     let _cat_other      = insert_category(conn, "Other",          "#6b7280", "expense", 10, &now)?;
 
     // No seed accounts or transactions in production — the onboarding wizard

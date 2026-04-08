@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use tauri::{State, AppHandle, Manager, Emitter};
+use tauri::{State, AppHandle, Emitter};
 use crate::error::AppResult;
 use crate::helpers::ai_local_model::{self, ModelStatus};
 
