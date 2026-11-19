@@ -9,18 +9,10 @@ export function AISearchSettings() {
   const [downloadedMB, setDownloadedMB] = useState(0);
   const [totalMB, setTotalMB] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [serverRunning, setServerRunning] = useState(false);
-  const [starting, setStarting] = useState(false);
   const eventsReceived = useRef(false);
 
   useEffect(() => {
     aiModelApi.status().then(setStatus);
-    aiModelApi.health().then(setServerRunning);
-    // Poll health every 5s so UI reflects auto-started server
-    const interval = setInterval(() => {
-      aiModelApi.health().then(setServerRunning);
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   // Set up Tauri event listeners via ESM dynamic import
@@ -50,8 +42,6 @@ export function AISearchSettings() {
           if (event.payload.success) {
             setProgress(100);
             aiModelApi.status().then(setStatus);
-            // Server auto-starts after install — check health after a moment
-            setTimeout(() => aiModelApi.health().then(setServerRunning), 3000);
           } else {
             setError(event.payload.error || 'Download failed');
           }
@@ -110,27 +100,6 @@ export function AISearchSettings() {
       setError(String(e));
       setDownloading(false);
     }
-  }
-
-  async function handleStart() {
-    setStarting(true);
-    try {
-      await aiModelApi.start();
-      // Poll for health
-      setTimeout(async () => {
-        const healthy = await aiModelApi.health();
-        setServerRunning(healthy);
-        setStarting(false);
-      }, 3000);
-    } catch (e) {
-      setError(String(e));
-      setStarting(false);
-    }
-  }
-
-  async function handleStop() {
-    await aiModelApi.stop();
-    setServerRunning(false);
   }
 
   const isInstalled = status?.installed === true;
@@ -218,19 +187,6 @@ export function AISearchSettings() {
               Status: <span style={{ color: 'var(--color-accent)' }}>Installed</span>
               {status?.modelSizeBytes && (
                 <> ({(status.modelSizeBytes / 1024 / 1024).toFixed(0)} MB)</>
-              )}
-              <br />
-              Server: <span style={{ color: serverRunning ? 'var(--color-accent)' : 'var(--text-muted)' }}>
-                {serverRunning ? 'Running' : 'Stopped'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {!serverRunning ? (
-                <Button size="sm" onClick={handleStart} disabled={starting}>
-                  {starting ? 'Starting...' : 'Start AI Search'}
-                </Button>
-              ) : (
-                <Button size="sm" variant="ghost" onClick={handleStop}>Stop</Button>
               )}
             </div>
           </>

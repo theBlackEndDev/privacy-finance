@@ -1,3 +1,15 @@
+let currencySymbol = '$';
+
+/** Set the symbol used by formatCurrency and chart formatters. Default is "$". */
+export function setCurrencySymbol(symbol: string): void {
+  currencySymbol = symbol;
+}
+
+/** Get the currently configured currency symbol. */
+export function getCurrencySymbol(): string {
+  return currencySymbol;
+}
+
 /**
  * Format integer cents as a currency string.
  * e.g. 4299 → "$42.99", -4299 → "-$42.99"
@@ -7,7 +19,7 @@ export function formatCurrency(cents: number): string {
   const abs = Math.abs(cents);
   const dollars = Math.floor(abs / 100);
   const centsRemainder = abs % 100;
-  const formatted = `$${dollars.toLocaleString()}.${String(centsRemainder).padStart(2, '0')}`;
+  const formatted = `${currencySymbol}${dollars.toLocaleString()}.${String(centsRemainder).padStart(2, '0')}`;
   return negative ? `-${formatted}` : formatted;
 }
 

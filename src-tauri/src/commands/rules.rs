@@ -259,47 +259,20 @@ pub fn delete_rule(id: String, state: State<DbState>) -> AppResult<()> {
 #[tauri::command]
 pub fn reorder_rules(ids: Vec<String>, state: State<DbState>) -> AppResult<()> {
     let conn = state.write_conn.lock().unwrap();
+    reorder_rules_inner(&conn, &ids)
+}
+
+pub(crate) fn reorder_rules_inner(conn: &rusqlite::Connection, ids: &[String]) -> AppResult<()> {
     let now = now_utc();
-    conn.execute_batch("BEGIN")?;
+    let tx = conn.unchecked_transaction()?;
     for (i, id) in ids.iter().enumerate() {
-        conn.execute(
+        tx.execute(
             "UPDATE categorization_rules SET priority = ?1, updated_at = ?2 WHERE id = ?3",
             params![i as i64, now, id],
         )?;
     }
-    conn.execute_batch("COMMIT")?;
+    tx.commit()?;
     Ok(())
-}
-
-/// Given a transaction's payee/description/amount, iterate active rules by priority
-/// and return the first matching category_id (or None).
-pub fn match_transaction_inner(
-    conn: &rusqlite::Connection,
-    payee: &str,
-    description: &str,
-    amount: i64,
-) -> AppResult<Option<String>> {
-    let rules = load_active_rules(conn)?;
-    let compiled = CompiledRule::from_rules(&rules);
-
-    for cr in &compiled {
-        let value = get_field_value(payee, description, amount, &cr.rule.match_field);
-        if cr.matches(&value) {
-            return Ok(Some(cr.rule.category_id.clone()));
-        }
-    }
-    Ok(None)
-}
-
-#[tauri::command]
-pub fn match_transaction(
-    payee: String,
-    description: String,
-    amount: i64,
-    state: State<DbState>,
-) -> AppResult<Option<String>> {
-    let conn = state.read_conn.lock().unwrap();
-    match_transaction_inner(&conn, &payee, &description, amount)
 }
 
 /// Shared helper: match transactions against compiled rules, update categories and apply counts.
@@ -317,13 +290,13 @@ fn apply_rules_to_rows(
     let mut updated = 0i64;
     let mut rule_apply_counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
 
-    conn.execute_batch("BEGIN")?;
+    let tx = conn.unchecked_transaction()?;
 
     for (tx_id, payee, description, amount) in txns {
         for cr in compiled_rules {
             let value = get_field_value(payee, description, *amount, &cr.rule.match_field);
             if cr.matches(&value) {
-                conn.execute(
+                tx.execute(
                     "UPDATE transactions SET category_id = ?1, updated_at = ?2 WHERE id = ?3",
                     params![cr.rule.category_id, now, tx_id],
                 )?;
@@ -336,13 +309,13 @@ fn apply_rules_to_rows(
 
     // Batch update apply_count for each rule
     for (rule_id, count) in &rule_apply_counts {
-        conn.execute(
+        tx.execute(
             "UPDATE categorization_rules SET apply_count = apply_count + ?1, updated_at = ?2 WHERE id = ?3",
             params![count, now, rule_id],
         )?;
     }
 
-    conn.execute_batch("COMMIT")?;
+    tx.commit()?;
     Ok(updated)
 }
 
@@ -369,7 +342,7 @@ pub fn apply_rules_to_uncategorized(state: State<DbState>) -> AppResult<i64> {
 
     // Batch-fetch uncategorized transactions
     let mut tx_stmt = conn.prepare(
-        "SELECT id, payee, description, amount FROM transactions WHERE category_id IS NULL"
+        "SELECT id, payee, description, amount FROM transactions WHERE category_id IS NULL AND kind != 'transfer' AND is_split = 0"
     )?;
     let txns: Vec<(String, String, String, i64)> = tx_stmt
         .query_map([], |row| {
@@ -454,7 +427,7 @@ pub fn apply_rules_to_transactions(
     // Batch-fetch transactions by IDs (only uncategorized)
     let placeholders: Vec<String> = (1..=transaction_ids.len()).map(|i| format!("?{}", i)).collect();
     let sql = format!(
-        "SELECT id, payee, description, amount FROM transactions WHERE id IN ({}) AND category_id IS NULL",
+        "SELECT id, payee, description, amount FROM transactions WHERE id IN ({}) AND category_id IS NULL AND kind != 'transfer' AND is_split = 0",
         placeholders.join(", ")
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -479,6 +452,85 @@ pub fn apply_rules_to_transactions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::migrations::{run_migrations, seed_test_data};
+    use rusqlite::Connection;
+
+    #[test]
+    fn failed_reorder_leaves_autocommit() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
+        let category_id: String = conn
+            .query_row("SELECT id FROM categories LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO categorization_rules
+             (id, name, match_field, match_type, pattern, category_id, created_at, updated_at)
+             VALUES ('r1', 'r', 'payee', 'contains', 'x', ?1, 't', 't')",
+            [&category_id],
+        )
+        .unwrap();
+        // Force the priority update to fail after the transaction has begun.
+        conn.execute_batch(
+            "CREATE TRIGGER fail_reorder BEFORE UPDATE ON categorization_rules
+             BEGIN SELECT RAISE(ABORT, 'forced failure'); END;",
+        )
+        .unwrap();
+
+        let result = reorder_rules_inner(&conn, &["r1".to_string()]);
+        assert!(result.is_err());
+        assert!(conn.is_autocommit());
+    }
+
+    #[test]
+    fn rules_skip_transfers() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
+        let category_id: String = conn
+            .query_row("SELECT id FROM categories LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        let account_id: String = conn
+            .query_row("SELECT id FROM accounts LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO categorization_rules
+             (id, name, match_field, match_type, pattern, category_id, created_at, updated_at)
+             VALUES ('r1', 'r', 'payee', 'contains', 'zzmatch', ?1, 't', 't')",
+            [&category_id],
+        )
+        .unwrap();
+        for (id, kind, is_split) in [
+            ("t_expense", "expense", 0),
+            ("t_transfer", "transfer", 0),
+            ("t_split", "expense", 1),
+        ] {
+            conn.execute(
+                "INSERT INTO transactions
+                 (id, account_id, date, amount, kind, payee, is_split, created_at, updated_at)
+                 VALUES (?1, ?2, '2024-01-01', 100, ?3, 'zzmatch', ?4, 't', 't')",
+                params![id, account_id, kind, is_split],
+            )
+            .unwrap();
+        }
+        let ids: Vec<String> = ["t_expense", "t_transfer", "t_split"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        let updated = apply_rules_to_transactions(&conn, &ids).unwrap();
+        assert_eq!(updated, 1);
+
+        let cat = |id: &str| -> Option<String> {
+            conn.query_row("SELECT category_id FROM transactions WHERE id = ?1", [id], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(cat("t_expense"), Some(category_id));
+        assert_eq!(cat("t_transfer"), None);
+        assert_eq!(cat("t_split"), None);
+    }
 
     #[test]
     fn test_matches_contains() {

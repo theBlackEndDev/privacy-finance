@@ -1,4 +1,5 @@
 import { BreakdownCardData } from '../../../types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 import styles from './Cards.module.css';
 
 export function BreakdownCard({ data }: { data: BreakdownCardData }) {
@@ -12,7 +13,7 @@ export function BreakdownCard({ data }: { data: BreakdownCardData }) {
               {item.color && <span className={styles.dot} style={{ background: item.color }} />}
               <span className={styles.breakdownName}>{item.name}</span>
               <span className={styles.breakdownAmount}>
-                ${(item.amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {formatCurrency(item.amount)}
               </span>
               <span className={styles.breakdownPct}>{item.percentage.toFixed(1)}%</span>
             </div>

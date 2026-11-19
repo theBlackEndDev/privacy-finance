@@ -117,6 +117,54 @@ mod tests {
         assert_eq!(preview.delimiter, '\t');
     }
 
+    // ── import_csv ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn import_debit_is_positive_expense() {
+        use crate::commands::import::import_csv_inner;
+        use crate::db::migrations::{run_migrations, seed_test_data};
+        use crate::models::import::ImportInput;
+
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
+        let account_id: String = conn
+            .query_row("SELECT id FROM accounts LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+
+        let f = write_temp_csv(b"date,payee,amount\n2024-01-01,Acme,-50.00\n2024-01-02,Employer,75.00\n");
+        let map = |c: &str| ColumnMapping { csv_column: c.into(), field: c.into() };
+        let input = ImportInput {
+            file_path: f.path().to_str().unwrap().to_string(),
+            account_id,
+            mappings: vec![map("date"), map("payee"), map("amount")],
+            date_format: "%Y-%m-%d".into(),
+            amount_format: "single".into(),
+            profile_id: None,
+        };
+        let result = import_csv_inner(&conn, input).unwrap();
+        assert_eq!(result.imported, 2);
+
+        let (amount, kind): (i64, String) = conn
+            .query_row(
+                "SELECT amount, kind FROM transactions WHERE payee = 'Acme'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((amount, kind.as_str()), (5000, "expense"));
+
+        let (amount, kind): (i64, String) = conn
+            .query_row(
+                "SELECT amount, kind FROM transactions WHERE payee = 'Employer'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((amount, kind.as_str()), (7500, "income"));
+    }
+
     // Keep ColumnMapping in scope to suppress unused-import warning
     fn _use_mapping() -> ColumnMapping {
         ColumnMapping { csv_column: "x".into(), field: "y".into() }

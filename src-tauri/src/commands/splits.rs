@@ -37,6 +37,13 @@ fn validate_split_sum(
         )
         .map_err(|_| AppError::NotFound(format!("transaction {transaction_id}")))?;
 
+    if let Some(bad) = splits.iter().find(|s| s.amount <= 0) {
+        return Err(AppError::Validation(format!(
+            "Split amount must be greater than zero (got {})",
+            bad.amount
+        )));
+    }
+
     let split_sum: i64 = splits.iter().map(|s| s.amount).sum();
     if split_sum != parent_amount {
         return Err(AppError::Validation(format!(
@@ -54,14 +61,11 @@ fn insert_split_rows(
 ) -> AppResult<()> {
     for split in splits {
         let id = Uuid::new_v4().to_string();
-        if let Err(e) = conn.execute(
+        conn.execute(
             "INSERT INTO transaction_splits (id, transaction_id, category_id, amount, description, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![id, transaction_id, split.category_id, split.amount, split.description, now],
-        ) {
-            let _ = conn.execute("ROLLBACK", []);
-            return Err(AppError::Db(e));
-        }
+        )?;
     }
     Ok(())
 }
@@ -94,24 +98,35 @@ pub fn create_splits(
     }
 
     let conn = state.write_conn.lock().unwrap();
-    validate_split_sum(&conn, &transaction_id, &splits)?;
+    create_splits_inner(&conn, &transaction_id, &splits)
+}
+
+pub(crate) fn create_splits_inner(
+    conn: &rusqlite::Connection,
+    transaction_id: &str,
+    splits: &[CreateSplitInput],
+) -> AppResult<Vec<TransactionSplit>> {
+    validate_split_sum(conn, transaction_id, splits)?;
 
     let now = now_utc();
-    conn.execute("BEGIN", [])?;
+    let tx = conn.unchecked_transaction()?;
 
-    insert_split_rows(&conn, &transaction_id, &splits, &now)?;
+    // Replace any existing splits rather than adding to them.
+    tx.execute(
+        "DELETE FROM transaction_splits WHERE transaction_id = ?1",
+        [transaction_id],
+    )?;
+
+    insert_split_rows(&tx, transaction_id, splits, &now)?;
 
     // Mark parent as split
-    if let Err(e) = conn.execute(
+    tx.execute(
         "UPDATE transactions SET is_split = 1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, transaction_id],
-    ) {
-        let _ = conn.execute("ROLLBACK", []);
-        return Err(AppError::Db(e));
-    }
+    )?;
 
-    conn.execute("COMMIT", [])?;
-    fetch_splits(&conn, &transaction_id)
+    tx.commit()?;
+    fetch_splits(conn, transaction_id)
 }
 
 #[tauri::command]
@@ -137,29 +152,23 @@ pub fn update_splits(
     validate_split_sum(&conn, &transaction_id, &splits)?;
 
     let now = now_utc();
-    conn.execute("BEGIN", [])?;
+    let tx = conn.unchecked_transaction()?;
 
     // Delete existing splits
-    if let Err(e) = conn.execute(
+    tx.execute(
         "DELETE FROM transaction_splits WHERE transaction_id = ?1",
         [&transaction_id],
-    ) {
-        let _ = conn.execute("ROLLBACK", []);
-        return Err(AppError::Db(e));
-    }
+    )?;
 
-    insert_split_rows(&conn, &transaction_id, &splits, &now)?;
+    insert_split_rows(&tx, &transaction_id, &splits, &now)?;
 
     // Update parent timestamp
-    if let Err(e) = conn.execute(
+    tx.execute(
         "UPDATE transactions SET updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, transaction_id],
-    ) {
-        let _ = conn.execute("ROLLBACK", []);
-        return Err(AppError::Db(e));
-    }
+    )?;
 
-    conn.execute("COMMIT", [])?;
+    tx.commit()?;
     fetch_splits(&conn, &transaction_id)
 }
 
@@ -171,26 +180,20 @@ pub fn delete_splits(
     let conn = state.write_conn.lock().unwrap();
     let now = now_utc();
 
-    conn.execute("BEGIN", [])?;
+    let tx = conn.unchecked_transaction()?;
 
-    if let Err(e) = conn.execute(
+    tx.execute(
         "DELETE FROM transaction_splits WHERE transaction_id = ?1",
         [&transaction_id],
-    ) {
-        let _ = conn.execute("ROLLBACK", []);
-        return Err(AppError::Db(e));
-    }
+    )?;
 
     // Un-mark parent as split
-    if let Err(e) = conn.execute(
+    tx.execute(
         "UPDATE transactions SET is_split = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, transaction_id],
-    ) {
-        let _ = conn.execute("ROLLBACK", []);
-        return Err(AppError::Db(e));
-    }
+    )?;
 
-    conn.execute("COMMIT", [])?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -249,18 +252,18 @@ mod tests {
 
         // Insert splits manually (no Tauri state in tests)
         let now = now_utc();
-        conn.execute("BEGIN", []).unwrap();
+        let tx = conn.unchecked_transaction().unwrap();
         for split in &splits {
             let id = Uuid::new_v4().to_string();
-            conn.execute(
+            tx.execute(
                 "INSERT INTO transaction_splits (id, transaction_id, category_id, amount, description, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 rusqlite::params![id, txn_id, split.category_id, split.amount, split.description, now],
             ).unwrap();
         }
-        conn.execute("UPDATE transactions SET is_split = 1, updated_at = ?1 WHERE id = ?2",
+        tx.execute("UPDATE transactions SET is_split = 1, updated_at = ?1 WHERE id = ?2",
             rusqlite::params![now, txn_id]).unwrap();
-        conn.execute("COMMIT", []).unwrap();
+        tx.commit().unwrap();
 
         // Verify splits exist
         let mut stmt = conn.prepare(
@@ -275,6 +278,48 @@ mod tests {
             [&txn_id], |r| r.get(0),
         ).unwrap();
         assert_eq!(is_split, 1);
+    }
+
+    #[test]
+    fn resplit_replaces_old_splits() {
+        let conn = setup();
+        let txn_id = create_test_transaction(&conn, 10000);
+        let cat1 = create_test_category(&conn, "ResplitA");
+        let cat2 = create_test_category(&conn, "ResplitB");
+
+        let first = vec![
+            CreateSplitInput { category_id: cat1.clone(), amount: 6000, description: "a".to_string() },
+            CreateSplitInput { category_id: cat2.clone(), amount: 4000, description: "b".to_string() },
+        ];
+        create_splits_inner(&conn, &txn_id, &first).unwrap();
+
+        let second = vec![
+            CreateSplitInput { category_id: cat1.clone(), amount: 2500, description: "c".to_string() },
+            CreateSplitInput { category_id: cat2.clone(), amount: 7500, description: "d".to_string() },
+        ];
+        let result = create_splits_inner(&conn, &txn_id, &second).unwrap();
+
+        assert_eq!(result.len(), 2);
+        let mut amounts: Vec<i64> = result.iter().map(|s| s.amount).collect();
+        amounts.sort();
+        assert_eq!(amounts, vec![2500, 7500]);
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM transaction_splits WHERE transaction_id = ?1",
+            [&txn_id], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 2);
+
+        // Non-positive amounts are rejected, and nothing changes.
+        let bad = vec![
+            CreateSplitInput { category_id: cat1.clone(), amount: 12000, description: "x".to_string() },
+            CreateSplitInput { category_id: cat2.clone(), amount: -2000, description: "y".to_string() },
+        ];
+        assert!(create_splits_inner(&conn, &txn_id, &bad).is_err());
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM transaction_splits WHERE transaction_id = ?1",
+            [&txn_id], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 2);
     }
 
     #[test]

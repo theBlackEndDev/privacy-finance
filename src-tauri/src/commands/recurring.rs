@@ -47,19 +47,12 @@ pub fn get_all_recurring(state: State<DbState>) -> AppResult<Vec<RecurringTransa
 }
 
 #[tauri::command]
-pub fn get_recurring(id: String, state: State<DbState>) -> AppResult<RecurringTransaction> {
-    let conn = state.read_conn.lock().unwrap();
-    conn.query_row(
-        &format!("SELECT {SELECT_COLS} FROM recurring_transactions WHERE id = ?1"),
-        [&id],
-        |row| row_to_recurring(row),
-    )
-    .map_err(|_| AppError::NotFound(format!("recurring transaction {id}")))
-}
-
-#[tauri::command]
 pub fn create_recurring(input: CreateRecurringInput, state: State<DbState>) -> AppResult<RecurringTransaction> {
     let conn = state.write_conn.lock().unwrap();
+    create_recurring_inner(&conn, input)
+}
+
+pub(crate) fn create_recurring_inner(conn: &rusqlite::Connection, input: CreateRecurringInput) -> AppResult<RecurringTransaction> {
     let id = Uuid::new_v4().to_string();
     let now = now_utc();
     let payee = input.payee.unwrap_or_default();
@@ -67,6 +60,7 @@ pub fn create_recurring(input: CreateRecurringInput, state: State<DbState>) -> A
     let auto_post = input.auto_post.unwrap_or(false);
 
     validate_frequency(&input.frequency)?;
+    validate_transfer_target(&input.kind, &input.account_id, input.transfer_to_account_id.as_deref())?;
     validate_date(&input.start_date, "start_date")?;
     if let Some(ref ed) = input.end_date {
         validate_date(ed, "end_date")?;
@@ -112,6 +106,10 @@ pub fn create_recurring(input: CreateRecurringInput, state: State<DbState>) -> A
 #[tauri::command]
 pub fn update_recurring(id: String, input: UpdateRecurringInput, state: State<DbState>) -> AppResult<RecurringTransaction> {
     let conn = state.write_conn.lock().unwrap();
+    update_recurring_inner(&conn, id, input)
+}
+
+pub(crate) fn update_recurring_inner(conn: &rusqlite::Connection, id: String, input: UpdateRecurringInput) -> AppResult<RecurringTransaction> {
     let now = now_utc();
 
     let current = conn.query_row(
@@ -152,6 +150,7 @@ pub fn update_recurring(id: String, input: UpdateRecurringInput, state: State<Db
     let auto_post = input.auto_post.map(|b| b as i64).unwrap_or(current.12);
 
     validate_frequency(&frequency)?;
+    validate_transfer_target(&kind, &account_id, transfer_to.as_deref())?;
 
     conn.execute(
         "UPDATE recurring_transactions SET
@@ -168,10 +167,7 @@ pub fn update_recurring(id: String, input: UpdateRecurringInput, state: State<Db
         ],
     )?;
 
-    drop(conn);
-
-    let read = state.read_conn.lock().unwrap();
-    let created_at: String = read.query_row(
+    let created_at: String = conn.query_row(
         "SELECT created_at FROM recurring_transactions WHERE id = ?1", [&id], |r| r.get(0)
     ).map_err(|_| AppError::NotFound(format!("recurring transaction {id}")))?;
 
@@ -256,6 +252,9 @@ pub fn check_due_recurring(state: State<DbState>) -> AppResult<Vec<DueRecurringI
         let today_date = NaiveDate::parse_from_str(&today, "%Y-%m-%d")
             .map_err(|e| AppError::Validation(format!("Invalid today date: {e}")))?;
 
+        let anchor_day = NaiveDate::parse_from_str(&item.start_date, "%Y-%m-%d")
+            .map_err(|e| AppError::Validation(format!("Invalid start_date: {e}")))?
+            .day();
         let mut count = 0i64;
         let mut cursor = next;
         while cursor <= today_date {
@@ -265,7 +264,7 @@ pub fn check_due_recurring(state: State<DbState>) -> AppResult<Vec<DueRecurringI
             });
             if !end_ok { break; }
             count += 1;
-            cursor = calculate_next_date_from(cursor, &item.frequency);
+            cursor = calculate_next_date_from(cursor, &item.frequency, anchor_day);
         }
 
         if count > 0 {
@@ -283,6 +282,10 @@ pub fn check_due_recurring(state: State<DbState>) -> AppResult<Vec<DueRecurringI
 pub fn generate_recurring_transactions(state: State<DbState>) -> AppResult<GenerateResult> {
     let conn = state.write_conn.lock().unwrap();
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    generate_recurring_transactions_inner(&conn, &today)
+}
+
+pub(crate) fn generate_recurring_transactions_inner(conn: &rusqlite::Connection, today: &str) -> AppResult<GenerateResult> {
     let today_date = NaiveDate::parse_from_str(&today, "%Y-%m-%d")
         .map_err(|e| AppError::Validation(format!("Invalid today date: {e}")))?;
 
@@ -293,7 +296,7 @@ pub fn generate_recurring_transactions(state: State<DbState>) -> AppResult<Gener
          ORDER BY next_date ASC"
     ))?;
 
-    let items = stmt.query_map([&today], |row| row_to_recurring(row))?
+    let items = stmt.query_map([today], |row| row_to_recurring(row))?
         .collect::<Result<Vec<_>, _>>()?;
     drop(stmt);
 
@@ -309,6 +312,9 @@ pub fn generate_recurring_transactions(state: State<DbState>) -> AppResult<Gener
     for item in &items {
         let mut cursor = NaiveDate::parse_from_str(&item.next_date, "%Y-%m-%d")
             .map_err(|e| AppError::Validation(format!("Invalid next_date: {e}")))?;
+        let anchor_day = NaiveDate::parse_from_str(&item.start_date, "%Y-%m-%d")
+            .map_err(|e| AppError::Validation(format!("Invalid start_date: {e}")))?
+            .day();
 
         while cursor <= today_date {
             let end_ok = item.end_date.as_ref().map_or(true, |ed| {
@@ -321,34 +327,39 @@ pub fn generate_recurring_transactions(state: State<DbState>) -> AppResult<Gener
             let date_str = cursor.format("%Y-%m-%d").to_string();
 
             if item.kind == "transfer" {
-                if let Some(ref to_account_id) = item.transfer_to_account_id {
-                    let group_id = Uuid::new_v4().to_string();
+                // Returning here drops `tx`, rolling back, so next_date is not advanced.
+                let to_account_id = item.transfer_to_account_id.as_deref().ok_or_else(|| {
+                    AppError::Validation(format!(
+                        "Recurring transfer {} has no transfer_to_account_id",
+                        item.id
+                    ))
+                })?;
+                let group_id = Uuid::new_v4().to_string();
 
-                    // Outgoing leg
-                    tx.execute(
-                        "INSERT INTO transactions
-                         (id, account_id, date, amount, kind, category_id, payee, description,
-                          is_cleared, transfer_group_id, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, 'transfer', NULL, ?5, ?6, 0, ?7, ?8, ?9)",
-                        rusqlite::params![
-                            tx_id, item.account_id, date_str, item.amount,
-                            item.payee, item.description, group_id, now, now,
-                        ],
-                    )?;
+                // Outgoing leg (negative)
+                tx.execute(
+                    "INSERT INTO transactions
+                     (id, account_id, date, amount, kind, category_id, payee, description,
+                      is_cleared, transfer_group_id, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, 'transfer', NULL, ?5, ?6, 0, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        tx_id, item.account_id, date_str, -item.amount.abs(),
+                        item.payee, item.description, group_id, now, now,
+                    ],
+                )?;
 
-                    // Incoming leg
-                    let tx_id2 = Uuid::new_v4().to_string();
-                    tx.execute(
-                        "INSERT INTO transactions
-                         (id, account_id, date, amount, kind, category_id, payee, description,
-                          is_cleared, transfer_group_id, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, ?4, 'transfer', NULL, ?5, ?6, 0, ?7, ?8, ?9)",
-                        rusqlite::params![
-                            tx_id2, to_account_id, date_str, item.amount,
-                            item.payee, item.description, group_id, now, now,
-                        ],
-                    )?;
-                }
+                // Incoming leg (positive)
+                let tx_id2 = Uuid::new_v4().to_string();
+                tx.execute(
+                    "INSERT INTO transactions
+                     (id, account_id, date, amount, kind, category_id, payee, description,
+                      is_cleared, transfer_group_id, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, 'transfer', NULL, ?5, ?6, 0, ?7, ?8, ?9)",
+                    rusqlite::params![
+                        tx_id2, to_account_id, date_str, item.amount.abs(),
+                        item.payee, item.description, group_id, now, now,
+                    ],
+                )?;
             } else {
                 tx.execute(
                     "INSERT INTO transactions
@@ -363,7 +374,7 @@ pub fn generate_recurring_transactions(state: State<DbState>) -> AppResult<Gener
             }
 
             total_generated += 1;
-            cursor = calculate_next_date_from(cursor, &item.frequency);
+            cursor = calculate_next_date_from(cursor, &item.frequency, anchor_day);
         }
 
         // Advance next_date
@@ -402,6 +413,19 @@ fn validate_date(s: &str, field: &str) -> AppResult<()> {
     Ok(())
 }
 
+fn validate_transfer_target(kind: &str, account_id: &str, transfer_to: Option<&str>) -> AppResult<()> {
+    if kind != "transfer" {
+        return Ok(());
+    }
+    match transfer_to {
+        None => Err(AppError::Validation("Transfers require transfer_to_account_id".into())),
+        Some(to) if to == account_id => Err(AppError::Validation(
+            "transfer_to_account_id must differ from account_id".into(),
+        )),
+        Some(_) => Ok(()),
+    }
+}
+
 fn validate_frequency(freq: &str) -> AppResult<()> {
     match freq {
         "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly" => Ok(()),
@@ -409,26 +433,29 @@ fn validate_frequency(freq: &str) -> AppResult<()> {
     }
 }
 
-pub fn calculate_next_date_from(current: NaiveDate, frequency: &str) -> NaiveDate {
+/// `anchor_day` is the day of month of the original start date; month-based
+/// frequencies use it (clamped to the target month's length) so a 31st schedule
+/// returns to the 31st after a short month.
+pub fn calculate_next_date_from(current: NaiveDate, frequency: &str, anchor_day: u32) -> NaiveDate {
     match frequency {
         "daily" => current + chrono::Duration::days(1),
         "weekly" => current + chrono::Duration::weeks(1),
         "biweekly" => current + chrono::Duration::weeks(2),
-        "monthly" => add_months(current, 1),
-        "quarterly" => add_months(current, 3),
-        "yearly" => add_months(current, 12),
+        "monthly" => add_months(current, 1, anchor_day),
+        "quarterly" => add_months(current, 3, anchor_day),
+        "yearly" => add_months(current, 12, anchor_day),
         _ => current + chrono::Duration::days(1), // fallback
     }
 }
 
-fn add_months(date: NaiveDate, months: u32) -> NaiveDate {
+fn add_months(date: NaiveDate, months: u32, anchor_day: u32) -> NaiveDate {
     let total_months = date.month0() + months;
     let new_year = date.year() + (total_months / 12) as i32;
     let new_month = (total_months % 12) + 1;
 
     // Clamp day to last day of target month
     let max_day = days_in_month(new_year, new_month);
-    let day = date.day().min(max_day);
+    let day = anchor_day.min(max_day);
 
     NaiveDate::from_ymd_opt(new_year, new_month, day)
         .unwrap_or(date)
@@ -450,62 +477,164 @@ fn days_in_month(year: i32, month: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::migrations::{run_migrations, seed_test_data};
+    use rusqlite::Connection;
+
+    fn test_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
+        conn
+    }
+
+    fn two_accounts(conn: &Connection) -> (String, String) {
+        let mut stmt = conn.prepare("SELECT id FROM accounts ORDER BY id LIMIT 2").unwrap();
+        let ids = stmt.query_map([], |r| r.get::<_, String>(0)).unwrap()
+            .collect::<Result<Vec<_>, _>>().unwrap();
+        (ids[0].clone(), ids[1].clone())
+    }
+
+    fn input(from: &str, to: Option<&str>, amount: i64) -> CreateRecurringInput {
+        CreateRecurringInput {
+            account_id: from.to_string(),
+            payee: Some("Savings".into()),
+            description: None,
+            amount,
+            kind: "transfer".into(),
+            category_id: None,
+            transfer_to_account_id: to.map(String::from),
+            frequency: "monthly".into(),
+            start_date: "2026-01-01".into(),
+            end_date: None,
+            auto_post: None,
+        }
+    }
+
+    #[test]
+    fn recurring_transfer_signs() {
+        let conn = test_conn();
+        let (from, to) = two_accounts(&conn);
+
+        // Negative stored amount must still yield -abs / +abs legs.
+        create_recurring_inner(&conn, input(&from, Some(&to), -2500)).unwrap();
+        let res = generate_recurring_transactions_inner(&conn, "2026-01-15").unwrap();
+        assert_eq!(res.generated_count, 1);
+
+        let out: i64 = conn.query_row(
+            "SELECT amount FROM transactions WHERE kind='transfer' AND account_id=?1 AND date='2026-01-01'",
+            [&from], |r| r.get(0)).unwrap();
+        let inc: i64 = conn.query_row(
+            "SELECT amount FROM transactions WHERE kind='transfer' AND account_id=?1 AND date='2026-01-01'",
+            [&to], |r| r.get(0)).unwrap();
+        assert_eq!(out, -2500);
+        assert_eq!(inc, 2500);
+    }
+
+    #[test]
+    fn recurring_transfer_without_target_errors_and_keeps_next_date() {
+        let conn = test_conn();
+        let (from, to) = two_accounts(&conn);
+        let rec = create_recurring_inner(&conn, input(&from, Some(&to), 1000)).unwrap();
+        // Simulate legacy bad row.
+        conn.execute("UPDATE recurring_transactions SET transfer_to_account_id = NULL WHERE id = ?1", [&rec.id]).unwrap();
+
+        let count = |c: &Connection| -> i64 {
+            c.query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0)).unwrap()
+        };
+        let before = count(&conn);
+        let err = generate_recurring_transactions_inner(&conn, "2026-01-15");
+        assert!(matches!(err, Err(AppError::Validation(_))));
+        let next: String = conn.query_row(
+            "SELECT next_date FROM recurring_transactions WHERE id = ?1", [&rec.id], |r| r.get(0)).unwrap();
+        assert_eq!(next, "2026-01-01");
+        assert_eq!(count(&conn), before);
+        assert!(conn.is_autocommit());
+    }
+
+    #[test]
+    fn recurring_transfer_target_validated_on_create_and_update() {
+        let conn = test_conn();
+        let (from, to) = two_accounts(&conn);
+        assert!(create_recurring_inner(&conn, input(&from, None, 1000)).is_err());
+        assert!(create_recurring_inner(&conn, input(&from, Some(&from), 1000)).is_err());
+
+        let rec = create_recurring_inner(&conn, input(&from, Some(&to), 1000)).unwrap();
+        let upd = UpdateRecurringInput {
+            account_id: Some(to.clone()),
+            payee: None, description: None, amount: None, kind: None,
+            category_id: None, transfer_to_account_id: None, frequency: None,
+            start_date: None, end_date: None, next_date: None,
+            is_active: None, auto_post: None,
+        };
+        // account_id now equals existing transfer_to → rejected.
+        assert!(update_recurring_inner(&conn, rec.id, upd).is_err());
+    }
 
     #[test]
     fn test_calculate_next_date_daily() {
         let d = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
-        assert_eq!(calculate_next_date_from(d, "daily"), NaiveDate::from_ymd_opt(2026, 3, 16).unwrap());
+        assert_eq!(calculate_next_date_from(d, "daily", d.day()), NaiveDate::from_ymd_opt(2026, 3, 16).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_weekly() {
         let d = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
-        assert_eq!(calculate_next_date_from(d, "weekly"), NaiveDate::from_ymd_opt(2026, 3, 22).unwrap());
+        assert_eq!(calculate_next_date_from(d, "weekly", d.day()), NaiveDate::from_ymd_opt(2026, 3, 22).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_biweekly() {
         let d = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
-        assert_eq!(calculate_next_date_from(d, "biweekly"), NaiveDate::from_ymd_opt(2026, 3, 29).unwrap());
+        assert_eq!(calculate_next_date_from(d, "biweekly", d.day()), NaiveDate::from_ymd_opt(2026, 3, 29).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_monthly() {
         let d = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
-        assert_eq!(calculate_next_date_from(d, "monthly"), NaiveDate::from_ymd_opt(2026, 2, 15).unwrap());
+        assert_eq!(calculate_next_date_from(d, "monthly", d.day()), NaiveDate::from_ymd_opt(2026, 2, 15).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_monthly_31st_to_feb() {
         // Jan 31 monthly → Feb 28 (non-leap year 2026)
         let d = NaiveDate::from_ymd_opt(2026, 1, 31).unwrap();
-        assert_eq!(calculate_next_date_from(d, "monthly"), NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+        assert_eq!(calculate_next_date_from(d, "monthly", d.day()), NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_monthly_31st_to_feb_leap() {
         // Jan 31 monthly → Feb 29 (leap year 2028)
         let d = NaiveDate::from_ymd_opt(2028, 1, 31).unwrap();
-        assert_eq!(calculate_next_date_from(d, "monthly"), NaiveDate::from_ymd_opt(2028, 2, 29).unwrap());
+        assert_eq!(calculate_next_date_from(d, "monthly", d.day()), NaiveDate::from_ymd_opt(2028, 2, 29).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_quarterly() {
         let d = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
-        assert_eq!(calculate_next_date_from(d, "quarterly"), NaiveDate::from_ymd_opt(2026, 4, 15).unwrap());
+        assert_eq!(calculate_next_date_from(d, "quarterly", d.day()), NaiveDate::from_ymd_opt(2026, 4, 15).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_yearly() {
         let d = NaiveDate::from_ymd_opt(2026, 3, 15).unwrap();
-        assert_eq!(calculate_next_date_from(d, "yearly"), NaiveDate::from_ymd_opt(2027, 3, 15).unwrap());
+        assert_eq!(calculate_next_date_from(d, "yearly", d.day()), NaiveDate::from_ymd_opt(2027, 3, 15).unwrap());
     }
 
     #[test]
     fn test_calculate_next_date_yearly_leap_day() {
         // Feb 29 yearly → Feb 28 (next non-leap year)
         let d = NaiveDate::from_ymd_opt(2028, 2, 29).unwrap();
-        assert_eq!(calculate_next_date_from(d, "yearly"), NaiveDate::from_ymd_opt(2029, 2, 28).unwrap());
+        assert_eq!(calculate_next_date_from(d, "yearly", d.day()), NaiveDate::from_ymd_opt(2029, 2, 28).unwrap());
+    }
+
+    #[test]
+    fn monthly_31st_returns_to_31st() {
+        let jan = NaiveDate::from_ymd_opt(2026, 1, 31).unwrap();
+        let feb = calculate_next_date_from(jan, "monthly", 31);
+        assert_eq!(feb, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+        let mar = calculate_next_date_from(feb, "monthly", 31);
+        assert_eq!(mar, NaiveDate::from_ymd_opt(2026, 3, 31).unwrap());
     }
 
     #[test]

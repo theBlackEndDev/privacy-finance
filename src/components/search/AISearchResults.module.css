@@ -52,3 +52,24 @@
   color: var(--text-muted);
   text-align: right;
 }
+
+.sql {
+  padding: 4px 14px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sql summary {
+  cursor: pointer;
+}
+
+.sql pre {
+  margin: 6px 0 0;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-secondary);
+  background: var(--bg-secondary, transparent);
+  border-radius: 4px;
+}

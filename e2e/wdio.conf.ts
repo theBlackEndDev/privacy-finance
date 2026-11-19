@@ -55,12 +55,6 @@ export const config = {
     timeout: 60000,
   },
 
-  autoCompileOpts: {
-    tsNodeOpts: {
-      project: join(__dirname, 'tsconfig.json'),
-    },
-  },
-
   async onPrepare() {
     resetDatabase();
 

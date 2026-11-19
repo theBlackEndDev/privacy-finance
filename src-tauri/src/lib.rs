@@ -11,7 +11,6 @@ use tauri::Manager;
 pub fn run() {
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init());
 
     #[cfg(feature = "e2e")]
@@ -29,9 +28,11 @@ pub fn run() {
             let app_data_dir = app.handle().path().app_data_dir()
                 .expect("failed to get app data dir");
             app.manage(commands::ai_model::InferenceServerState {
-                process: std::sync::Arc::new(std::sync::Mutex::new(None)),
                 app_data_dir,
             });
+
+            // Lazily loaded on the first Tier 2 query
+            app.manage(std::sync::Mutex::new(None::<helpers::ai_engine::Engine>));
 
             app.manage(state);
             Ok(())
@@ -59,25 +60,19 @@ pub fn run() {
             commands::import::preview_csv,
             commands::import::import_csv,
             commands::import::rollback_import,
-            commands::import::get_import_batches,
             commands::import::get_import_profiles,
             commands::import::save_import_profile,
-            commands::import::delete_import_profile,
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::delete_all_data,
             commands::recurring::get_all_recurring,
-            commands::recurring::get_recurring,
             commands::recurring::create_recurring,
             commands::recurring::update_recurring,
             commands::recurring::delete_recurring,
             commands::recurring::toggle_recurring_active,
             commands::recurring::check_due_recurring,
             commands::recurring::generate_recurring_transactions,
-            commands::search::search_transactions,
             commands::search::search_transactions_full,
-            commands::search::search_suggest,
-            commands::search::rebuild_fts,
             commands::export::export_transactions_csv,
             commands::export::export_transactions_json,
             commands::export::export_all_data_json,
@@ -96,7 +91,6 @@ pub fn run() {
             commands::rules::update_rule,
             commands::rules::delete_rule,
             commands::rules::reorder_rules,
-            commands::rules::match_transaction,
             commands::rules::apply_rules_to_uncategorized,
             commands::rules::test_rule,
             commands::splits::create_splits,
@@ -109,8 +103,6 @@ pub fn run() {
             commands::tags::delete_tag,
             commands::tags::tag_transaction,
             commands::tags::untag_transaction,
-            commands::tags::get_transaction_tags,
-            commands::tags::get_transactions_by_tag,
             commands::reports::get_income_expense_report,
             commands::reports::get_category_spending_report,
             commands::reports::get_cash_flow_report,
@@ -119,14 +111,11 @@ pub fn run() {
             commands::reports::get_payee_spending_report,
             commands::reconciliation::start_reconciliation,
             commands::reconciliation::toggle_reconciliation_item,
-            commands::reconciliation::get_reconciliation_diff,
             commands::reconciliation::complete_reconciliation,
             commands::reconciliation::cancel_reconciliation,
             commands::exchange_rates::create_rate,
-            commands::exchange_rates::get_rate,
             commands::exchange_rates::get_all_rates,
             commands::exchange_rates::delete_rate,
-            commands::exchange_rates::convert_amount,
             commands::encryption::check_encryption_status,
             commands::encryption::enable_encryption,
             commands::encryption::unlock_database,
@@ -136,9 +125,6 @@ pub fn run() {
             commands::ai_search::ai_search,
             commands::ai_model::ai_model_status,
             commands::ai_model::ai_model_download,
-            commands::ai_model::ai_model_start,
-            commands::ai_model::ai_model_stop,
-            commands::ai_model::ai_model_health,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -18,8 +18,6 @@ export const reconciliationApi = {
     invoke<ReconciliationSummary>('start_reconciliation', { input }, emptySummary),
   toggleItem: (reconciliationId: string, transactionId: string) =>
     invoke<ReconciliationSummary>('toggle_reconciliation_item', { reconciliationId, transactionId }, emptySummary),
-  getDiff: (reconciliationId: string) =>
-    invoke<ReconciliationSummary>('get_reconciliation_diff', { reconciliationId }, emptySummary),
   complete: (reconciliationId: string) =>
     invoke<Reconciliation>('complete_reconciliation', { reconciliationId }),
   cancel: (reconciliationId: string) =>

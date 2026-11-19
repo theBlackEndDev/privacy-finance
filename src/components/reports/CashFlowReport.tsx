@@ -5,6 +5,7 @@ import {
 import { CashFlowPoint } from '../../types';
 import { reportsApi } from '../../api/reports';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useToast } from '../ui/Toast';
 import { TICK_STYLE, TOOLTIP_STYLE, dollarTickFormatter } from './chartConfig';
 import styles from './CashFlowReport.module.css';
 
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function CashFlowReport({ startDate, endDate, onData }: Props) {
+  const toast = useToast();
   const [data, setData] = useState<CashFlowPoint[]>([]);
 
   useEffect(() => {
@@ -24,9 +26,12 @@ export function CashFlowReport({ startDate, endDate, onData }: Props) {
       if (cancelled) return;
       setData(d);
       onData?.(d);
+    }).catch((err) => {
+      if (cancelled) return;
+      toast(`Failed to load cash flow: ${err}`, 'error');
     });
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, onData, toast]);
 
   if (data.length === 0) {
     return <div className={styles.empty}>No cash flow data for selected period</div>;

@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
-import { CreateTagInput, Tag, TagBrief, Transaction } from '../types';
+import { invoke } from './invoke';
+import { CreateTagInput, Tag } from '../types';
 
 export const tagsApi = {
   create: (input: CreateTagInput) =>
@@ -19,10 +19,4 @@ export const tagsApi = {
 
   untagTransaction: (transactionId: string, tagId: string) =>
     invoke<void>('untag_transaction', { transactionId, tagId }),
-
-  getTransactionTags: (transactionId: string) =>
-    invoke<TagBrief[]>('get_transaction_tags', { transactionId }),
-
-  getTransactionsByTag: (tagId: string) =>
-    invoke<Transaction[]>('get_transactions_by_tag', { tagId }),
 };

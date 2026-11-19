@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
 import { Tooltip } from '../ui/Tooltip';
-import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
+import { parseCurrency } from '../../utils/formatCurrency';
 import { ACCOUNT_TYPE_OPTIONS } from '../../utils/accountTypes';
 import styles from './AccountForm.module.css';
 
@@ -18,7 +18,7 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? '');
   const [type, setType] = useState(account?.type ?? 'checking');
   const [openingBalance, setOpeningBalance] = useState(
-    account ? formatCurrency(account.openingBalance).replace('$', '') : '0.00'
+    account ? (account.openingBalance / 100).toFixed(2) : '0.00'
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

@@ -1,68 +1,71 @@
+use std::sync::Mutex;
 use tauri::State;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::{ai_entities, ai_templates, ai_sql_builder, ai_result_formatter, ai_sql_validator, ai_local_model};
+use crate::helpers::ai_engine::Engine;
 use crate::models::ai_search::*;
 use crate::commands::ai_model::InferenceServerState;
 
 /// Natural language search — user asks a question about their finances.
 /// Tier 1: template matching (instant). Tier 2: local model fallback (2-5s).
-#[tauri::command]
+/// Async command: runs on the thread pool so generation does not block the UI.
+#[tauri::command(async)]
 pub fn ai_search(
     query: String,
     state: State<DbState>,
     inference_state: State<InferenceServerState>,
+    engine_state: State<Mutex<Option<Engine>>>,
 ) -> AppResult<AISearchResult> {
     let start = std::time::Instant::now();
-    let conn = state.read_conn.lock().unwrap();
 
-    // ── Tier 1: Template matching (instant) ──────────────────────
-    let mut entities = ai_entities::extract_entities(&query, &conn);
+    // ── Tiers 1 and payee fallback, under the read_conn lock ─────
+    {
+        let conn = state.read_conn.lock().unwrap();
+        let mut entities = ai_entities::extract_entities(&query, &conn);
 
-    if let Some((intent_match, card_type)) = ai_templates::detect_intent(&query, &entities) {
-        let queries = ai_sql_builder::build_query(&intent_match);
-        let (card_data, text_answer) = ai_result_formatter::execute_and_format(
-            &queries, &intent_match, &conn
-        )?;
-        let elapsed = start.elapsed().as_millis() as u64;
-        return Ok(AISearchResult {
-            matched: true,
-            intent: Some(intent_match.intent),
-            card_type: Some(card_type),
-            card_data: Some(card_data),
-            text_answer: Some(text_answer),
-            suggestions: vec![],
-            query_time_ms: elapsed,
-        });
-    }
+        let matched = match ai_templates::detect_intent(&query, &entities) {
+            Some(m) => Some(m),
+            None => try_payee_fallback(&query, &mut entities, &conn),
+        };
 
-    // ── Payee fallback (still instant) ───────────────────────────
-    if let Some((intent_match, card_type)) = try_payee_fallback(&query, &mut entities, &conn) {
-        let queries = ai_sql_builder::build_query(&intent_match);
-        let (card_data, text_answer) = ai_result_formatter::execute_and_format(
-            &queries, &intent_match, &conn
-        )?;
-        let elapsed = start.elapsed().as_millis() as u64;
-        return Ok(AISearchResult {
-            matched: true,
-            intent: Some(intent_match.intent),
-            card_type: Some(card_type),
-            card_data: Some(card_data),
-            text_answer: Some(text_answer),
-            suggestions: vec![],
-            query_time_ms: elapsed,
-        });
-    }
+        if let Some((intent_match, card_type)) = matched {
+            let queries = ai_sql_builder::build_query(&intent_match);
+            let (card_data, text_answer) = ai_result_formatter::execute_and_format(
+                &queries, &intent_match, &conn
+            )?;
+            let elapsed = start.elapsed().as_millis() as u64;
+            return Ok(AISearchResult {
+                matched: true,
+                intent: Some(intent_match.intent),
+                card_type: Some(card_type),
+                card_data: Some(card_data),
+                text_answer: Some(text_answer),
+                sql: None,
+                suggestions: vec![],
+                query_time_ms: elapsed,
+            });
+        }
+    } // read_conn released here
 
     // ── Tier 2: Local model (if installed) ───────────────────────
     let model_status = ai_local_model::check_model_status(&inference_state.app_data_dir);
     if model_status.installed {
-        // Ensure the server is running before attempting inference
-        ensure_server_running(&inference_state);
+        // Generate without holding the DB lock; re-lock only to execute.
+        let model_path = ai_local_model::get_model_path(&inference_state.app_data_dir);
+        let system_prompt = {
+            let conn = state.read_conn.lock().unwrap();
+            ai_local_model::build_system_prompt(&conn)
+        };
+        let outcome = system_prompt
+            .and_then(|prompt| generate_sql(&prompt, &query, &model_path, &engine_state))
+            .and_then(|raw_sql| {
+                let conn = state.read_conn.lock().unwrap();
+                execute_tier2(&raw_sql, &conn)
+            });
 
-        match try_tier2_inference(&query, &conn) {
-            Ok(result) => {
-                let mut result = result;
+        match outcome {
+            Ok(mut result) => {
                 result.query_time_ms = start.elapsed().as_millis() as u64;
                 return Ok(result);
             }
@@ -84,153 +87,110 @@ pub fn ai_search(
     Ok(result)
 }
 
-/// Start the inference server if it's not already running. Blocks until healthy.
-fn ensure_server_running(inference_state: &InferenceServerState) {
-    // Quick health check — if already responsive, nothing to do
-    if ureq::get("http://127.0.0.1:8847/health").call().is_ok() {
-        return;
+/// Load the engine on first use, then ask it for SQL. No DB lock is held here.
+fn generate_sql(
+    system_prompt: &str,
+    query: &str,
+    model_path: &std::path::Path,
+    engine_state: &Mutex<Option<Engine>>,
+) -> AppResult<String> {
+    let mut guard = engine_state.lock().unwrap();
+    if guard.is_none() {
+        eprintln!("[AI Search] Loading model...");
+        *guard = Some(Engine::load(model_path)?);
     }
-
-    let mut process = inference_state.process.lock().unwrap();
-
-    // Check if we have a live process (still loading model)
-    if let Some(ref mut child) = *process {
-        if let Ok(None) = child.try_wait() {
-            // Process alive but not healthy yet — wait for it
-            drop(process);
-            for _ in 0..20 {
-                std::thread::sleep(std::time::Duration::from_secs(1));
-                if ureq::get("http://127.0.0.1:8847/health").call().is_ok() {
-                    return;
-                }
-            }
-            eprintln!("[AI Search] Existing server process not responding after 20s");
-            return;
-        }
-        // Process exited — will restart below
-    }
-
-    // No live process — start a new one (this blocks until healthy or 30s timeout)
-    eprintln!("[AI Search] Auto-starting inference server for Tier 2 query...");
-    match ai_local_model::start_inference_server(&inference_state.app_data_dir) {
-        Ok(child) => {
-            *process = Some(child);
-            eprintln!("[AI Search] Inference server ready");
-        }
-        Err(e) => {
-            eprintln!("[AI Search] Failed to auto-start server: {e}");
-        }
-    }
+    guard.as_ref().unwrap().complete(system_prompt, query)
 }
 
-/// Tier 2: Send the question to the local model, get SQL, validate, execute
-fn try_tier2_inference(query: &str, conn: &rusqlite::Connection) -> AppResult<AISearchResult> {
-    // Call the local model
-    let _engine = ai_local_model::InferenceEngine::new(std::path::PathBuf::new());
-    let raw_sql = ai_local_model::call_inference_server_public(query)?;
+const TIER2_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const TIER2_MAX_ROWS: usize = 50;
 
-    // Validate the generated SQL
-    let validated_sql = ai_sql_validator::validate_sql(&raw_sql)?;
+/// Tier 2: execute the model's SQL, read-only, with a time limit and a row cap
+fn execute_tier2(raw_sql: &str, conn: &rusqlite::Connection) -> AppResult<AISearchResult> {
+    execute_tier2_with_timeout(raw_sql, conn, TIER2_TIMEOUT)
+}
 
-    // Execute with a timeout
-    let result = conn.query_row(
-        &format!("SELECT json_group_array(json_object('row', *)) FROM ({validated_sql}) LIMIT 100"),
-        [],
-        |row| row.get::<_, String>(0),
-    );
+fn execute_tier2_with_timeout(
+    raw_sql: &str,
+    conn: &rusqlite::Connection,
+    timeout: std::time::Duration,
+) -> AppResult<AISearchResult> {
+    let sql = ai_sql_validator::extract_sql(raw_sql);
+    if sql.is_empty() {
+        return Err(AppError::Validation("empty SQL query".to_string()));
+    }
 
-    // If json_group_array doesn't work, try direct execution
-    let (_rows_json, text_answer) = match result {
-        Ok(json) => {
-            let answer = format_tier2_answer(&validated_sql, &json);
-            (json, answer)
+    let mut stmt = conn.prepare(&sql)
+        .map_err(|e| AppError::Validation(format!("generated SQL error: {e}")))?;
+    if !stmt.readonly() {
+        return Err(AppError::Validation("generated SQL is not read-only".to_string()));
+    }
+
+    // Timer thread interrupts the query after `timeout`; dropping `done_tx` stops it early.
+    let handle = conn.get_interrupt_handle();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let timer = std::thread::spawn(move || {
+        if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = done_rx.recv_timeout(timeout) {
+            handle.interrupt();
         }
-        Err(_) => {
-            // Fallback: execute directly and format
-            let mut stmt = conn.prepare(&validated_sql)
-                .map_err(|e| AppError::Validation(format!("generated SQL error: {e}")))?;
+    });
 
-            let column_count = stmt.column_count();
-            let column_names: Vec<String> = (0..column_count)
-                .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
-                .collect();
+    let result = collect_rows(&mut stmt);
 
-            let mut rows = Vec::new();
-            let mut row_iter = stmt.query([])
-                .map_err(|e| AppError::Validation(format!("query error: {e}")))?;
+    drop(done_tx);
+    let _ = timer.join();
 
-            while let Some(row) = row_iter.next()
-                .map_err(|e| AppError::Validation(format!("row error: {e}")))? {
-                let mut obj = serde_json::Map::new();
-                for (i, name) in column_names.iter().enumerate() {
-                    let val: rusqlite::types::Value = row.get(i).unwrap_or(rusqlite::types::Value::Null);
-                    let json_val = match val {
-                        rusqlite::types::Value::Null => serde_json::Value::Null,
-                        rusqlite::types::Value::Integer(n) => serde_json::Value::Number(n.into()),
-                        rusqlite::types::Value::Real(f) => serde_json::json!(f),
-                        rusqlite::types::Value::Text(s) => serde_json::Value::String(s),
-                        rusqlite::types::Value::Blob(_) => serde_json::Value::String("[blob]".to_string()),
-                    };
-                    obj.insert(name.clone(), json_val);
-                }
-                rows.push(serde_json::Value::Object(obj));
-                if rows.len() >= 50 { break; }
-            }
+    let (columns, rows) = result?;
 
-            let json = serde_json::to_string(&rows).unwrap_or_default();
-            let answer = format_tier2_rows(&column_names, &rows);
-            (json, answer)
-        }
+    // No rows or one cell: plain text. Anything bigger: a Table card.
+    let (card_type, card_data, text_answer) = if rows.is_empty() {
+        (None, None, "No results found".to_string())
+    } else if rows.len() == 1 && columns.len() == 1 {
+        (None, None, format_value(&rows[0][0]))
+    } else {
+        let text = format!("{} results found", rows.len());
+        (Some(CardType::Table), Some(CardData::Table { columns, rows }), text)
     };
 
-    // Build a TransactionList card for Tier 2 results
     Ok(AISearchResult {
         matched: true,
         intent: None,
-        card_type: Some(CardType::TransactionList),
-        card_data: Some(CardData::TransactionList {
-            transactions: vec![], // Tier 2 uses text_answer instead
-            total: 0,
-            count: 0,
-            label: "AI Search Result".to_string(),
-        }),
+        card_type,
+        card_data,
         text_answer: Some(text_answer),
+        sql: Some(sql),
         suggestions: vec![],
         query_time_ms: 0,
     })
 }
 
-fn format_tier2_answer(_sql: &str, json: &str) -> String {
-    // Try to extract a meaningful answer from the JSON result
-    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(json) {
-        if arr.len() == 1 {
-            // Single row result — likely an aggregate
-            if let Some(obj) = arr[0].as_object() {
-                let parts: Vec<String> = obj.iter().map(|(k, v)| {
-                    let formatted = format_value(v);
-                    format!("{}: {}", k, formatted)
-                }).collect();
-                return parts.join(" | ");
-            }
-        }
-        return format!("{} results found", arr.len());
-    }
-    "Query executed successfully".to_string()
-}
+fn collect_rows(stmt: &mut rusqlite::Statement) -> AppResult<(Vec<String>, Vec<Vec<serde_json::Value>>)> {
+    let column_names: Vec<String> = (0..stmt.column_count())
+        .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
+        .collect();
 
-fn format_tier2_rows(_columns: &[String], rows: &[serde_json::Value]) -> String {
-    if rows.is_empty() {
-        return "No results found".to_string();
-    }
-    if rows.len() == 1 {
-        if let Some(obj) = rows[0].as_object() {
-            let parts: Vec<String> = obj.iter().map(|(k, v)| {
-                format!("{}: {}", k, format_value(v))
-            }).collect();
-            return parts.join(" | ");
+    let mut rows = Vec::new();
+    let mut row_iter = stmt.query([])
+        .map_err(|e| AppError::Validation(format!("query error: {e}")))?;
+
+    while let Some(row) = row_iter.next()
+        .map_err(|e| AppError::Validation(format!("row error: {e}")))? {
+        let mut cells = Vec::with_capacity(column_names.len());
+        for i in 0..column_names.len() {
+            let val: rusqlite::types::Value = row.get(i).unwrap_or(rusqlite::types::Value::Null);
+            let json_val = match val {
+                rusqlite::types::Value::Null => serde_json::Value::Null,
+                rusqlite::types::Value::Integer(n) => serde_json::Value::Number(n.into()),
+                rusqlite::types::Value::Real(f) => serde_json::json!(f),
+                rusqlite::types::Value::Text(s) => serde_json::Value::String(s),
+                rusqlite::types::Value::Blob(_) => serde_json::Value::String("[blob]".to_string()),
+            };
+            cells.push(json_val);
         }
+        rows.push(cells);
+        if rows.len() >= TIER2_MAX_ROWS { break; }
     }
-    format!("{} results found", rows.len())
+    Ok((column_names, rows))
 }
 
 fn format_value(v: &serde_json::Value) -> String {
@@ -311,4 +271,60 @@ fn extract_subject(query: &str) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn seeded() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::migrations::run_migrations(&conn).unwrap();
+        crate::db::migrations::seed_test_data(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn tier2_rejects_write_statement() {
+        let conn = seeded();
+        let before: i64 = conn.query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0)).unwrap();
+        assert!(before > 0);
+
+        let res = execute_tier2("WITH a AS (SELECT 1) DELETE\nFROM transactions", &conn);
+        assert!(res.unwrap_err().to_string().contains("not read-only"));
+
+        let after: i64 = conn.query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0)).unwrap();
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn tier2_multi_row_returns_table() {
+        let conn = seeded();
+        let res = execute_tier2("SELECT id, name FROM categories LIMIT 3;", &conn).unwrap();
+        assert_eq!(res.card_type, Some(CardType::Table));
+        match res.card_data {
+            Some(CardData::Table { columns, rows }) => {
+                assert_eq!(columns, vec!["id", "name"]);
+                assert_eq!(rows.len(), 3);
+                assert!(rows.iter().all(|r| r.len() == 2));
+            }
+            other => panic!("expected Table card, got {other:?}"),
+        }
+        assert!(res.sql.unwrap().starts_with("SELECT id, name FROM categories"));
+
+        let single = execute_tier2("SELECT COUNT(*) FROM transactions", &conn).unwrap();
+        assert!(single.card_type.is_none());
+        assert!(single.text_answer.is_some());
+    }
+
+    #[test]
+    fn tier2_interrupts_slow_query() {
+        let conn = seeded();
+        let sql = "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c) SELECT MAX(x) FROM c";
+        let start = Instant::now();
+        let res = execute_tier2_with_timeout(sql, &conn, Duration::from_millis(200));
+        assert!(res.is_err());
+        assert!(start.elapsed() < Duration::from_secs(3));
+    }
 }

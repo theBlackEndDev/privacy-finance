@@ -1,39 +1,7 @@
 use tauri::State;
 use crate::db::DbState;
 use crate::error::AppResult;
-use crate::models::search::{SearchResult, SearchSuggestion};
-
-// ── search_transactions: returns ranked transaction IDs ─────────────
-
-#[tauri::command]
-pub fn search_transactions(
-    query: String,
-    limit: Option<i64>,
-    offset: Option<i64>,
-    state: State<DbState>,
-) -> AppResult<Vec<String>> {
-    let q = sanitize_fts_query(&query);
-    if q.is_empty() {
-        return Ok(vec![]);
-    }
-    let conn = state.read_conn.lock().unwrap();
-    let limit = limit.unwrap_or(20);
-    let offset = offset.unwrap_or(0);
-
-    let mut stmt = conn.prepare(
-        "SELECT transaction_id FROM transactions_fts
-         WHERE transactions_fts MATCH ?1
-         ORDER BY rank
-         LIMIT ?2 OFFSET ?3"
-    )?;
-
-    let ids: Vec<String> = stmt.query_map(
-        rusqlite::params![q, limit, offset],
-        |row: &rusqlite::Row| row.get(0),
-    )?.filter_map(|r: Result<String, _>| r.ok()).collect();
-
-    Ok(ids)
-}
+use crate::models::search::SearchResult;
 
 // ── search_transactions_full: returns full Transaction structs + snippets ──
 
@@ -101,72 +69,6 @@ pub fn search_transactions_full(
     )?.filter_map(|r: Result<SearchResult, _>| r.ok()).collect();
 
     Ok(results)
-}
-
-// ── search_suggest: prefix autocomplete suggestions ─────────────────
-
-#[tauri::command]
-pub fn search_suggest(
-    query: String,
-    state: State<DbState>,
-) -> AppResult<Vec<SearchSuggestion>> {
-    let trimmed = query.trim();
-    if trimmed.is_empty() {
-        return Ok(vec![]);
-    }
-    // Use prefix query for autocomplete
-    let prefix_query = format!("\"{}\"*", trimmed.replace('"', "\"\""));
-    let conn = state.read_conn.lock().unwrap();
-
-    let mut stmt = conn.prepare(
-        "SELECT transaction_id, payee, description
-         FROM transactions_fts
-         WHERE transactions_fts MATCH ?1
-         ORDER BY rank
-         LIMIT 10"
-    )?;
-
-    let rows: Vec<(String, String)> = stmt.query_map(
-        rusqlite::params![prefix_query],
-        |row: &rusqlite::Row| {
-            let payee: String = row.get(1)?;
-            let description: String = row.get(2)?;
-            Ok((payee, description))
-        },
-    )?.filter_map(|r: Result<(String, String), _>| r.ok()).collect();
-
-    // Deduplicate and pick best suggestions
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut suggestions = Vec::new();
-    let lower_query = trimmed.to_lowercase();
-
-    for (payee, description) in &rows {
-        if !payee.is_empty() && payee.to_lowercase().contains(&lower_query) && seen.insert(payee.clone()) {
-            suggestions.push(SearchSuggestion {
-                text: payee.clone(),
-                field: "payee".to_string(),
-            });
-        }
-        if !description.is_empty() && description.to_lowercase().contains(&lower_query) && seen.insert(description.clone()) {
-            suggestions.push(SearchSuggestion {
-                text: description.clone(),
-                field: "description".to_string(),
-            });
-        }
-        if suggestions.len() >= 5 {
-            break;
-        }
-    }
-
-    Ok(suggestions)
-}
-
-// ── rebuild_fts: drop and repopulate FTS5 index ─────────────────────
-
-#[tauri::command]
-pub fn rebuild_fts(state: State<DbState>) -> AppResult<()> {
-    let conn = state.write_conn.lock().unwrap();
-    crate::db::migrations::rebuild_fts(&conn)
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────

@@ -40,7 +40,7 @@ export function GlobalSearch() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mode, setMode] = useState<'keyword' | 'ai'>('keyword');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { result: aiResult, loading: aiLoading, search: aiDoSearch, clear: aiClear } = useAISearch();
+  const { result: aiResult, loading: aiLoading, error: aiError, search: aiDoSearch, clear: aiClear } = useAISearch();
 
   const debouncedQuery = useDebounce(query, 250);
 
@@ -172,6 +172,11 @@ export function GlobalSearch() {
           )}
           {showAI && aiLoading && !aiResult && (
             <div className={styles.empty}>Searching...</div>
+          )}
+          {mode === 'ai' && aiError && !aiLoading && (
+            <div className={styles.empty} role="alert" data-testid="search-error">
+              Search failed: {aiError}
+            </div>
           )}
           {showKeyword && (
             <div role="listbox" aria-label="Search results">

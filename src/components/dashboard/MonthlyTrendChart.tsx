@@ -3,6 +3,7 @@ import {
 } from 'recharts';
 import { MonthSummary } from '../../types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { dollarTickFormatter } from '../reports/chartConfig';
 import styles from './MonthlyTrendChart.module.css';
 
 interface Props {
@@ -28,7 +29,7 @@ export function MonthlyTrendChart({ data }: Props) {
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
         <XAxis dataKey="month" tick={tickStyle} axisLine={false} tickLine={false} />
         <YAxis
-          tickFormatter={(v) => `$${(v / 100).toFixed(0)}`}
+          tickFormatter={dollarTickFormatter}
           tick={tickStyle}
           axisLine={false}
           tickLine={false}

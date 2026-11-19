@@ -196,16 +196,6 @@ export interface ImportResult {
   errors: ImportRowError[];
 }
 
-export interface ImportBatch {
-  id: string;
-  filename: string;
-  fileHash: string;
-  accountId: string;
-  profileId: string | null;
-  rowCount: number;
-  createdAt: string;
-}
-
 export interface ImportProfile {
   id: string;
   name: string;
@@ -282,11 +272,6 @@ export interface SearchResult extends Transaction {
   snippet: string;
 }
 
-export interface SearchSuggestion {
-  text: string;
-  field: string;
-}
-
 // ── Export + Backup ──────────────────────────────────────────────
 
 export type ExportFormat = 'csv' | 'json' | 'full-json';
@@ -325,8 +310,9 @@ export interface BudgetCategoryRow {
   categoryColor: string;
   budgeted: number;  // cents
   spent: number;     // cents
-  available: number; // cents (budgeted - spent)
+  available: number; // cents (budgeted + rolloverAmount - spent)
   rollover: boolean;
+  rolloverAmount: number; // cents carried in from the previous month
   groupId?: string;
   groupName?: string;
   targetAmount?: number | null;
@@ -555,7 +541,7 @@ export interface EncryptionStatus {
 // ── AI Search ─────────────────────────────────────────────────────
 
 export type SearchIntent = 'SPENDING_TOTAL' | 'SPENDING_BY_CATEGORY' | 'SPENDING_COMPARISON' | 'INCOME_TOTAL' | 'BALANCE_CHECK' | 'BUDGET_STATUS' | 'TRANSACTION_SEARCH' | 'TOP_MERCHANTS' | 'TOP_EXPENSES' | 'RECURRING_CHECK' | 'NET_WORTH' | 'CATEGORY_DETAIL';
-export type CardType = 'total' | 'comparison' | 'budgetStatus' | 'transactionList' | 'breakdown' | 'accountSummary';
+export type CardType = 'total' | 'comparison' | 'budgetStatus' | 'transactionList' | 'breakdown' | 'accountSummary' | 'table';
 
 export interface TotalCardData { type: 'total'; label: string; amount: number; count: number; periodLabel: string; comparisonAmount?: number; comparisonCount?: number; changePct?: number; topItems: BreakdownItem[]; }
 export interface ComparisonCardData { type: 'comparison'; label: string; currentLabel: string; currentAmount: number; previousLabel: string; previousAmount: number; changeAmount: number; changePct: number; }
@@ -564,7 +550,9 @@ export interface TransactionListCardData { type: 'transactionList'; transactions
 export interface BreakdownCardData { type: 'breakdown'; label: string; items: BreakdownItem[]; total: number; }
 export interface AccountSummaryCardData { type: 'accountSummary'; accounts: AccountSummaryItem[]; netWorth: number; }
 
-export type CardData = TotalCardData | ComparisonCardData | BudgetStatusCardData | TransactionListCardData | BreakdownCardData | AccountSummaryCardData;
+export interface TableCardData { type: 'table'; columns: string[]; rows: unknown[][]; }
+
+export type CardData = TotalCardData | ComparisonCardData | BudgetStatusCardData | TransactionListCardData | BreakdownCardData | AccountSummaryCardData | TableCardData;
 
 export interface BreakdownItem { name: string; color?: string; amount: number; percentage: number; }
 export interface BudgetStatusItem { categoryName: string; color: string; budgeted: number; spent: number; available: number; }
@@ -577,6 +565,7 @@ export interface AISearchResult {
   cardType: CardType | null;
   cardData: CardData | null;
   textAnswer: string | null;
+  sql?: string | null;
   suggestions: string[];
   queryTimeMs: number;
 }

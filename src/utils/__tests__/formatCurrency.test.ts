@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency } from '../formatCurrency';
+import { formatCurrency, setCurrencySymbol, getCurrencySymbol } from '../formatCurrency';
 
 describe('formatCurrency', () => {
   it('formats positive cents', () => {
@@ -20,5 +20,20 @@ describe('formatCurrency', () => {
 
   it('formats small amounts under a dollar', () => {
     expect(formatCurrency(5)).toBe('$0.05');
+  });
+
+  it('configured symbol', () => {
+    const original = getCurrencySymbol();
+    try {
+      setCurrencySymbol('€');
+      expect(getCurrencySymbol()).toBe('€');
+      expect(formatCurrency(4299)).toBe('€42.99');
+      expect(formatCurrency(-4299)).toBe('-€42.99');
+
+      setCurrencySymbol('R$');
+      expect(formatCurrency(4299)).toBe('R$42.99');
+    } finally {
+      setCurrencySymbol(original);
+    }
   });
 });

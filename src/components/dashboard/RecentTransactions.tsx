@@ -29,7 +29,7 @@ export function RecentTransactions({ transactions }: Props) {
             {t.categoryName && <div className={styles.category}>{t.categoryName}</div>}
           </div>
           <div className={cx(styles.amount, styles[t.kind])}>
-            {AMOUNT_PREFIX[t.kind]}{formatCurrency(Math.abs(t.amount))}
+            {AMOUNT_PREFIX[t.kind]}{formatCurrency(t.kind === 'transfer' ? t.amount : Math.abs(t.amount))}
           </div>
         </div>
       ))}

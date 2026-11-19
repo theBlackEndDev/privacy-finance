@@ -29,6 +29,10 @@ import { recurringApi } from './api/recurring';
 import { DueRecurringItem } from './types';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from './components/ui/Toast';
+import { setCurrencySymbol } from './utils/formatCurrency';
+import { setDateFormat, DateFormat } from './utils/formatDate';
+
+const DATE_FORMATS: DateFormat[] = ['MMM D', 'MMM D, YYYY', 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'];
 
 function AppShell() {
   const { currentView, navigate } = useApp();
@@ -74,6 +78,7 @@ function AppShell() {
     setGenerating(true);
     try {
       await recurringApi.generateAll();
+      await refreshAccounts();
       setShowDueModal(false);
       setDueItems([]);
     } catch (err) {
@@ -126,12 +131,28 @@ function AppShell() {
 
 export default function App() {
   const [locked, setLocked] = useState<boolean | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     encryptionApi.checkStatus().then(status => {
       setLocked(status.isEncrypted);
     }).catch(() => setLocked(false));
   }, []);
+
+  useEffect(() => {
+    if (locked !== false) return;
+    let cancelled = false;
+    Promise.all([
+      settingsApi.get('currency_symbol').catch(() => null),
+      settingsApi.get('date_format').catch(() => null),
+    ]).then(([symbol, format]) => {
+      if (cancelled) return;
+      if (symbol) setCurrencySymbol(symbol);
+      if (format && (DATE_FORMATS as string[]).includes(format)) setDateFormat(format as DateFormat);
+      setSettingsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [locked]);
 
   if (locked === null) {
     return null; // Loading encryption status
@@ -143,6 +164,10 @@ export default function App() {
         <UnlockScreen onUnlocked={() => setLocked(false)} />
       </ToastProvider>
     );
+  }
+
+  if (!settingsLoaded) {
+    return null; // Loading settings that affect formatting
   }
 
   return (

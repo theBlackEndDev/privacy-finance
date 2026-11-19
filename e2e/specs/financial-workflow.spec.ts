@@ -9,7 +9,35 @@ import {
   closeModal,
 } from '../helpers/app';
 
+/**
+ * Read an account's current balance (in cents) from the dashboard's account list.
+ * The Accounts page only shows opening balances, so the dashboard is the place
+ * where a transfer becomes visible.
+ */
+async function readDashboardBalanceCents(accountName: string): Promise<number> {
+  await navigateTo('dashboard');
+  const rowSelector = byTestIdPrefix('dashboard-balance-');
+  await browser.waitUntil(async () => {
+    return (await countElements(rowSelector)) > 0;
+  }, { timeout: 10000, timeoutMsg: 'Dashboard account balances did not render' });
+
+  const rows = await $$(rowSelector);
+  for (const row of rows) {
+    const text = await row.getText();
+    if (text.includes(accountName)) {
+      const lastLine = text.trim().split('\n').pop() ?? '';
+      const cents = Math.round(parseFloat(lastLine.replace(/[^0-9.-]/g, '')) * 100);
+      if (Number.isNaN(cents)) throw new Error(`Could not parse balance from "${lastLine}"`);
+      return cents;
+    }
+  }
+  throw new Error(`No dashboard balance row for ${accountName}`);
+}
+
 describe('Financial Workflow (Full Journey)', () => {
+  let checkingBefore = 0;
+  let savingsBefore = 0;
+
   before(async () => {
     await waitForAppReady();
   });
@@ -172,6 +200,9 @@ describe('Financial Workflow (Full Journey)', () => {
   });
 
   it('creates a transfer from checking to savings ($500)', async () => {
+    checkingBefore = await readDashboardBalanceCents('Workflow Checking');
+    savingsBefore = await readDashboardBalanceCents('Workflow Savings');
+
     await navigateTo('transactions');
 
     const transferBtn = await $('button*=Transfer');
@@ -192,21 +223,12 @@ describe('Financial Workflow (Full Journey)', () => {
   });
 
   it('verifies both accounts reflect the transfer', async () => {
-    await navigateTo('accounts');
-    await browser.pause(500);
+    const checkingAfter = await readDashboardBalanceCents('Workflow Checking');
+    const savingsAfter = await readDashboardBalanceCents('Workflow Savings');
 
-    const rows = await $$(byTestIdPrefix('account-row-'));
-    let checkingText = '';
-    let savingsText = '';
-    for (const row of rows) {
-      const text = await row.getText();
-      if (text.includes('Workflow Checking')) checkingText = text;
-      if (text.includes('Workflow Savings')) savingsText = text;
-    }
-
-    // Both accounts should still be visible (transfer didn't break anything)
-    expect(checkingText).toContain('Workflow Checking');
-    expect(savingsText).toContain('Workflow Savings');
+    // $500.00 = 50000 cents: source down, destination up.
+    expect(checkingAfter - checkingBefore).toBe(-50000);
+    expect(savingsAfter - savingsBefore).toBe(50000);
   });
 
   it('reports page shows at least one chart with data', async () => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ColumnMapping, ImportProfile } from '../../types';
 import { importApi } from '../../api/import';
 import { Button } from '../ui/Button';
+import { useToast } from '../ui/Toast';
 
 const TARGET_FIELDS = [
   { value: '', label: '— skip —' },
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function ColumnMappingStep({ headers, profiles, onBack, onNext, onProfilesChange }: Props) {
+  const toast = useToast();
   const [fieldMap, setFieldMap] = useState<Record<string, string>>(() => {
     // Auto-guess by header name
     const guess: Record<string, string> = {};
@@ -74,6 +76,8 @@ export function ColumnMappingStep({ headers, profiles, onBack, onNext, onProfile
       const updated = await importApi.getImportProfiles();
       onProfilesChange(updated);
       setProfileName('');
+    } catch (err) {
+      toast(String(err), 'error');
     } finally {
       setSaving(false);
     }

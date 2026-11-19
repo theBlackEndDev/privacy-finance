@@ -27,13 +27,13 @@ export function AccountDetailPage() {
   const [editing, setEditing] = useState<Transaction | null>(null);
 
   // Redirect if no account selected
-  if (!activeAccountId) {
-    navigate('accounts');
-    return null;
-  }
+  useEffect(() => {
+    if (!activeAccountId) navigate('accounts');
+  }, [activeAccountId, navigate]);
 
   // Load account + balance (only on mount or account change)
   useEffect(() => {
+    if (!activeAccountId) return;
     let cancelled = false;
     setLoadingAccount(true);
     Promise.all([
@@ -57,6 +57,7 @@ export function AccountDetailPage() {
 
   // Load transactions (on mount, page change, or after edit)
   const loadTransactions = useCallback((pageNum: number) => {
+    if (!activeAccountId) return;
     setLoadingTxns(true);
     transactionsApi
       .getAll({ accountId: activeAccountId, page: pageNum, pageSize: 50 })
@@ -94,6 +95,8 @@ export function AccountDetailPage() {
     }
     return { totalIncome: inc, totalExpense: exp, net: inc - exp };
   }, [page]);
+
+  if (!activeAccountId) return null;
 
   if (loadingAccount && !account) {
     return (

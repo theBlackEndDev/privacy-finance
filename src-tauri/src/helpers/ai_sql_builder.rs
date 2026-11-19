@@ -131,7 +131,7 @@ pub fn build_query(intent_match: &IntentMatch) -> Vec<BuiltQuery> {
                       a.opening_balance + COALESCE(
                         (SELECT SUM(CASE WHEN t.kind = 'income' THEN ABS(t.amount)
                                          WHEN t.kind = 'expense' THEN -ABS(t.amount)
-                                         ELSE 0 END)
+                                         ELSE t.amount END)
                          FROM transactions t WHERE t.account_id = a.id), 0
                       ) as balance
                       FROM accounts a WHERE a.is_archived = 0 ORDER BY a.sort_order".to_string(),

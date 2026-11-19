@@ -1,3 +1,4 @@
+use crate::db::migrations::run_migrations;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::models::encryption::EncryptionStatus;
@@ -46,10 +47,11 @@ fn open_keyed_conn(path: &Path, key: Option<&str>) -> AppResult<Connection> {
     Ok(conn)
 }
 
-/// Replaces both managed DB connections with fresh ones.
-fn replace_connections(state: &State<DbState>, path: &Path, key: Option<&str>) -> AppResult<()> {
+/// Replaces both managed DB connections with fresh ones and runs migrations on the new write connection.
+fn replace_connections(state: &DbState, path: &Path, key: Option<&str>) -> AppResult<()> {
     let wc = open_keyed_conn(path, key)?;
     let rc = open_keyed_conn(path, key)?;
+    run_migrations(&wc)?;
     {
         let mut w = state.write_conn.lock().unwrap();
         *w = wc;
@@ -70,41 +72,67 @@ pub fn check_encryption_status(app: AppHandle) -> AppResult<EncryptionStatus> {
     })
 }
 
-#[tauri::command]
-pub fn enable_encryption(app: AppHandle, mut password: String) -> AppResult<()> {
+/// Replaces both managed connections with in-memory ones so the file-backed
+/// connections close and checkpoint the WAL (D5). Without this the export
+/// misses WAL contents and plaintext survives in the `-wal` file.
+fn close_file_connections(state: &DbState) -> AppResult<()> {
+    let wc = Connection::open_in_memory()?;
+    let rc = Connection::open_in_memory()?;
+    *state.write_conn.lock().unwrap() = wc;
+    *state.read_conn.lock().unwrap() = rc;
+    Ok(())
+}
+
+/// Encrypts the plaintext DB at `path` and swaps the managed connections to the encrypted file.
+pub(crate) fn enable_encryption_inner(state: &DbState, path: &Path, password: &str) -> AppResult<()> {
     if password.is_empty() {
         return Err(AppError::Validation("Password cannot be empty".into()));
     }
-
-    let path = db_path(&app)?;
-
-    if is_db_encrypted(&path)? {
-        password.zeroize();
+    if is_db_encrypted(path)? {
         return Err(AppError::Validation("Database is already encrypted".into()));
     }
 
     let tmp_path = path.with_extension("db.enc");
-    let mut escaped_pw = escape_pragma(&password);
-    password.zeroize();
+    let mut escaped_pw = escape_pragma(password);
 
-    // Open the plaintext DB and export to an encrypted copy
-    let plain_conn = Connection::open(&path)?;
-    plain_conn.execute_batch(&format!(
-        "ATTACH DATABASE '{}' AS encrypted KEY '{}'",
-        escape_path(&tmp_path),
-        escaped_pw
-    ))?;
-    plain_conn.execute_batch(
-        "SELECT sqlcipher_export('encrypted'); DETACH DATABASE encrypted;"
-    )?;
+    close_file_connections(state)?;
 
-    // Atomic swap: replace plaintext with encrypted
-    std::fs::rename(&tmp_path, &path)?;
+    let export = || -> AppResult<()> {
+        let plain_conn = Connection::open(path)?;
+        plain_conn.execute_batch(&format!(
+            "ATTACH DATABASE '{}' AS encrypted KEY '{}'",
+            escape_path(&tmp_path),
+            escaped_pw
+        ))?;
+        plain_conn.execute_batch(
+            "SELECT sqlcipher_export('encrypted'); DETACH DATABASE encrypted;"
+        )?;
+        drop(plain_conn);
 
-    let state: State<DbState> = app.state();
-    let result = replace_connections(&state, &path, Some(&escaped_pw));
+        // Atomic swap: replace plaintext with encrypted
+        std::fs::rename(&tmp_path, path)?;
+        Ok(())
+    };
+
+    let result = match export() {
+        Ok(()) => replace_connections(state, path, Some(&escaped_pw)),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            // Best effort: reopen the untouched plaintext DB so the app keeps working.
+            let _ = replace_connections(state, path, None);
+            Err(e)
+        }
+    };
     escaped_pw.zeroize();
+    result
+}
 
+#[tauri::command]
+pub fn enable_encryption(app: AppHandle, mut password: String) -> AppResult<()> {
+    let path = db_path(&app)?;
+    let state: State<DbState> = app.state();
+    let result = enable_encryption_inner(&state, &path, &password);
+    password.zeroize();
     result
 }
 
@@ -178,41 +206,63 @@ pub fn change_password(app: AppHandle, mut current_password: String, mut new_pas
     result
 }
 
-#[tauri::command]
-pub fn disable_encryption(app: AppHandle, mut password: String) -> AppResult<()> {
-    let path = db_path(&app)?;
-
-    if !is_db_encrypted(&path)? {
-        password.zeroize();
+/// Decrypts the DB at `path` to plaintext and swaps the managed connections to the plaintext file.
+pub(crate) fn disable_encryption_inner(state: &DbState, path: &Path, password: &str) -> AppResult<()> {
+    if !is_db_encrypted(path)? {
         return Err(AppError::Validation("Database is not encrypted".into()));
     }
 
-    let mut escaped_pw = escape_pragma(&password);
-    password.zeroize();
+    let mut escaped_pw = escape_pragma(password);
     let tmp_path = path.with_extension("db.plain");
 
-    // Open encrypted DB and export to plaintext
-    let enc_conn = Connection::open(&path)?;
-    enc_conn.execute_batch(&format!("PRAGMA key = '{}';", escaped_pw))?;
+    // Verify the password before closing the live connections
+    let test_conn = Connection::open(path)?;
+    test_conn.execute_batch(&format!("PRAGMA key = '{}';", escaped_pw))?;
+    if test_conn.execute_batch("SELECT count(*) FROM sqlite_master;").is_err() {
+        escaped_pw.zeroize();
+        return Err(AppError::Validation("Incorrect password".into()));
+    }
+    drop(test_conn);
+
+    close_file_connections(state)?;
+
+    let export = || -> AppResult<()> {
+        let enc_conn = Connection::open(path)?;
+        enc_conn.execute_batch(&format!("PRAGMA key = '{}';", escaped_pw))?;
+        enc_conn.execute_batch(&format!(
+            "ATTACH DATABASE '{}' AS plaintext KEY ''",
+            escape_path(&tmp_path)
+        ))?;
+        enc_conn.execute_batch(
+            "SELECT sqlcipher_export('plaintext'); DETACH DATABASE plaintext;"
+        )?;
+        drop(enc_conn);
+
+        // Atomic swap
+        std::fs::rename(&tmp_path, path)?;
+        Ok(())
+    };
+
+    let result = match export() {
+        Ok(()) => replace_connections(state, path, None),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            // Best effort: reopen the untouched encrypted DB so the app keeps working.
+            let _ = replace_connections(state, path, Some(&escaped_pw));
+            Err(e)
+        }
+    };
     escaped_pw.zeroize();
-    enc_conn.execute_batch("SELECT count(*) FROM sqlite_master;")
-        .map_err(|_| AppError::Validation("Incorrect password".into()))?;
+    result
+}
 
-    enc_conn.execute_batch(&format!(
-        "ATTACH DATABASE '{}' AS plaintext KEY ''",
-        escape_path(&tmp_path)
-    ))?;
-    enc_conn.execute_batch(
-        "SELECT sqlcipher_export('plaintext'); DETACH DATABASE plaintext;"
-    )?;
-
-    // Atomic swap
-    std::fs::rename(&tmp_path, &path)?;
-
+#[tauri::command]
+pub fn disable_encryption(app: AppHandle, mut password: String) -> AppResult<()> {
+    let path = db_path(&app)?;
     let state: State<DbState> = app.state();
-    replace_connections(&state, &path, None)?;
-
-    Ok(())
+    let result = disable_encryption_inner(&state, &path, &password);
+    password.zeroize();
+    result
 }
 
 #[cfg(test)]
@@ -333,5 +383,85 @@ mod tests {
         assert!(!is_db_encrypted(&path).unwrap());
         let plain_conn = Connection::open(&path).unwrap();
         assert!(plain_conn.execute_batch("SELECT count(*) FROM sqlite_master;").is_ok());
+    }
+
+    #[test]
+    fn unlock_runs_migrations() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("privacyfinance.db");
+
+        // Build a DB from before the is_split migration
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute_batch("ALTER TABLE transactions DROP COLUMN is_split;").unwrap();
+        let has_is_split = |c: &Connection| -> bool {
+            c.prepare("PRAGMA table_info(transactions)").unwrap()
+                .query_map([], |r| r.get::<_, String>(1)).unwrap()
+                .any(|n| n.as_deref() == Ok("is_split"))
+        };
+        assert!(!has_is_split(&conn));
+        drop(conn);
+        encrypt_test_db(&path, "pw123");
+
+        // Locked state: in-memory placeholders, as after init_db on an encrypted DB
+        let state = DbState {
+            write_conn: std::sync::Mutex::new(Connection::open_in_memory().unwrap()),
+            read_conn: std::sync::Mutex::new(Connection::open_in_memory().unwrap()),
+        };
+        replace_connections(&state, &path, Some("pw123")).unwrap();
+
+        assert!(has_is_split(&state.write_conn.lock().unwrap()));
+        assert!(has_is_split(&state.read_conn.lock().unwrap()));
+    }
+
+    fn file_contains(path: &Path, needle: &[u8]) -> bool {
+        match std::fs::read(path) {
+            Ok(bytes) => bytes.windows(needle.len()).any(|w| w == needle),
+            Err(_) => false,
+        }
+    }
+
+    #[test]
+    fn encryption_with_open_wal_keeps_data() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("privacyfinance.db");
+
+        let wc = open_keyed_conn(&path, None).unwrap();
+        let rc = open_keyed_conn(&path, None).unwrap();
+        wc.execute_batch("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT);").unwrap();
+        for i in 0..50 {
+            wc.execute("INSERT INTO t (id, v) VALUES (?1, 'SECRET')", [i]).unwrap();
+        }
+        // Reader must see the data so its snapshot keeps the WAL in use
+        let n: i64 = rc.query_row("SELECT count(*) FROM t", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 50);
+        let state = DbState {
+            write_conn: std::sync::Mutex::new(wc),
+            read_conn: std::sync::Mutex::new(rc),
+        };
+
+        enable_encryption_inner(&state, &path, "pw123").unwrap();
+
+        // Managed connections now read the encrypted file
+        let n: i64 = state.read_conn.lock().unwrap()
+            .query_row("SELECT count(*) FROM t", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 50);
+
+        // Reopen independently with the key
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("PRAGMA key = 'pw123';").unwrap();
+        let n: i64 = conn.query_row("SELECT count(*) FROM t", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 50);
+        drop(conn);
+
+        assert!(!file_contains(&path, b"SECRET"));
+        assert!(!file_contains(&dir.path().join("privacyfinance.db-wal"), b"SECRET"));
+
+        // And back again
+        disable_encryption_inner(&state, &path, "pw123").unwrap();
+        assert!(!is_db_encrypted(&path).unwrap());
+        let n: i64 = state.write_conn.lock().unwrap()
+            .query_row("SELECT count(*) FROM t", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 50);
     }
 }

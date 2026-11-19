@@ -21,9 +21,3 @@ pub struct SearchResult {
     pub snippet: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchSuggestion {
-    pub text: String,
-    pub field: String,
-}

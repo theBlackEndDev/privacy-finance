@@ -1,5 +1,6 @@
 use serde::Serialize;
 use tauri::State;
+use crate::db::migrations::run_migrations;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 
@@ -78,6 +79,10 @@ pub fn restore_backup(
     // Use backup API to copy from backup source into the live write connection
     let backup = rusqlite::backup::Backup::new(&src, &mut *write_conn)?;
     backup.run_to_completion(100, std::time::Duration::from_millis(10), None)?;
+    drop(backup);
+
+    // The backup may predate the current schema
+    run_migrations(&write_conn)?;
 
     Ok(())
 }

@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useToast } from '../ui/Toast';
-import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
+import { parseCurrency } from '../../utils/formatCurrency';
 import { todayISO } from '../../utils/formatDate';
 import { SplitEditor } from '../splits/SplitEditor';
 import { TagPicker } from '../tags/TagPicker';
@@ -23,7 +23,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
   const today = todayISO();
   const [date, setDate] = useState(t.date);
   const [payee, setPayee] = useState(t.payee);
-  const [amount, setAmount] = useState(formatCurrency(t.amount).replace('$', ''));
+  const [amount, setAmount] = useState((Math.abs(t.amount) / 100).toFixed(2));
   const [kind, setKind] = useState(t.kind);
   const [categoryId, setCategoryId] = useState(t.categoryId ?? '');
   const [description, setDescription] = useState(t.description);
@@ -42,10 +42,14 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const cents = parseCurrency(amount);
+    if (cents <= 0) { setError('Amount must be greater than 0'); return; }
+    // Outgoing transfer legs are stored negative; keep the sign the user cannot see.
+    const signedCents = kind === 'transfer' && t.kind === 'transfer' && t.amount < 0 ? -cents : cents;
     setSaving(true);
     try {
       const input: UpdateTransactionInput = {
-        date, payee, amount: parseCurrency(amount), kind,
+        date, payee, amount: signedCents, kind,
         categoryId: categoryId || null, description,
         isCleared: isFutureDate ? false : isCleared,
       };
@@ -128,7 +132,7 @@ export function TransactionEditModal({ transaction: t, categories, onSaved, onCl
             ) : (
               <SplitEditor
                 transactionId={t.id}
-                parentAmount={t.amount}
+                parentAmount={parseCurrency(amount)}
                 categories={categories}
                 onSaved={onSaved}
               />

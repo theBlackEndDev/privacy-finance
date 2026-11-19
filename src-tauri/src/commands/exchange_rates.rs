@@ -15,33 +15,24 @@ fn row_to_exchange_rate(row: &rusqlite::Row<'_>) -> rusqlite::Result<ExchangeRat
     })
 }
 
-/// Find the nearest-date exchange rate for a currency pair.
-fn find_nearest_rate(
-    conn: &rusqlite::Connection,
-    from: &str,
-    to: &str,
-    date: &str,
-) -> rusqlite::Result<Option<f64>> {
-    let result = conn.query_row(
-        "SELECT rate FROM exchange_rates
-         WHERE from_currency = ?1 AND to_currency = ?2
-         ORDER BY ABS(julianday(date) - julianday(?3)) ASC
-         LIMIT 1",
-        rusqlite::params![from, to, date],
-        |row| row.get::<_, f64>(0),
-    );
-    match result {
-        Ok(r) => Ok(Some(r)),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(e),
-    }
-}
-
 #[tauri::command]
 pub fn create_rate(
     db: State<DbState>,
     input: CreateExchangeRateInput,
 ) -> AppResult<ExchangeRate> {
+    if input.date.len() != 10
+        || chrono::NaiveDate::parse_from_str(&input.date, "%Y-%m-%d").is_err()
+    {
+        return Err(crate::error::AppError::Validation(
+            "Date must be in YYYY-MM-DD format".to_string(),
+        ));
+    }
+    if !input.rate.is_finite() || input.rate <= 0.0 {
+        return Err(crate::error::AppError::Validation(
+            "Rate must be a finite number greater than zero".to_string(),
+        ));
+    }
+
     let conn = db.write_conn.lock().unwrap();
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_utc();
@@ -60,32 +51,6 @@ pub fn create_rate(
         date: input.date,
         created_at: now,
     })
-}
-
-#[tauri::command]
-pub fn get_rate(
-    db: State<DbState>,
-    from_currency: String,
-    to_currency: String,
-    date: String,
-) -> AppResult<Option<ExchangeRate>> {
-    let conn = db.read_conn.lock().unwrap();
-
-    let result = conn.query_row(
-        "SELECT id, from_currency, to_currency, rate, date, created_at
-         FROM exchange_rates
-         WHERE from_currency = ?1 AND to_currency = ?2
-         ORDER BY ABS(julianday(date) - julianday(?3)) ASC
-         LIMIT 1",
-        rusqlite::params![from_currency, to_currency, date],
-        row_to_exchange_rate,
-    );
-
-    match result {
-        Ok(rate) => Ok(Some(rate)),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(e.into()),
-    }
 }
 
 #[tauri::command]
@@ -113,28 +78,6 @@ pub fn delete_rate(
     let conn = db.write_conn.lock().unwrap();
     conn.execute("DELETE FROM exchange_rates WHERE id = ?1", [&id])?;
     Ok(())
-}
-
-#[tauri::command]
-pub fn convert_amount(
-    db: State<DbState>,
-    amount: i64,
-    from_currency: String,
-    to_currency: String,
-    date: String,
-) -> AppResult<i64> {
-    let conn = db.read_conn.lock().unwrap();
-
-    if from_currency == to_currency {
-        return Ok(amount);
-    }
-
-    match find_nearest_rate(&conn, &from_currency, &to_currency, &date)? {
-        Some(rate) => Ok((amount as f64 * rate).round() as i64),
-        None => Err(crate::error::AppError::Validation(
-            format!("No exchange rate found for {}/{}", from_currency, to_currency),
-        )),
-    }
 }
 
 #[cfg(test)]

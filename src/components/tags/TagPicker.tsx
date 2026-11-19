@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Tag, TagBrief } from '../../types';
 import { tagsApi } from '../../api/tags';
 import { TagBadge } from './TagBadge';
+import { useToast } from '../ui/Toast';
 import styles from './TagPicker.module.css';
 
 interface TagPickerProps {
@@ -15,6 +16,7 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
     tagsApi.getAll().then(setAllTags).catch(() => {});
@@ -52,8 +54,8 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
         }
         onTagsChange([...selectedTags, { id: tag.id, name: tag.name, color: tag.color }]);
       }
-    } catch {
-      // tag/untag failed silently — state stays unchanged
+    } catch (err) {
+      toast(String(err), 'error');
     }
   }
 
@@ -66,16 +68,20 @@ export function TagPicker({ selectedTags, onTagsChange, transactionId }: TagPick
       }
       onTagsChange([...selectedTags, { id: newTag.id, name: newTag.name, color: newTag.color }]);
       setSearch('');
-    } catch {
-      // tag name may already exist
+    } catch (err) {
+      toast(String(err), 'error');
     }
   }
 
-  function handleRemove(tagId: string) {
-    if (transactionId) {
-      tagsApi.untagTransaction(transactionId, tagId).catch(() => {});
+  async function handleRemove(tagId: string) {
+    try {
+      if (transactionId) {
+        await tagsApi.untagTransaction(transactionId, tagId);
+      }
+      onTagsChange(selectedTags.filter((t) => t.id !== tagId));
+    } catch (err) {
+      toast(String(err), 'error');
     }
-    onTagsChange(selectedTags.filter((t) => t.id !== tagId));
   }
 
   return (

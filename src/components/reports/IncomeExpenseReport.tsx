@@ -5,6 +5,7 @@ import {
 import { IncomeExpenseReport as IEReport } from '../../types';
 import { reportsApi } from '../../api/reports';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useToast } from '../ui/Toast';
 import { TICK_STYLE, TOOLTIP_STYLE, dollarTickFormatter } from './chartConfig';
 import styles from './IncomeExpenseReport.module.css';
 
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function IncomeExpenseReport({ startDate, endDate, onData }: Props) {
+  const toast = useToast();
   const [data, setData] = useState<IEReport | null>(null);
 
   useEffect(() => {
@@ -24,9 +26,12 @@ export function IncomeExpenseReport({ startDate, endDate, onData }: Props) {
       if (cancelled) return;
       setData(d);
       onData?.(d.months);
+    }).catch((err) => {
+      if (cancelled) return;
+      toast(`Failed to load income/expense: ${err}`, 'error');
     });
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, onData, toast]);
 
   if (!data || data.months.length === 0) {
     return <div className={styles.empty}>No data for selected period</div>;

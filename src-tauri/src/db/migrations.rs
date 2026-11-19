@@ -5,11 +5,8 @@ use crate::helpers::timestamps::now_utc;
 /// Delete all user data from every table and re-seed defaults.
 /// Tables are deleted in FK-safe order (children first).
 pub fn reset_all_data(conn: &Connection) -> AppResult<()> {
-    conn.execute_batch("
-        DELETE FROM agent_audit_log;
-        DELETE FROM agent_scope_grants;
-        DELETE FROM agent_keys;
-        DELETE FROM agents;
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch("
         DELETE FROM reconciliation_items;
         DELETE FROM reconciliations;
         DELETE FROM transaction_tags;
@@ -28,13 +25,21 @@ pub fn reset_all_data(conn: &Connection) -> AppResult<()> {
         DELETE FROM exchange_rates;
         DELETE FROM settings;
     ")?;
-    seed_defaults(conn)?;
-    seed_category_groups(conn)?;
+    seed_defaults(&tx)?;
+    seed_category_groups(&tx)?;
+    tx.commit()?;
     Ok(())
 }
 
 pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(SCHEMA)?;
+    // Agent gateway was never implemented; drop its tables (children first).
+    conn.execute_batch("
+        DROP TABLE IF EXISTS agent_audit_log;
+        DROP TABLE IF EXISTS agent_scope_grants;
+        DROP TABLE IF EXISTS agent_keys;
+        DROP TABLE IF EXISTS agents;
+    ")?;
     seed_defaults(conn)?;
     fix_negative_expense_amounts(conn)?;
     populate_fts(conn)?;
@@ -42,6 +47,8 @@ pub fn run_migrations(conn: &Connection) -> AppResult<()> {
     add_category_group_id_column(conn)?;
     seed_category_groups(conn)?;
     add_target_amount_column(conn)?;
+    fix_transfer_signs(conn)?;
+    add_rollover_amount_column(conn)?;
     Ok(())
 }
 
@@ -144,6 +151,18 @@ fn add_target_amount_column(conn: &Connection) -> AppResult<()> {
     Ok(())
 }
 
+/// Idempotent: add rollover_amount column to budget_items if it doesn't exist.
+fn add_rollover_amount_column(conn: &Connection) -> AppResult<()> {
+    let has_column: bool = conn
+        .prepare("PRAGMA table_info(budget_items)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|name| name.as_deref() == Ok("rollover_amount"));
+    if !has_column {
+        conn.execute_batch("ALTER TABLE budget_items ADD COLUMN rollover_amount INTEGER NOT NULL DEFAULT 0")?;
+    }
+    Ok(())
+}
+
 /// Populate FTS5 index from existing transactions that aren't already indexed.
 /// Idempotent: only inserts rows missing from FTS.
 fn populate_fts(conn: &Connection) -> AppResult<()> {
@@ -158,6 +177,7 @@ fn populate_fts(conn: &Connection) -> AppResult<()> {
 }
 
 /// Rebuild FTS5 index from scratch — drop all FTS rows and repopulate.
+#[cfg(test)]
 pub fn rebuild_fts(conn: &Connection) -> AppResult<()> {
     conn.execute("DELETE FROM transactions_fts", [])?;
     conn.execute(
@@ -175,6 +195,59 @@ fn fix_negative_expense_amounts(conn: &Connection) -> AppResult<()> {
         "UPDATE transactions SET amount = ABS(amount) WHERE kind = 'expense' AND amount < 0",
         [],
     )?;
+    Ok(())
+}
+
+/// Idempotent: older code stored both legs of a transfer as positive amounts.
+/// Only transfer groups where both legs are positive are touched; in those the
+/// outgoing leg is negated. The outgoing leg is the one whose payee is
+/// 'Transfer to account' (manual transfers), or, for recurring transfers, the
+/// one on the recurring row's `account_id` whose peer is on its
+/// `transfer_to_account_id`. A recurring pair that matches in both directions
+/// is ambiguous and is left alone.
+fn fix_transfer_signs(conn: &Connection) -> AppResult<()> {
+    const BAD_GROUPS: &str = "SELECT transfer_group_id FROM transactions
+         WHERE kind = 'transfer' AND transfer_group_id IS NOT NULL
+         GROUP BY transfer_group_id
+         HAVING COUNT(*) = 2 AND MIN(amount) > 0";
+
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        &format!(
+            "UPDATE transactions SET amount = -amount
+             WHERE kind = 'transfer' AND amount > 0
+               AND payee = 'Transfer to account'
+               AND transfer_group_id IN ({BAD_GROUPS})"
+        ),
+        [],
+    )?;
+
+    // Runs after the manual fix, so groups repaired above are no longer "bad".
+    tx.execute(
+        &format!(
+            "UPDATE transactions SET amount = -amount
+             WHERE kind = 'transfer' AND amount > 0
+               AND transfer_group_id IN ({BAD_GROUPS})
+               AND EXISTS (
+                   SELECT 1 FROM transactions o
+                   JOIN recurring_transactions r
+                     ON r.kind = 'transfer'
+                    AND r.account_id = transactions.account_id
+                    AND r.transfer_to_account_id = o.account_id
+                   WHERE o.transfer_group_id = transactions.transfer_group_id
+                     AND o.id != transactions.id)
+               AND NOT EXISTS (
+                   SELECT 1 FROM transactions o
+                   JOIN recurring_transactions r
+                     ON r.kind = 'transfer'
+                    AND r.account_id = o.account_id
+                    AND r.transfer_to_account_id = transactions.account_id
+                   WHERE o.transfer_group_id = transactions.transfer_group_id
+                     AND o.id != transactions.id)"
+        ),
+        [],
+    )?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -441,57 +514,6 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 );
 
 CREATE INDEX IF NOT EXISTS idx_exchange_rates_pair_date ON exchange_rates(from_currency, to_currency, date);
-
--- Agent Gateway tables: planned feature (see AGENT-GATEWAY-SPEC.md), not yet implemented in backend commands
-
-CREATE TABLE IF NOT EXISTS agents (
-    id              TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    publisher       TEXT NOT NULL,
-    version         TEXT NOT NULL,
-    description     TEXT,
-    manifest_url    TEXT,
-    icon_url        TEXT,
-    status          TEXT NOT NULL DEFAULT 'pending'
-                    CHECK(status IN ('pending','approved','denied','revoked')),
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS agent_keys (
-    id              TEXT PRIMARY KEY,
-    agent_id        TEXT NOT NULL,
-    key_hash        TEXT NOT NULL UNIQUE,
-    scopes          TEXT NOT NULL,
-    expires_at      TEXT,
-    last_used_at    TEXT,
-    created_at      TEXT NOT NULL,
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS agent_scope_grants (
-    id              TEXT PRIMARY KEY,
-    agent_id        TEXT NOT NULL,
-    scope           TEXT NOT NULL,
-    access_mode     TEXT NOT NULL DEFAULT 'always'
-                    CHECK(access_mode IN ('always','ask_each_time','never')),
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
-    UNIQUE(agent_id, scope)
-);
-
-CREATE TABLE IF NOT EXISTS agent_audit_log (
-    id              TEXT PRIMARY KEY,
-    agent_id        TEXT NOT NULL,
-    scope_requested TEXT NOT NULL,
-    scope_granted   TEXT NOT NULL,
-    status          TEXT NOT NULL,
-    result_summary  TEXT,
-    created_at      TEXT NOT NULL,
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_agent ON agent_audit_log(agent_id);
-CREATE INDEX IF NOT EXISTS idx_audit_created ON agent_audit_log(created_at);
 ";
 
 fn insert_category(conn: &Connection, name: &str, color: &str, kind: &str, sort: i64, now: &str) -> AppResult<String> {
@@ -608,7 +630,7 @@ pub fn seed_test_data(conn: &Connection) -> AppResult<()> {
     )?;
 
     let checking = insert_account(conn, "Primary Checking", "checking", 250_000, 0, &now)?;
-    let savings  = insert_account(conn, "High-Yield Savings", "savings", 1_200_000, 1, &now)?;
+    insert_account(conn, "High-Yield Savings", "savings", 1_200_000, 1, &now)?;
     let cc       = insert_account(conn, "Visa Rewards Card", "credit_card", 0, 2, &now)?;
 
     // Minimal set of transactions for testing

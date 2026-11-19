@@ -5,14 +5,17 @@ import { AISearchResult } from '../types';
 export function useAISearch() {
   const [result, setResult] = useState<AISearchResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const search = useCallback(async (query: string) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await aiSearchApi.search(query);
       setResult(res);
-    } catch {
+    } catch (err) {
       setResult(null);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -20,7 +23,8 @@ export function useAISearch() {
 
   const clear = useCallback(() => {
     setResult(null);
+    setError(null);
   }, []);
 
-  return { result, loading, search, clear };
+  return { result, loading, error, search, clear };
 }

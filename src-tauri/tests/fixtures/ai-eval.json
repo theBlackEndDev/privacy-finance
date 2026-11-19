@@ -1,0 +1,162 @@
+[
+  {
+    "question": "Which categories have no entries at all?",
+    "gold_sql": "SELECT c.name FROM categories c LEFT JOIN transactions t ON t.category_id = c.id WHERE t.id IS NULL ORDER BY c.name"
+  },
+  {
+    "question": "What is the average amount of the Food entries?",
+    "gold_sql": "SELECT AVG(t.amount) AS avg_amount FROM transactions t JOIN categories c ON c.id = t.category_id WHERE c.name = 'Food' AND t.kind = 'expense'"
+  },
+  {
+    "question": "Name the 2 categories with the most entries.",
+    "gold_sql": "SELECT c.name, COUNT(*) AS n FROM transactions t JOIN categories c ON c.id = t.category_id GROUP BY c.id ORDER BY n DESC, c.name LIMIT 2"
+  },
+  {
+    "question": "How many entries did each account get in February 2026?",
+    "gold_sql": "SELECT a.name, COUNT(t.id) AS n FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id AND t.date BETWEEN '2026-02-01' AND '2026-02-28' GROUP BY a.id ORDER BY a.name"
+  },
+  {
+    "question": "Which month brought in the most money from Acme Corp?",
+    "gold_sql": "SELECT substr(date, 1, 7) AS month, SUM(amount) AS sum_amount FROM transactions WHERE payee = 'Acme Corp' GROUP BY month ORDER BY sum_amount DESC, month LIMIT 1"
+  },
+  {
+    "question": "What is the mean entry amount for each account type, ignoring transfers?",
+    "gold_sql": "SELECT a.type, AVG(t.amount) AS avg_amount FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE t.kind != 'transfer' GROUP BY a.type ORDER BY a.type"
+  },
+  {
+    "question": "For every transfer leg, give the account name and the amount.",
+    "gold_sql": "SELECT t.transfer_group_id, a.name, t.amount FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE t.kind = 'transfer' ORDER BY t.transfer_group_id, t.amount"
+  },
+  {
+    "question": "Which account sent money to the Visa Rewards Card?",
+    "gold_sql": "SELECT DISTINCT a.name FROM transactions o JOIN transactions i ON i.transfer_group_id = o.transfer_group_id AND i.id != o.id JOIN accounts a ON a.id = o.account_id JOIN accounts b ON b.id = i.account_id WHERE o.kind = 'transfer' AND o.amount < 0 AND b.name = 'Visa Rewards Card'"
+  },
+  {
+    "question": "On what date was the first entry on a credit card account?",
+    "gold_sql": "SELECT MIN(t.date) AS first_date FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE a.type = 'credit_card'"
+  },
+  {
+    "question": "Give me the entries dated between 2026-01-01 and 2026-01-31, oldest first.",
+    "gold_sql": "SELECT date, payee, amount FROM transactions WHERE date BETWEEN '2026-01-01' AND '2026-01-31' ORDER BY date, payee"
+  },
+  {
+    "question": "Which merchants appear on more than one entry?",
+    "gold_sql": "SELECT payee, COUNT(*) AS n FROM transactions WHERE kind != 'transfer' GROUP BY payee HAVING COUNT(*) > 1 ORDER BY payee"
+  },
+  {
+    "question": "What is the mean Food amount for each merchant?",
+    "gold_sql": "SELECT t.payee, AVG(t.amount) AS avg_amount FROM transactions t JOIN categories c ON c.id = t.category_id WHERE c.name = 'Food' GROUP BY t.payee ORDER BY t.payee"
+  },
+  {
+    "question": "Which entries are still uncleared?",
+    "gold_sql": "SELECT date, payee, amount FROM transactions WHERE is_cleared = 0 ORDER BY date"
+  },
+  {
+    "question": "How many entries fall under each category group?",
+    "gold_sql": "SELECT g.name, COUNT(t.id) AS n FROM category_groups g LEFT JOIN categories c ON c.group_id = g.id LEFT JOIN transactions t ON t.category_id = c.id GROUP BY g.id ORDER BY g.sort_order"
+  },
+  {
+    "question": "Which entries have no tag attached?",
+    "gold_sql": "SELECT t.date, t.payee, t.amount FROM transactions t LEFT JOIN transaction_tags tt ON tt.transaction_id = t.id WHERE tt.transaction_id IS NULL ORDER BY t.date, t.payee"
+  },
+  {
+    "question": "How many entries carry at least one tag?",
+    "gold_sql": "SELECT COUNT(DISTINCT transaction_id) AS n FROM transaction_tags"
+  },
+  {
+    "question": "What is the mean amount of the entries that have a tag?",
+    "gold_sql": "SELECT COALESCE(AVG(t.amount), 0) AS avg_amount FROM transactions t JOIN transaction_tags tt ON tt.transaction_id = t.id"
+  },
+  {
+    "question": "Which entries are not split across categories?",
+    "gold_sql": "SELECT date, payee, amount FROM transactions WHERE is_split = 0 ORDER BY date, payee"
+  },
+  {
+    "question": "What is the sum of all split line amounts?",
+    "gold_sql": "SELECT COALESCE(SUM(amount), 0) AS split_sum FROM transaction_splits"
+  },
+  {
+    "question": "For each entry, how many split lines does it have?",
+    "gold_sql": "SELECT t.date, t.payee, COUNT(s.id) AS split_lines FROM transactions t LEFT JOIN transaction_splits s ON s.transaction_id = t.id GROUP BY t.id ORDER BY t.date, t.payee"
+  },
+  {
+    "question": "For January 2026, give the planned amount and the actual outflow of every expense category.",
+    "gold_sql": "SELECT c.name, COALESCE(bi.budgeted, 0) AS planned, COALESCE(SUM(t.amount), 0) AS actual FROM categories c LEFT JOIN budgets b ON b.year = 2026 AND b.month = 1 LEFT JOIN budget_items bi ON bi.budget_id = b.id AND bi.category_id = c.id LEFT JOIN transactions t ON t.category_id = c.id AND t.kind = 'expense' AND substr(t.date, 1, 7) = '2026-01' WHERE c.type = 'expense' GROUP BY c.id ORDER BY c.name"
+  },
+  {
+    "question": "Which expense categories have nothing planned for March 2026?",
+    "gold_sql": "SELECT c.name FROM categories c WHERE c.type = 'expense' AND NOT EXISTS (SELECT 1 FROM budget_items bi JOIN budgets b ON b.id = bi.budget_id WHERE b.year = 2026 AND b.month = 3 AND bi.category_id = c.id) ORDER BY c.name"
+  },
+  {
+    "question": "For how many months has a plan been set up?",
+    "gold_sql": "SELECT COUNT(*) AS n FROM budgets"
+  },
+  {
+    "question": "Which expense categories passed 100000 cents in the first quarter of 2026?",
+    "gold_sql": "SELECT c.name, SUM(t.amount) AS sum_amount FROM transactions t JOIN categories c ON c.id = t.category_id WHERE t.kind = 'expense' AND t.date BETWEEN '2026-01-01' AND '2026-03-31' GROUP BY c.id HAVING SUM(t.amount) > 100000 ORDER BY c.name"
+  },
+  {
+    "question": "Which accounts have no repeating entries set up?",
+    "gold_sql": "SELECT a.name FROM accounts a LEFT JOIN recurring_transactions r ON r.account_id = a.id WHERE r.id IS NULL ORDER BY a.name"
+  },
+  {
+    "question": "How many active repeating entries are set up?",
+    "gold_sql": "SELECT COUNT(*) AS n FROM recurring_transactions WHERE is_active = 1"
+  },
+  {
+    "question": "What is the combined amount of all active repeating entries?",
+    "gold_sql": "SELECT COALESCE(SUM(amount), 0) AS combined FROM recurring_transactions WHERE is_active = 1"
+  },
+  {
+    "question": "What is the current figure of each account after applying all its entries to its opening amount?",
+    "gold_sql": "SELECT a.name, a.opening_balance + COALESCE(SUM(CASE WHEN t.kind = 'expense' THEN -t.amount ELSE t.amount END), 0) AS current_amount FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id GROUP BY a.id ORDER BY a.name"
+  },
+  {
+    "question": "How many accounts are there of each type?",
+    "gold_sql": "SELECT type, COUNT(*) AS n FROM accounts GROUP BY type ORDER BY type"
+  },
+  {
+    "question": "Which account has the most entries?",
+    "gold_sql": "SELECT a.name, COUNT(*) AS n FROM transactions t JOIN accounts a ON a.id = t.account_id GROUP BY a.id ORDER BY n DESC, a.name LIMIT 1"
+  },
+  {
+    "question": "What are the 2 earliest entries?",
+    "gold_sql": "SELECT date, payee, amount FROM transactions ORDER BY date ASC LIMIT 2"
+  },
+  {
+    "question": "What is the latest entry date for each account?",
+    "gold_sql": "SELECT a.name, MAX(t.date) AS latest FROM accounts a JOIN transactions t ON t.account_id = a.id GROUP BY a.id ORDER BY a.name"
+  },
+  {
+    "question": "What is the mean deposit for each month?",
+    "gold_sql": "SELECT substr(date, 1, 7) AS month, AVG(amount) AS avg_amount FROM transactions WHERE kind = 'income' GROUP BY month ORDER BY month"
+  },
+  {
+    "question": "Which entries sit in a category whose color is #ef4444?",
+    "gold_sql": "SELECT t.date, t.payee, t.amount FROM transactions t JOIN categories c ON c.id = t.category_id WHERE c.color = '#ef4444' ORDER BY t.date"
+  },
+  {
+    "question": "Which entries hit a credit card account in January 2026?",
+    "gold_sql": "SELECT t.date, t.payee, t.amount FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE a.type = 'credit_card' AND t.date BETWEEN '2026-01-01' AND '2026-01-31' ORDER BY t.date"
+  },
+  {
+    "question": "Which entries mention groceries in the description?",
+    "gold_sql": "SELECT date, payee, amount FROM transactions WHERE description LIKE '%Groceries%' ORDER BY date"
+  },
+  {
+    "question": "Which merchants did the credit card go to more than once?",
+    "gold_sql": "SELECT t.payee, COUNT(*) AS n FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE a.type = 'credit_card' AND t.kind = 'expense' GROUP BY t.payee HAVING COUNT(*) > 1 ORDER BY t.payee"
+  },
+  {
+    "question": "What are the minimum and maximum amounts of the Housing entries?",
+    "gold_sql": "SELECT MIN(t.amount) AS min_amount, MAX(t.amount) AS max_amount FROM transactions t JOIN categories c ON c.id = t.category_id WHERE c.name = 'Housing'"
+  },
+  {
+    "question": "How many days passed between the first and the last entry?",
+    "gold_sql": "SELECT CAST(julianday(MAX(date)) - julianday(MIN(date)) AS INTEGER) AS days FROM transactions"
+  },
+  {
+    "question": "Which accounts have never been reconciled?",
+    "gold_sql": "SELECT a.name FROM accounts a LEFT JOIN reconciliations r ON r.account_id = a.id AND r.status = 'completed' WHERE r.id IS NULL ORDER BY a.name"
+  }
+]

@@ -10,7 +10,7 @@ use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::timestamps::now_utc;
 use crate::models::import::{
-    ColumnMapping, CsvPreview, ImportBatch, ImportInput, ImportProfile, ImportResult,
+    ColumnMapping, CsvPreview, ImportInput, ImportProfile, ImportResult,
     ImportRowError,
 };
 
@@ -185,6 +185,11 @@ pub fn preview_csv(file_path: String) -> AppResult<CsvPreview> {
 /// Full CSV import: parse, map columns, dedupe, batch-insert.
 #[tauri::command]
 pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<ImportResult> {
+    let conn = state.write_conn.lock().unwrap();
+    import_csv_inner(&conn, input)
+}
+
+pub(crate) fn import_csv_inner(conn: &rusqlite::Connection, input: ImportInput) -> AppResult<ImportResult> {
     let raw = fs::read(&input.file_path).map_err(AppError::Io)?;
     let fhash = file_hash(&raw);
     let stripped = strip_bom(&raw);
@@ -338,25 +343,25 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
 
     // Insert all valid rows in a single DB transaction
     {
-        let conn = state.write_conn.lock().unwrap();
-        conn.execute_batch("BEGIN")?;
+        let tx = conn.unchecked_transaction()?;
 
         // Create batch record
-        conn.execute(
+        tx.execute(
             "INSERT INTO import_batches (id, filename, file_hash, account_id, profile_id, row_count, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
             rusqlite::params![batch_id, filename, fhash, input.account_id, input.profile_id, now],
         )?;
 
         for row in &valid_rows {
+            // Amounts are stored positive; kind carries the direction.
             let kind = if row.amount >= 0 { "income" } else { "expense" };
-            let result = conn.execute(
+            let result = tx.execute(
                 "INSERT OR IGNORE INTO transactions
                  (id, account_id, date, amount, kind, payee, description,
                   is_cleared, import_batch_id, import_row_hash, created_at, updated_at)
                  VALUES (?1,?2,?3,?4,?5,?6,?7,1,?8,?9,?10,?10)",
                 rusqlite::params![
-                    row.id, input.account_id, row.date, row.amount, kind,
+                    row.id, input.account_id, row.date, row.amount.abs(), kind,
                     row.payee, row.description, batch_id, row.hash, now
                 ],
             )?;
@@ -369,19 +374,17 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
         }
 
         // Update batch row_count
-        conn.execute(
+        tx.execute(
             "UPDATE import_batches SET row_count = ?1 WHERE id = ?2",
             rusqlite::params![imported as i64, batch_id],
         )?;
 
-        conn.execute_batch("COMMIT")?;
+        tx.commit()?;
     }
 
     // Auto-categorize newly imported uncategorized transactions
-    // Done outside the write_conn lock scope above to release it sooner
     if !imported_ids.is_empty() {
-        let conn = state.write_conn.lock().unwrap();
-        let _ = super::rules::apply_rules_to_transactions(&conn, &imported_ids);
+        let _ = super::rules::apply_rules_to_transactions(conn, &imported_ids);
     }
 
     Ok(ImportResult {
@@ -396,41 +399,17 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
 #[tauri::command]
 pub fn rollback_import(batch_id: String, state: State<'_, DbState>) -> AppResult<()> {
     let conn = state.write_conn.lock().unwrap();
-    conn.execute_batch("BEGIN")?;
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "DELETE FROM transactions WHERE import_batch_id = ?1",
         rusqlite::params![batch_id],
     )?;
-    conn.execute(
+    tx.execute(
         "DELETE FROM import_batches WHERE id = ?1",
         rusqlite::params![batch_id],
     )?;
-    conn.execute_batch("COMMIT")?;
+    tx.commit()?;
     Ok(())
-}
-
-/// List all import batches (most recent first).
-#[tauri::command]
-pub fn get_import_batches(state: State<'_, DbState>) -> AppResult<Vec<ImportBatch>> {
-    let conn = state.read_conn.lock().unwrap();
-    let mut stmt = conn.prepare(
-        "SELECT id, filename, file_hash, account_id, profile_id, row_count, created_at
-         FROM import_batches ORDER BY created_at DESC",
-    )?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(ImportBatch {
-                id: row.get(0)?,
-                filename: row.get(1)?,
-                file_hash: row.get(2)?,
-                account_id: row.get(3)?,
-                profile_id: row.get(4)?,
-                row_count: row.get(5)?,
-                created_at: row.get(6)?,
-            })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(rows)
 }
 
 /// Return all saved import profiles.
@@ -483,18 +462,4 @@ pub fn save_import_profile(
         }),
     )?;
     Ok(profile)
-}
-
-/// Delete a saved import profile by id.
-#[tauri::command]
-pub fn delete_import_profile(id: String, state: State<'_, DbState>) -> AppResult<()> {
-    let conn = state.write_conn.lock().unwrap();
-    let rows = conn.execute(
-        "DELETE FROM import_profiles WHERE id = ?1",
-        rusqlite::params![id],
-    )?;
-    if rows == 0 {
-        return Err(AppError::NotFound(format!("Import profile {}", id)));
-    }
-    Ok(())
 }

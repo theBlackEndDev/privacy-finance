@@ -30,9 +30,13 @@ export function AccountsPage() {
 
   const deleteFlow = useConfirmDelete<Account>({
     onConfirm: async (account) => {
-      await accountsApi.delete(account.id);
-      await refresh();
-      toast('Account deleted');
+      try {
+        await accountsApi.delete(account.id);
+        await refresh();
+        toast('Account deleted');
+      } catch (err) {
+        toast(String(err), 'error');
+      }
     },
   });
 

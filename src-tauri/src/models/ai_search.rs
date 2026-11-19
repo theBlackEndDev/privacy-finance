@@ -30,6 +30,7 @@ pub enum CardType {
     TransactionList,
     Breakdown,
     AccountSummary,
+    Table,
 }
 
 // ── Entities ──────────────────────────────────────────────────────
@@ -114,6 +115,11 @@ pub enum CardData {
         accounts: Vec<AccountItem>,
         net_worth: i64,
     },
+    #[serde(rename_all = "camelCase")]
+    Table {
+        columns: Vec<String>,
+        rows: Vec<Vec<serde_json::Value>>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -164,6 +170,8 @@ pub struct AISearchResult {
     pub card_type: Option<CardType>,
     pub card_data: Option<CardData>,
     pub text_answer: Option<String>,
+    /// The SQL a tier-2 answer ran; None for tier 1 and no-match.
+    pub sql: Option<String>,
     pub suggestions: Vec<String>,
     pub query_time_ms: u64,
 }
@@ -176,6 +184,7 @@ impl AISearchResult {
             card_type: None,
             card_data: None,
             text_answer: None,
+            sql: None,
             suggestions: vec![
                 "How much did I spend on [category]?".to_string(),
                 "Show me transactions over $[amount]".to_string(),

@@ -28,12 +28,14 @@ export function TransferForm({ accounts, onSaved, onClose }: TransferFormProps) 
     e.preventDefault();
     if (fromId === toId) { setError('From and To accounts must be different'); return; }
     if (!amount) { setError('Amount is required'); return; }
+    const cents = parseCurrency(amount);
+    if (cents <= 0) { setError('Amount must be greater than 0'); return; }
     setSaving(true);
     try {
       const input: CreateTransferInput = {
         fromAccountId: fromId,
         toAccountId: toId,
-        amount: parseCurrency(amount),
+        amount: cents,
         date,
         description: description || undefined,
       };
