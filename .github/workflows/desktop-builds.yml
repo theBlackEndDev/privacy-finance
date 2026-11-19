@@ -206,8 +206,7 @@ jobs:
             echo "## ${RUNNER_OS} artifact summary"
             echo ""
             echo "Expected output: ${{ matrix.release_notes }}"
-            echo "Artifact glob: \
-`${{ matrix.artifact_glob }}`"
+            echo "Artifact glob: \`${{ matrix.artifact_glob }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload bundle artifacts
