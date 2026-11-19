@@ -93,6 +93,8 @@ jobs:
           echo "C:\Program Files\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # openssl-src rejects Git Bash's MSYS perl; use the runner's Strawberry Perl.
+          echo "OPENSSL_SRC_PERL=C:\Strawberry\perl\bin\perl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install JS dependencies
         run: npm ci
@@ -196,6 +198,10 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
+          # Unset Apple variables whose secret is missing, so Tauri builds unsigned instead of failing.
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_TEAM_ID APPLE_ID APPLE_PASSWORD APPLE_PROVIDER_SHORT_NAME APPLE_API_KEY APPLE_API_ISSUER; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
           if [ -n "${{ matrix.tauri_args }}" ]; then
             npm exec tauri -- build ${{ matrix.tauri_args }}
           else
