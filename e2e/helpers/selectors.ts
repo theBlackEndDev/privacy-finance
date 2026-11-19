@@ -17,6 +17,7 @@ export function byTestIdPrefix(prefix: string) {
 export const sel = {
   // Layout
   sidebar: byTestId('sidebar'),
+  sidebarAccounts: '[class*="accountsSection"]',
   mainContent: byTestId('main-content'),
   header: byTestId('header'),
 

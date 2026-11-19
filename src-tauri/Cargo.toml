@@ -34,6 +34,10 @@ ureq = { version = "2", features = ["json"] }
 zeroize = "1"
 llama-cpp-2 = "0.1.161"
 
+# Windows has no system OpenSSL for SQLCipher: build it from source and link statically.
+[target.'cfg(windows)'.dependencies]
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
+
 [features]
 e2e = ["tauri-plugin-webdriver"]
 

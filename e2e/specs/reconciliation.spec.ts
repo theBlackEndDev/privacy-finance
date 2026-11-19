@@ -42,8 +42,9 @@ describe('Reconciliation', () => {
   });
 
   it('starts reconciliation for an account', async () => {
-    // Click the first account button (data-testid starts with recon-account-)
-    const accountBtn = await $(byTestIdPrefix('recon-account-'));
+    // Click the first account button. The list container is also recon-account-select,
+    // so match buttons only (a bare prefix match returns the container div first).
+    const accountBtn = await $('button' + byTestIdPrefix('recon-account-'));
     await accountBtn.waitForDisplayed({ timeout: 10000 });
     await browser.execute((el: HTMLElement) => el.click(), accountBtn as any);
     await browser.pause(1000);
