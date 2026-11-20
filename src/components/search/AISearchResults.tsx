@@ -19,10 +19,18 @@ export function AISearchResults({ result, loading, onConfirm, onDecline }: Props
     return <div className={styles.container}><div className={styles.loading}>Searching...</div></div>;
   }
 
+  const betaBanner = (
+    <div className={styles.betaBanner} data-testid="ai-search-beta">
+      <span className={styles.betaBadge}>Beta</span>
+      <span className={styles.betaText}>AI search is in beta. Answers can be wrong or fail.</span>
+    </div>
+  );
+
   if (result.proposal) {
     const { proposal } = result;
     return (
       <div className={styles.container}>
+        {betaBanner}
         <div className={styles.proposal} data-testid="ai-search-proposal">
           <div className={styles.proposalText}>Did you mean: {proposal.interpretation}?</div>
           <div className={styles.proposalActions}>
@@ -41,6 +49,7 @@ export function AISearchResults({ result, loading, onConfirm, onDecline }: Props
   if (!result.matched) {
     return (
       <div className={styles.container}>
+        {betaBanner}
         <div className={styles.noMatch}>
           {result.textAnswer ?? "Couldn't find an answer for that."}
         </div>
@@ -58,6 +67,7 @@ export function AISearchResults({ result, loading, onConfirm, onDecline }: Props
 
   return (
     <div className={styles.container}>
+      {betaBanner}
       {result.source !== 'none' && result.interpretation && (
         <div className={styles.interpretation} data-testid="ai-search-interpretation">
           Understood as: {result.interpretation}

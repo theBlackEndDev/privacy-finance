@@ -140,3 +140,34 @@ describe('AISearchResults proposal', () => {
     expect(mockConfirm).not.toHaveBeenCalled();
   });
 });
+
+describe('AISearchResults beta', () => {
+  it('shows the Beta badge and warning for an answer', () => {
+    render(<AISearchResults result={makeResult({})} loading={false} {...noop} />);
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.getByText('AI search is in beta. Answers can be wrong or fail.')).toBeInTheDocument();
+  });
+
+  it('shows the Beta badge and warning for a proposal', () => {
+    render(<AISearchResults result={proposalResult} loading={false} {...noop} />);
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.getByText('AI search is in beta. Answers can be wrong or fail.')).toBeInTheDocument();
+  });
+
+  it('shows the Beta badge and warning for the decline message', () => {
+    render(
+      <AISearchResults
+        result={makeResult({
+          matched: false,
+          source: 'none',
+          interpretation: null,
+          textAnswer: "I can't answer that yet. Try one of these:",
+        })}
+        loading={false}
+        {...noop}
+      />,
+    );
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.getByText('AI search is in beta. Answers can be wrong or fail.')).toBeInTheDocument();
+  });
+});

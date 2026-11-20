@@ -179,12 +179,14 @@ fn populate_fts(conn: &Connection) -> AppResult<()> {
 /// Rebuild FTS5 index from scratch — drop all FTS rows and repopulate.
 #[cfg(test)]
 pub fn rebuild_fts(conn: &Connection) -> AppResult<()> {
-    conn.execute("DELETE FROM transactions_fts", [])?;
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM transactions_fts", [])?;
+    tx.execute(
         "INSERT INTO transactions_fts(transaction_id, payee, description)
          SELECT id, payee, description FROM transactions",
         [],
     )?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -645,4 +647,45 @@ pub fn seed_test_data(conn: &Connection) -> AppResult<()> {
     insert_transfer(conn, &checking, &cc, 180_000, "2026-02-05", "CC payment", &now)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rebuild_fts_keeps_rows() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        seed_test_data(&conn).unwrap();
+
+        let tx_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
+            .unwrap();
+        assert!(tx_count > 0);
+
+        // Wiping FTS and rebuilding restores every row.
+        conn.execute("DELETE FROM transactions_fts", []).unwrap();
+        rebuild_fts(&conn).unwrap();
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transactions_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count, tx_count);
+
+        // Rebuilding again on a populated index keeps the exact row count.
+        rebuild_fts(&conn).unwrap();
+        let fts_count_after: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transactions_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count_after, tx_count);
+
+        // If the INSERT step fails, the transaction rolls back the DELETE so existing FTS rows are kept.
+        conn.execute_batch("PRAGMA foreign_keys = OFF; DROP TABLE transactions;")
+            .unwrap();
+        assert!(rebuild_fts(&conn).is_err());
+        let fts_count_rollback: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transactions_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count_rollback, tx_count);
+    }
 }

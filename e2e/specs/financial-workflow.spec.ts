@@ -11,8 +11,6 @@ import {
 
 /**
  * Read an account's current balance (in cents) from the dashboard's account list.
- * The Accounts page only shows opening balances, so the dashboard is the place
- * where a transfer becomes visible.
  */
 async function readDashboardBalanceCents(accountName: string): Promise<number> {
   await navigateTo('dashboard');
@@ -34,9 +32,38 @@ async function readDashboardBalanceCents(accountName: string): Promise<number> {
   throw new Error(`No dashboard balance row for ${accountName}`);
 }
 
+/**
+ * Read an account's current balance (in cents) from the Accounts list page.
+ */
+async function readAccountsListBalanceCents(accountName: string): Promise<number> {
+  await navigateTo('accounts');
+  const rowSelector = byTestIdPrefix('account-row-');
+  await browser.waitUntil(async () => {
+    return (await countElements(rowSelector)) > 0;
+  }, { timeout: 10000, timeoutMsg: 'Accounts list rows did not render' });
+  await browser.waitUntil(async () => {
+    return (await countElements('[data-balances-loaded="true"]')) > 0;
+  }, { timeout: 10000, timeoutMsg: 'Accounts list balances did not load' });
+
+  const rows = await $$(rowSelector);
+  for (const row of rows) {
+    const text = await row.getText();
+    if (text.includes(accountName)) {
+      const match = text.match(/-?\$[\d,]+\.\d{2}/);
+      if (!match) throw new Error(`Could not find balance in "${text}"`);
+      const cents = Math.round(parseFloat(match[0].replace(/[^0-9.-]/g, '')) * 100);
+      if (Number.isNaN(cents)) throw new Error(`Could not parse balance from "${match[0]}"`);
+      return cents;
+    }
+  }
+  throw new Error(`No accounts list row for ${accountName}`);
+}
+
 describe('Financial Workflow (Full Journey)', () => {
   let checkingBefore = 0;
   let savingsBefore = 0;
+  let checkingListBefore = 0;
+  let savingsListBefore = 0;
 
   before(async () => {
     await waitForAppReady();
@@ -202,6 +229,8 @@ describe('Financial Workflow (Full Journey)', () => {
   it('creates a transfer from checking to savings ($500)', async () => {
     checkingBefore = await readDashboardBalanceCents('Workflow Checking');
     savingsBefore = await readDashboardBalanceCents('Workflow Savings');
+    checkingListBefore = await readAccountsListBalanceCents('Workflow Checking');
+    savingsListBefore = await readAccountsListBalanceCents('Workflow Savings');
 
     await navigateTo('transactions');
 
@@ -225,10 +254,14 @@ describe('Financial Workflow (Full Journey)', () => {
   it('verifies both accounts reflect the transfer', async () => {
     const checkingAfter = await readDashboardBalanceCents('Workflow Checking');
     const savingsAfter = await readDashboardBalanceCents('Workflow Savings');
+    const checkingListAfter = await readAccountsListBalanceCents('Workflow Checking');
+    const savingsListAfter = await readAccountsListBalanceCents('Workflow Savings');
 
     // $500.00 = 50000 cents: source down, destination up.
     expect(checkingAfter - checkingBefore).toBe(-50000);
     expect(savingsAfter - savingsBefore).toBe(50000);
+    expect(checkingListAfter - checkingListBefore).toBe(-50000);
+    expect(savingsListAfter - savingsListBefore).toBe(50000);
   });
 
   it('reports page shows at least one chart with data', async () => {

@@ -17,6 +17,19 @@ pub fn search_transactions_full(
         return Ok(vec![]);
     }
     let conn = state.read_conn.lock().unwrap();
+    search_transactions_full_inner(&conn, &query, limit, offset)
+}
+
+fn search_transactions_full_inner(
+    conn: &rusqlite::Connection,
+    query: &str,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> AppResult<Vec<SearchResult>> {
+    let q = sanitize_fts_query(query);
+    if q.is_empty() {
+        return Ok(vec![]);
+    }
     let limit = limit.unwrap_or(20);
     let offset = offset.unwrap_or(0);
 
@@ -66,7 +79,7 @@ pub fn search_transactions_full(
                 snippet,
             })
         },
-    )?.filter_map(|r: Result<SearchResult, _>| r.ok()).collect();
+    )?.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -76,18 +89,13 @@ pub fn search_transactions_full(
 /// Sanitize FTS5 query to prevent syntax errors.
 /// Wraps each word in double quotes for literal matching, appends * for prefix.
 fn sanitize_fts_query(input: &str) -> String {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return String::new();
-    }
-    let words: Vec<String> = trimmed
+    input
         .split_whitespace()
-        .map(|w| {
-            let clean = w.replace('"', "\"\"");
-            format!("\"{}\"*", clean)
-        })
-        .collect();
-    words.join(" ")
+        .map(|w| w.chars().filter(|&c| c != '"' && c != '\0').collect::<String>())
+        .filter(|w| !w.is_empty())
+        .map(|w| format!("\"{w}\"*"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 // ── Tests ───────────────────────────────────────────────────────────
@@ -265,5 +273,36 @@ mod tests {
             "SELECT COUNT(*) FROM transactions", [], |row| row.get(0),
         ).unwrap();
         assert_eq!(fts_count, tx_count);
+    }
+
+    #[test]
+    fn search_handles_quotes_and_nul() {
+        let conn = setup_db();
+        insert_tx(&conn, "tx-q1", "Whole Foods", "organic groceries");
+        insert_tx(&conn, "tx-q2", "foobar", "nul test");
+
+        for input in ["\"", "\"\"", "foo\0bar", "\"Whole\""] {
+            let res = search_transactions_full_inner(&conn, input, None, None);
+            assert!(res.is_ok(), "expected Ok for input {input:?}, got {res:?}");
+        }
+
+        let whole = search_transactions_full_inner(&conn, "\"Whole\"", None, None).unwrap();
+        assert!(whole.iter().any(|r| r.payee.contains("Whole")));
+
+        let foobar = search_transactions_full_inner(&conn, "foo\0bar", None, None).unwrap();
+        assert!(foobar.iter().any(|r| r.id == "tx-q2"));
+    }
+
+    #[test]
+    fn search_surfaces_row_errors() {
+        let conn = setup_db();
+        insert_tx(&conn, "tx-err", "CorruptPayee", "row error test");
+        conn.execute(
+            "UPDATE transactions SET amount = 'not-an-int' WHERE id = 'tx-err'",
+            [],
+        ).unwrap();
+
+        let res = search_transactions_full_inner(&conn, "CorruptPayee", None, None);
+        assert!(res.is_err(), "expected row error to be surfaced, got {res:?}");
     }
 }

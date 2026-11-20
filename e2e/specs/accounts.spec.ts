@@ -103,6 +103,61 @@ describe('Accounts', () => {
     expect(updatedCount).toBe(initialCount - 1);
   });
 
+  it('updates account list balance after a transaction', async () => {
+    async function readAccountBalanceCents(accountName: string): Promise<number> {
+      const rows = await $$(byTestIdPrefix('account-row-'));
+      for (const row of rows) {
+        const text = await row.getText();
+        if (text.includes(accountName)) {
+          const match = text.match(/-?\$[\d,]+\.\d{2}/);
+          if (!match) throw new Error(`Could not find balance in "${text}"`);
+          const cents = Math.round(parseFloat(match[0].replace(/[^0-9.-]/g, '')) * 100);
+          if (Number.isNaN(cents)) throw new Error(`Could not parse balance from "${match[0]}"`);
+          return cents;
+        }
+      }
+      throw new Error(`No account row for ${accountName}`);
+    }
+
+    const beforeCents = await readAccountBalanceCents('Checking');
+
+    await navigateTo('transactions');
+    const kindGroup = await $(sel.txKindSelect);
+    await kindGroup.waitForDisplayed({ timeout: 5000 });
+    const expenseBtn = await kindGroup.$('button*=\u2212');
+    if (await expenseBtn.isExisting()) {
+      await expenseBtn.click();
+    }
+    await fillInput(sel.txPayeeInput, 'Account Balance Check');
+    await fillInput(sel.txAmountInput, '25.00');
+    await selectOption(sel.txCategorySelect, 'Food');
+    await clickButton(sel.txSubmitBtn);
+    await browser.pause(500);
+
+    await navigateTo('accounts');
+    await browser.waitUntil(async () => {
+      return (await readAccountBalanceCents('Checking')) !== beforeCents;
+    }, { timeout: 5000, timeoutMsg: 'Accounts list balance did not update after transaction' });
+    const afterCents = await readAccountBalanceCents('Checking');
+    expect(afterCents - beforeCents).toBe(-2500);
+
+    // Clean up the transaction so subsequent specs start with a clean ledger
+    await navigateTo('transactions');
+    const firstRow = await $(byTestIdPrefix('tx-row-'));
+    await firstRow.waitForClickable({ timeout: 5000 });
+    await firstRow.click();
+    const editModal = await $(sel.txEditModal);
+    await editModal.waitForDisplayed({ timeout: 5000 });
+    await clickButton(sel.txEditDelete);
+    await confirmAction();
+    await browser.pause(500);
+
+    await navigateTo('accounts');
+    await browser.waitUntil(async () => {
+      return (await readAccountBalanceCents('Checking')) === beforeCents;
+    }, { timeout: 5000, timeoutMsg: 'Accounts list balance did not restore after deleting transaction' });
+  });
+
   it('views account detail by clicking row', async () => {
     // After delete, there should still be the Checking account
     const rows = await $$(byTestIdPrefix('account-row-'));

@@ -1,5 +1,6 @@
-import { MouseEvent } from 'react';
-import { Account } from '../../types';
+import { useState, useEffect, MouseEvent } from 'react';
+import { Account, AccountBalance } from '../../types';
+import { dashboardApi } from '../../api/dashboard';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -16,11 +17,30 @@ interface AccountListProps {
 }
 
 export function AccountList({ accounts, onAdd, onEdit, onDelete, onClickAccount }: AccountListProps) {
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [balancesLoaded, setBalancesLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    dashboardApi.getAccountBalances().then((rows: AccountBalance[]) => {
+      if (cancelled) return;
+      const next: Record<string, number> = {};
+      for (const row of rows) {
+        next[row.accountId] = row.balance;
+      }
+      setBalances(next);
+      setBalancesLoaded(true);
+    }).catch(() => {
+      // Keep showing opening balances if the balance query fails.
+    });
+    return () => { cancelled = true; };
+  }, [accounts]);
+
   const active = accounts.filter((a) => !a.isArchived);
   const archived = accounts.filter((a) => a.isArchived);
 
   return (
-    <div>
+    <div data-balances-loaded={balancesLoaded ? 'true' : 'false'}>
       <div className={styles.header}>
         <span className={styles.title}>Accounts</span>
         <Button onClick={onAdd} size="sm">+ Add Account</Button>
@@ -39,6 +59,7 @@ export function AccountList({ accounts, onAdd, onEdit, onDelete, onClickAccount 
               <AccountRow
                 key={account.id}
                 account={account}
+                balance={balances[account.id] ?? account.openingBalance}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onClick={onClickAccount}
@@ -53,6 +74,7 @@ export function AccountList({ accounts, onAdd, onEdit, onDelete, onClickAccount 
                   <AccountRow
                     key={account.id}
                     account={account}
+                    balance={balances[account.id] ?? account.openingBalance}
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onClick={onClickAccount}
@@ -69,12 +91,13 @@ export function AccountList({ accounts, onAdd, onEdit, onDelete, onClickAccount 
 
 interface AccountRowProps {
   account: Account;
+  balance: number;
   onEdit: (a: Account) => void;
   onDelete: (a: Account) => void;
   onClick?: (a: Account) => void;
 }
 
-function AccountRow({ account, onEdit, onDelete, onClick }: AccountRowProps) {
+function AccountRow({ account, balance, onEdit, onDelete, onClick }: AccountRowProps) {
   function handleActionClick(e: MouseEvent, action: () => void) {
     e.stopPropagation();
     action();
@@ -93,7 +116,7 @@ function AccountRow({ account, onEdit, onDelete, onClick }: AccountRowProps) {
         <div className={styles.name}>{account.name}</div>
         <div className={styles.type}>{ACCOUNT_TYPE_LABELS[account.type] ?? account.type}</div>
       </div>
-      <div className={styles.balance}>{formatCurrency(account.openingBalance)}</div>
+      <div className={styles.balance}>{formatCurrency(balance)}</div>
       <div className={styles.actions}>
         <Button variant="ghost" size="sm" onClick={(e) => handleActionClick(e, () => onEdit(account))}>Edit</Button>
         <Button variant="danger" size="sm" onClick={(e) => handleActionClick(e, () => onDelete(account))}>Delete</Button>
