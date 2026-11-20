@@ -40,7 +40,7 @@ export function GlobalSearch() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mode, setMode] = useState<'keyword' | 'ai'>('keyword');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { result: aiResult, loading: aiLoading, error: aiError, search: aiDoSearch, clear: aiClear } = useAISearch();
+  const { result: aiResult, loading: aiLoading, error: aiError, search: aiDoSearch, confirm: aiConfirm, decline: aiDecline, clear: aiClear } = useAISearch();
 
   const debouncedQuery = useDebounce(query, 250);
 
@@ -168,7 +168,7 @@ export function GlobalSearch() {
       {isOpen && (
         <div className={`${styles.dropdown} ${showAI ? styles.dropdownWide : ''}`} id={LISTBOX_ID} data-testid="search-results">
           {showAI && aiResult && (
-            <AISearchResults result={aiResult} loading={aiLoading} />
+            <AISearchResults result={aiResult} loading={aiLoading} onConfirm={aiConfirm} onDecline={aiDecline} />
           )}
           {showAI && aiLoading && !aiResult && (
             <div className={styles.empty}>Searching...</div>

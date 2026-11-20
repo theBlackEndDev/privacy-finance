@@ -541,7 +541,7 @@ export interface EncryptionStatus {
 // ── AI Search ─────────────────────────────────────────────────────
 
 export type SearchIntent = 'SPENDING_TOTAL' | 'SPENDING_BY_CATEGORY' | 'SPENDING_COMPARISON' | 'INCOME_TOTAL' | 'BALANCE_CHECK' | 'BUDGET_STATUS' | 'TRANSACTION_SEARCH' | 'TOP_MERCHANTS' | 'TOP_EXPENSES' | 'RECURRING_CHECK' | 'NET_WORTH' | 'CATEGORY_DETAIL';
-export type CardType = 'total' | 'comparison' | 'budgetStatus' | 'transactionList' | 'breakdown' | 'accountSummary' | 'table';
+export type CardType = 'total' | 'comparison' | 'budgetStatus' | 'transactionList' | 'breakdown' | 'accountSummary';
 
 export interface TotalCardData { type: 'total'; label: string; amount: number; count: number; periodLabel: string; comparisonAmount?: number; comparisonCount?: number; changePct?: number; topItems: BreakdownItem[]; }
 export interface ComparisonCardData { type: 'comparison'; label: string; currentLabel: string; currentAmount: number; previousLabel: string; previousAmount: number; changeAmount: number; changePct: number; }
@@ -550,14 +550,30 @@ export interface TransactionListCardData { type: 'transactionList'; transactions
 export interface BreakdownCardData { type: 'breakdown'; label: string; items: BreakdownItem[]; total: number; }
 export interface AccountSummaryCardData { type: 'accountSummary'; accounts: AccountSummaryItem[]; netWorth: number; }
 
-export interface TableCardData { type: 'table'; columns: string[]; rows: unknown[][]; }
-
-export type CardData = TotalCardData | ComparisonCardData | BudgetStatusCardData | TransactionListCardData | BreakdownCardData | AccountSummaryCardData | TableCardData;
+export type CardData = TotalCardData | ComparisonCardData | BudgetStatusCardData | TransactionListCardData | BreakdownCardData | AccountSummaryCardData;
 
 export interface BreakdownItem { name: string; color?: string; amount: number; percentage: number; }
 export interface BudgetStatusItem { categoryName: string; color: string; budgeted: number; spent: number; available: number; }
 export interface TransactionListItem { id: string; date: string; payee: string; amount: number; kind: string; categoryName?: string; }
 export interface AccountSummaryItem { name: string; accountType: string; balance: number; }
+
+export type AnswerSource = 'template' | 'modelRouter' | 'none';
+
+export interface DatePeriod { startDate: string; endDate: string; label: string; }
+export interface ExtractedEntities {
+  categoryId: string | null;
+  categoryName: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  datePeriod: DatePeriod | null;
+  comparisonPeriod: DatePeriod | null;
+  amountThreshold: number | null;
+  amountOperator: string | null;
+  merchant: string | null;
+  wantsPercentage: boolean;
+}
+export interface IntentMatch { intent: SearchIntent; confidence: number; entities: ExtractedEntities; }
+export interface RouterProposal { interpretation: string; intentMatch: IntentMatch; }
 
 export interface AISearchResult {
   matched: boolean;
@@ -565,7 +581,9 @@ export interface AISearchResult {
   cardType: CardType | null;
   cardData: CardData | null;
   textAnswer: string | null;
-  sql?: string | null;
+  source: AnswerSource;
+  interpretation: string | null;
+  proposal: RouterProposal | null;
   suggestions: string[];
   queryTimeMs: number;
 }

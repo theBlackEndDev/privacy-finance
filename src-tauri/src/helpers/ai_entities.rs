@@ -381,11 +381,11 @@ fn extract_rolling_days(query: &str) -> Option<i64> {
     caps[1].parse().ok()
 }
 
-fn prev_month(year: i32, month: u32) -> (i32, u32) {
+pub(crate) fn prev_month(year: i32, month: u32) -> (i32, u32) {
     if month == 1 { (year - 1, 12) } else { (year, month - 1) }
 }
 
-fn end_of_month(year: i32, month: u32) -> Option<NaiveDate> {
+pub(crate) fn end_of_month(year: i32, month: u32) -> Option<NaiveDate> {
     if month == 12 {
         NaiveDate::from_ymd_opt(year + 1, 1, 1).map(|d| d - Duration::days(1))
     } else {
@@ -393,7 +393,7 @@ fn end_of_month(year: i32, month: u32) -> Option<NaiveDate> {
     }
 }
 
-fn date_period_single_day(date: NaiveDate, label: &str) -> DatePeriod {
+pub(crate) fn date_period_single_day(date: NaiveDate, label: &str) -> DatePeriod {
     DatePeriod {
         start_date: date.format("%Y-%m-%d").to_string(),
         end_date: date.format("%Y-%m-%d").to_string(),

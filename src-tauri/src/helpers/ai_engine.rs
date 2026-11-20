@@ -1,7 +1,7 @@
 //! In-process LLM inference via llama.cpp (CPU only).
 //!
-//! Sampling rules follow Locked decision D9: the model's own chat template,
-//! greedy sampling, at most 256 new tokens, stop at end-of-turn or `;`.
+//! Sampling rules follow Locked decision D6: the model's own chat template,
+//! grammar-constrained greedy sampling, at most 128 new tokens, stop at end-of-turn.
 
 use std::num::NonZeroU32;
 use std::path::Path;
@@ -16,7 +16,7 @@ use llama_cpp_2::sampling::LlamaSampler;
 
 use crate::error::{AppError, AppResult};
 
-const MAX_NEW_TOKENS: usize = 256;
+const MAX_JSON_TOKENS: usize = 128;
 const QWEN3_EMPTY_THINK: &str = "<think>\n\n</think>\n\n";
 
 /// llama.cpp allows one backend init per process; share it between engines.
@@ -59,9 +59,23 @@ impl Engine {
         Ok(Engine { backend, model, is_qwen3 })
     }
 
-    /// Run one system + user turn and return the generated text, cut at the
-    /// first `;` (exclusive) and trimmed.
-    pub fn complete(&self, system: &str, user: &str) -> AppResult<String> {
+    /// Run one system + user turn with GBNF-constrained greedy sampling (root rule `root`)
+    /// and return the generated text, trimmed. At most 128 new tokens; stops on an
+    /// end-of-generation token only.
+    pub fn complete_json(&self, system: &str, user: &str, grammar: &str) -> AppResult<String> {
+        let grammar = LlamaSampler::grammar(&self.model, grammar, "root")
+            .map_err(err("invalid grammar"))?;
+        let sampler = LlamaSampler::chain_simple([grammar, LlamaSampler::greedy()]);
+        self.generate(system, user, sampler, MAX_JSON_TOKENS)
+    }
+
+    fn generate(
+        &self,
+        system: &str,
+        user: &str,
+        mut sampler: LlamaSampler,
+        max_new: usize,
+    ) -> AppResult<String> {
         let template = self
             .model
             .chat_template(None)
@@ -82,7 +96,7 @@ impl Engine {
         let vocab = self.model.vocab();
         let tokens = vocab.tokenize(prompt.as_bytes(), true, true);
         let n_prompt = tokens.len();
-        let n_ctx = (n_prompt + MAX_NEW_TOKENS).next_multiple_of(256) as u32;
+        let n_ctx = (n_prompt + max_new).next_multiple_of(256) as u32;
         let ctx_params = LlamaContextParams::default()
             .with_n_ctx(NonZeroU32::new(n_ctx))
             .with_n_batch(n_ctx)
@@ -101,25 +115,18 @@ impl Engine {
         }
         ctx.decode(&mut batch).map_err(err("decode failed"))?;
 
-        let mut sampler = LlamaSampler::greedy();
         let mut out: Vec<u8> = Vec::new();
         let mut pos = n_prompt as i32;
-        for _ in 0..MAX_NEW_TOKENS {
+        for _ in 0..max_new {
             let tok = sampler.sample(&ctx, batch.n_tokens() - 1);
             if vocab.is_eog(tok) {
                 break;
             }
             out.extend(vocab.token_to_piece(tok, false, None));
-            if out.contains(&b';') {
-                break;
-            }
             batch.clear();
             batch.add(tok, pos, &[0], true).map_err(err("batch error"))?;
             pos += 1;
             ctx.decode(&mut batch).map_err(err("decode failed"))?;
-        }
-        if let Some(i) = out.iter().position(|&b| b == b';') {
-            out.truncate(i);
         }
         Ok(String::from_utf8_lossy(&out).trim().to_string())
     }
@@ -131,16 +138,17 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn engine_completes() {
+    fn complete_json_follows_grammar() {
         let path = std::env::var("MODEL_PATH").expect("set MODEL_PATH to a .gguf file");
         let engine = Engine::load(Path::new(&path)).unwrap();
         let out = engine
-            .complete(
-                "Answer with one SQLite SELECT statement and nothing else.",
-                "How many rows are in the table transactions?",
+            .complete_json(
+                "Answer the question with yes or no.",
+                "Is the sky blue?",
+                r#"root ::= "yes" | "no""#,
             )
             .unwrap();
         println!("model output: {out}");
-        assert!(!out.is_empty());
+        assert!(out == "yes" || out == "no", "unexpected output: {out}");
     }
 }

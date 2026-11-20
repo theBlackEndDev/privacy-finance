@@ -53,23 +53,41 @@
   text-align: right;
 }
 
-.sql {
-  padding: 4px 14px 8px;
-  font-size: 11px;
-  color: var(--text-muted);
+.proposal {
+  padding: 12px 14px;
 }
 
-.sql summary {
+.proposalText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.proposalActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.proposalConfirm,
+.proposalDecline {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
-.sql pre {
-  margin: 6px 0 0;
-  padding: 8px;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  color: var(--text-secondary);
-  background: var(--bg-secondary, transparent);
-  border-radius: 4px;
+.proposalConfirm {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.interpretation {
+  padding: 8px 14px 0;
+  font-size: 11px;
+  color: var(--text-muted);
 }

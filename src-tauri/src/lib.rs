@@ -24,14 +24,14 @@ pub fn run() {
             let state = init_db(app.handle())
                 .expect("failed to initialize database");
 
-            // Initialize inference server state for Tier 2 AI search
+            // Initialize inference server state for AI search
             let app_data_dir = app.handle().path().app_data_dir()
                 .expect("failed to get app data dir");
             app.manage(commands::ai_model::InferenceServerState {
                 app_data_dir,
             });
 
-            // Lazily loaded on the first Tier 2 query
+            // Lazily loaded on the first model query
             app.manage(std::sync::Mutex::new(None::<helpers::ai_engine::Engine>));
 
             app.manage(state);
@@ -123,6 +123,7 @@ pub fn run() {
             commands::encryption::disable_encryption,
             // AI Search (natural language)
             commands::ai_search::ai_search,
+            commands::ai_search::ai_search_confirm,
             commands::ai_model::ai_model_status,
             commands::ai_model::ai_model_download,
         ])

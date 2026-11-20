@@ -1,28 +1,48 @@
-import { AISearchResult } from '../../types';
+import { AISearchResult, IntentMatch } from '../../types';
 import { TotalCard } from './cards/TotalCard';
 import { ComparisonCard } from './cards/ComparisonCard';
 import { BudgetStatusCard } from './cards/BudgetStatusCard';
 import { TransactionListCard } from './cards/TransactionListCard';
 import { BreakdownCard } from './cards/BreakdownCard';
 import { AccountSummaryCard } from './cards/AccountSummaryCard';
-import { TableCard } from './cards/TableCard';
 import styles from './AISearchResults.module.css';
 
 interface Props {
   result: AISearchResult;
   loading: boolean;
+  onConfirm: (intentMatch: IntentMatch) => void;
+  onDecline: () => void;
 }
 
-export function AISearchResults({ result, loading }: Props) {
+export function AISearchResults({ result, loading, onConfirm, onDecline }: Props) {
   if (loading) {
     return <div className={styles.container}><div className={styles.loading}>Searching...</div></div>;
+  }
+
+  if (result.proposal) {
+    const { proposal } = result;
+    return (
+      <div className={styles.container}>
+        <div className={styles.proposal} data-testid="ai-search-proposal">
+          <div className={styles.proposalText}>Did you mean: {proposal.interpretation}?</div>
+          <div className={styles.proposalActions}>
+            <button type="button" className={styles.proposalConfirm} onClick={() => onConfirm(proposal.intentMatch)}>
+              Show answer
+            </button>
+            <button type="button" className={styles.proposalDecline} onClick={onDecline}>
+              No
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!result.matched) {
     return (
       <div className={styles.container}>
         <div className={styles.noMatch}>
-          Couldn't find an answer for that.
+          {result.textAnswer ?? "Couldn't find an answer for that."}
         </div>
         {result.suggestions.length > 0 && (
           <div className={styles.suggestions}>
@@ -38,16 +58,15 @@ export function AISearchResults({ result, loading }: Props) {
 
   return (
     <div className={styles.container}>
+      {result.source !== 'none' && result.interpretation && (
+        <div className={styles.interpretation} data-testid="ai-search-interpretation">
+          Understood as: {result.interpretation}
+        </div>
+      )}
       {result.textAnswer && (
         <div className={styles.textAnswer}>{result.textAnswer}</div>
       )}
       {result.cardData && <div data-testid="ai-search-card">{renderCard(result.cardData)}</div>}
-      {result.sql && (
-        <details className={styles.sql}>
-          <summary>SQL</summary>
-          <pre>{result.sql}</pre>
-        </details>
-      )}
       {result.queryTimeMs > 0 && (
         <div className={styles.timing}>Answered in {result.queryTimeMs}ms</div>
       )}
@@ -64,7 +83,6 @@ function renderCard(cardData: AISearchResult['cardData']) {
     case 'transactionList': return <TransactionListCard data={cardData} />;
     case 'breakdown': return <BreakdownCard data={cardData} />;
     case 'accountSummary': return <AccountSummaryCard data={cardData} />;
-    case 'table': return <TableCard data={cardData} />;
     default: return null;
   }
 }

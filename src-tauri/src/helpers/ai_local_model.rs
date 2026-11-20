@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 use crate::error::{AppError, AppResult};
 
@@ -21,37 +20,6 @@ pub const MODEL_URL: &str = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Inst
 pub const MODEL_SIZE_APPROX: u64 = 1_000_000_000; // ~1GB
 /// Expected SHA-256 checksum for the model file (verified after download)
 pub const MODEL_SHA256: &str = "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046";
-
-/// Tables whose live `CREATE TABLE` text goes into the system prompt
-const PROMPT_TABLES: [&str; 10] = [
-    "transactions", "categories", "category_groups", "accounts", "budgets",
-    "budget_items", "recurring_transactions", "tags", "transaction_tags",
-    "transaction_splits",
-];
-
-/// Build the system prompt from the live schema in `sqlite_master`
-pub fn build_system_prompt(conn: &Connection) -> AppResult<String> {
-    let mut stmt = conn.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1")?;
-    let mut schema = String::new();
-    for table in PROMPT_TABLES {
-        let sql: Option<String> = stmt.query_row([table], |row| row.get(0)).optional()?;
-        if let Some(sql) = sql {
-            schema.push_str(sql.trim());
-            schema.push_str(";\n\n");
-        }
-    }
-
-    Ok(format!(
-        "You are a SQL assistant for a personal finance SQLite database.\n\n\
-Schema:\n\n{schema}\
-Rules:\n\
-- Amounts are integer cents. Income and expense amounts are positive; the outgoing leg of a transfer is negative. Do not divide by 100.\n\
-- transactions.kind is one of income, expense, transfer.\n\
-- Dates are TEXT in YYYY-MM-DD format.\n\
-- Use the SQLite dialect.\n\
-- Answer with one SELECT statement and nothing else: no explanation, no markdown, no comments."
-    ))
-}
 
 /// Get the model storage directory
 pub fn get_models_dir(app_data_dir: &PathBuf) -> PathBuf {
@@ -151,22 +119,4 @@ fn verify_model_checksum(path: &std::path::Path) -> AppResult<()> {
         )));
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn prompt_contains_live_columns() {
-        let conn = Connection::open_in_memory().unwrap();
-        crate::db::migrations::run_migrations(&conn).unwrap();
-        let prompt = build_system_prompt(&conn).unwrap();
-        assert!(prompt.contains("is_split"));
-        assert!(prompt.contains("transfer_group_id"));
-        for table in PROMPT_TABLES {
-            assert!(prompt.contains(&format!("CREATE TABLE {table}"))
-                || prompt.contains(&format!("CREATE TABLE \"{table}\"")), "missing {table}");
-        }
-    }
 }
