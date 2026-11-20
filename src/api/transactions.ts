@@ -4,7 +4,7 @@ import {
   TransactionFilters, TransactionPage, CreateTransferInput,
 } from '../types';
 
-const emptyPage: TransactionPage = { items: [], total: 0, page: 1, pageSize: 50 };
+const emptyPage: TransactionPage = { items: [], total: 0, page: 0, pageSize: 50 };
 
 export const transactionsApi = {
   getAll: (filters: TransactionFilters) =>

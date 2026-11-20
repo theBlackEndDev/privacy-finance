@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
 import { Tooltip } from '../ui/Tooltip';
-import { parseCurrency, formatCurrency } from '../../utils/formatCurrency';
+import { parseCurrency } from '../../utils/formatCurrency';
 import { ACCOUNT_TYPE_OPTIONS } from '../../utils/accountTypes';
 import styles from './AccountForm.module.css';
 
@@ -18,7 +18,7 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
   const [name, setName] = useState(account?.name ?? '');
   const [type, setType] = useState(account?.type ?? 'checking');
   const [openingBalance, setOpeningBalance] = useState(
-    account ? formatCurrency(account.openingBalance).replace('$', '') : '0.00'
+    account ? (account.openingBalance / 100).toFixed(2) : '0.00'
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -55,11 +55,11 @@ export function AccountForm({ account, onSave, onClose }: AccountFormProps) {
         />
 
         <div>
-          <label className={styles.selectLabel}>
+          <label htmlFor="account-type" className={styles.selectLabel}>
             Account Type{' '}
             <Tooltip text="Checking for daily spending, savings for reserves, credit card for tracking debt, cash for physical money, investment for brokerage or retirement accounts." />
           </label>
-          <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])} data-testid="account-type-select">
+          <select id="account-type" className={styles.select} value={type} onChange={(e) => setType(e.target.value as Account['type'])} data-testid="account-type-select">
             {ACCOUNT_TYPE_OPTIONS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use tauri::State;
 use crate::db::DbState;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::report::*;
 
 const MONTHLY_INCOME_EXPENSE_SQL: &str =
@@ -168,6 +168,18 @@ pub fn get_net_worth_report(
     state: State<DbState>,
 ) -> AppResult<Vec<NetWorthPoint>> {
     let conn = state.read_conn.lock().unwrap();
+    net_worth_report(&conn, &range.start_date, &range.end_date)
+}
+
+fn net_worth_report(
+    conn: &rusqlite::Connection,
+    start_date: &str,
+    end_date: &str,
+) -> AppResult<Vec<NetWorthPoint>> {
+    let start = NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
+        .map_err(|_| AppError::Validation(format!("Invalid start_date: {start_date}")))?;
+    let end = NaiveDate::parse_from_str(end_date, "%Y-%m-%d")
+        .map_err(|_| AppError::Validation(format!("Invalid end_date: {end_date}")))?;
 
     // Get all non-archived accounts with opening balances
     let mut acct_stmt = conn.prepare(
@@ -181,7 +193,7 @@ pub fn get_net_worth_report(
         return Ok(vec![]);
     }
 
-    // Single query: get cumulative transaction delta per account per month (up to end of range)
+    // Single query: transaction delta per account per month (up to end of range)
     let mut txn_stmt = conn.prepare(
         "SELECT
             account_id,
@@ -195,64 +207,60 @@ pub fn get_net_worth_report(
             ), 0) AS delta
          FROM transactions
          WHERE date <= ?1
-         GROUP BY account_id, month
-         ORDER BY account_id, month ASC"
+         GROUP BY account_id, month"
     )?;
-    // Map: (account_id, month) -> delta for that month
-    let mut monthly_deltas: HashMap<(String, String), i64> = HashMap::new();
-    let mut all_months: Vec<String> = Vec::new();
-    txn_stmt.query_map(rusqlite::params![range.end_date], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
-    })?.for_each(|r| {
-        if let Ok((acct_id, month, delta)) = r {
-            if !all_months.contains(&month) {
-                all_months.push(month.clone());
-            }
-            monthly_deltas.insert((acct_id, month), delta);
-        }
-    });
+    let rows: Vec<(String, String, i64)> = txn_stmt
+        .query_map(rusqlite::params![end.format("%Y-%m-%d").to_string()], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?
+        .collect::<Result<_, _>>()?;
 
-    all_months.sort();
+    let start_month = start.format("%Y-%m").to_string();
 
-    // Filter to months within range
-    let start_month = &range.start_date[..7]; // YYYY-MM
-    let end_month = &range.end_date[..7];
-    let months_in_range: Vec<&String> = all_months.iter()
-        .filter(|m| m.as_str() >= start_month && m.as_str() <= end_month)
-        .collect();
-
-    // Build running balances per account across all months
+    // Running balance per account: opening balance plus all deltas before the start month
     let mut running: HashMap<String, i64> = accounts.iter()
         .map(|(id, _, opening)| (id.clone(), *opening))
         .collect();
+    // (account_id, month) -> delta for months within the range
+    let mut monthly_deltas: HashMap<(String, String), i64> = HashMap::new();
+    for (acct_id, month, delta) in rows {
+        if month < start_month {
+            if let Some(bal) = running.get_mut(&acct_id) {
+                *bal += delta;
+            }
+        } else {
+            monthly_deltas.insert((acct_id, month), delta);
+        }
+    }
 
+    // Emit every calendar month from start to end
+    let (mut year, mut mon) = (start.year(), start.month());
+    let (end_year, end_mon) = (end.year(), end.month());
     let mut points = Vec::new();
-    for month in &all_months {
-        // Accumulate this month's deltas
-        for (acct_id, _, _) in &accounts {
+    while (year, mon) <= (end_year, end_mon) {
+        let month = format!("{:04}-{:02}", year, mon);
+
+        let mut account_balances = Vec::new();
+        let mut total: i64 = 0;
+        for (acct_id, acct_name, _) in &accounts {
             if let Some(delta) = monthly_deltas.get(&(acct_id.clone(), month.clone())) {
                 *running.entry(acct_id.clone()).or_insert(0) += delta;
             }
-        }
-
-        // Only emit points within the requested range
-        if months_in_range.contains(&month) {
-            let mut account_balances = Vec::new();
-            let mut total: i64 = 0;
-            for (acct_id, acct_name, _) in &accounts {
-                let balance = *running.get(acct_id).unwrap_or(&0);
-                total += balance;
-                account_balances.push(NetWorthAccount {
-                    account_id: acct_id.clone(),
-                    account_name: acct_name.clone(),
-                    balance,
-                });
-            }
-            points.push(NetWorthPoint {
-                month: month.clone(),
-                total,
-                accounts: account_balances,
+            let balance = *running.get(acct_id).unwrap_or(&0);
+            total += balance;
+            account_balances.push(NetWorthAccount {
+                account_id: acct_id.clone(),
+                account_name: acct_name.clone(),
+                balance,
             });
+        }
+        points.push(NetWorthPoint { month, total, accounts: account_balances });
+
+        if mon == 12 {
+            year += 1;
+            mon = 1;
+        } else {
+            mon += 1;
         }
     }
 
@@ -468,5 +476,34 @@ mod tests {
         assert_eq!(points.len(), 2);
         assert_eq!(points[0].cumulative, 70000);
         assert_eq!(points[1].cumulative, 120000);
+    }
+
+    #[test]
+    fn net_worth_includes_empty_months() {
+        let conn = setup();
+        let acct = create_test_account(&conn);
+        // Isolate from seeded accounts
+        conn.execute("UPDATE accounts SET is_archived = 1 WHERE id != ?1", [&acct]).unwrap();
+
+        // Before the range: folded into the starting balance
+        insert_transaction(&conn, &acct, "2029-12-10", 50000, "income", "Salary", None);
+        insert_transaction(&conn, &acct, "2030-01-15", 100000, "income", "Salary", None);
+        // Nothing in February or March
+        insert_transaction(&conn, &acct, "2030-04-05", 20000, "expense", "Rent", None);
+
+        let points = net_worth_report(&conn, "2030-01-01", "2030-04-30").unwrap();
+        let months: Vec<&str> = points.iter().map(|p| p.month.as_str()).collect();
+        assert_eq!(months, vec!["2030-01", "2030-02", "2030-03", "2030-04"]);
+        let totals: Vec<i64> = points.iter().map(|p| p.total).collect();
+        assert_eq!(totals, vec![150000, 150000, 150000, 130000]);
+
+        assert!(matches!(
+            net_worth_report(&conn, "bad", "2030-04-30"),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            net_worth_report(&conn, "2030-01-01", "2030"),
+            Err(AppError::Validation(_))
+        ));
     }
 }

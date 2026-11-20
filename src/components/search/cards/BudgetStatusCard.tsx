@@ -1,4 +1,5 @@
 import { BudgetStatusCardData } from '../../../types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 import styles from './Cards.module.css';
 
 export function BudgetStatusCard({ data }: { data: BudgetStatusCardData }) {
@@ -17,7 +18,7 @@ export function BudgetStatusCard({ data }: { data: BudgetStatusCardData }) {
                 <div className={styles.budgetHeader}>
                   <span style={{ color: item.color }}>{item.categoryName}</span>
                   <span className={over ? styles.overBudget : styles.meta}>
-                    ${(item.spent / 100).toFixed(0)} / ${(item.budgeted / 100).toFixed(0)}
+                    {formatCurrency(item.spent)} / {formatCurrency(item.budgeted)}
                   </span>
                 </div>
                 <div className={styles.progressTrack}>

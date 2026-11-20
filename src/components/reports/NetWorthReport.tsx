@@ -5,6 +5,7 @@ import {
 import { NetWorthPoint } from '../../types';
 import { reportsApi } from '../../api/reports';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useToast } from '../ui/Toast';
 import { TICK_STYLE, TOOLTIP_STYLE, dollarTickFormatter } from './chartConfig';
 import styles from './NetWorthReport.module.css';
 
@@ -19,6 +20,7 @@ const COLORS = ['#0d9488', '#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444'
 export function NetWorthReport({ startDate, endDate, onData }: Props) {
   const [data, setData] = useState<NetWorthPoint[]>([]);
   const [showAccounts, setShowAccounts] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (!startDate || !endDate) return;
@@ -27,9 +29,12 @@ export function NetWorthReport({ startDate, endDate, onData }: Props) {
       if (cancelled) return;
       setData(d);
       onData?.(d);
+    }).catch((err) => {
+      if (cancelled) return;
+      toast(String(err), 'error');
     });
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, onData, toast]);
 
   if (data.length === 0) {
     return <div className={styles.empty}>No net worth data for selected period</div>;

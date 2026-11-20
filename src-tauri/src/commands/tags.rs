@@ -3,9 +3,7 @@ use uuid::Uuid;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::timestamps::now_utc;
-use crate::commands::transactions::row_to_transaction;
-use crate::models::tag::{CreateTagInput, Tag, TagBrief};
-use crate::models::transaction::Transaction;
+use crate::models::tag::{CreateTagInput, Tag};
 
 fn row_to_tag(row: &rusqlite::Row<'_>) -> rusqlite::Result<Tag> {
     Ok(Tag {
@@ -123,54 +121,6 @@ pub fn untag_transaction(
     Ok(())
 }
 
-#[tauri::command]
-pub fn get_transaction_tags(
-    transaction_id: String,
-    state: State<DbState>,
-) -> AppResult<Vec<TagBrief>> {
-    let conn = state.read_conn.lock().unwrap();
-    let mut stmt = conn.prepare(
-        "SELECT tg.id, tg.name, tg.color
-         FROM transaction_tags tt
-         JOIN tags tg ON tt.tag_id = tg.id
-         WHERE tt.transaction_id = ?1
-         ORDER BY tg.name ASC"
-    )?;
-    let tags = stmt
-        .query_map([&transaction_id], |row| {
-            Ok(TagBrief {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                color: row.get(2)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(tags)
-}
-
-#[tauri::command]
-pub fn get_transactions_by_tag(
-    tag_id: String,
-    state: State<DbState>,
-) -> AppResult<Vec<Transaction>> {
-    let conn = state.read_conn.lock().unwrap();
-    let mut stmt = conn.prepare(
-        "SELECT t.id, t.account_id, t.date, t.amount, t.kind,
-                t.category_id, t.payee, t.description, t.is_cleared, t.is_split,
-                t.transfer_group_id, t.import_batch_id, t.created_at, t.updated_at,
-                c.name AS category_name, c.color AS category_color
-         FROM transactions t
-         LEFT JOIN categories c ON t.category_id = c.id
-         JOIN transaction_tags tt ON t.id = tt.transaction_id
-         WHERE tt.tag_id = ?1
-         ORDER BY t.date DESC, t.created_at DESC"
-    )?;
-    let transactions = stmt
-        .query_map([&tag_id], row_to_transaction)?
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(transactions)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,7 +231,7 @@ mod tests {
         let now = now_utc();
         let account_id = get_account_id(&conn);
         let txn1 = create_test_transaction(&conn, &account_id);
-        let txn2 = create_test_transaction(&conn, &account_id);
+        create_test_transaction(&conn, &account_id);
 
         let tag_id = Uuid::new_v4().to_string();
         conn.execute(

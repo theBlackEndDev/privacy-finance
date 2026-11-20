@@ -2,6 +2,7 @@ import { ImportResult } from '../../types';
 import { Button } from '../ui/Button';
 import { importApi } from '../../api/import';
 import { useState } from 'react';
+import { useToast } from '../ui/Toast';
 
 interface Props {
   result: ImportResult;
@@ -12,12 +13,15 @@ interface Props {
 export function ImportResultStep({ result, onViewTransactions, onImportAnother }: Props) {
   const [undone, setUndone] = useState(false);
   const [undoing, setUndoing] = useState(false);
+  const toast = useToast();
 
   async function handleUndo() {
     setUndoing(true);
     try {
       await importApi.rollbackImport(result.batchId);
       setUndone(true);
+    } catch (err) {
+      toast(String(err), 'error');
     } finally {
       setUndoing(false);
     }

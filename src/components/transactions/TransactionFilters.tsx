@@ -15,8 +15,11 @@ export function TransactionFiltersBar({ filters, accounts, categories, onChange 
   const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => {
-    onChange({ ...filters, search: debouncedSearch || undefined, page: 0 });
-  }, [debouncedSearch]);
+    const next = debouncedSearch || undefined;
+    if (next !== filters.search) {
+      onChange({ ...filters, search: next, page: 0 });
+    }
+  }, [debouncedSearch, filters, onChange]);
 
   return (
     <div className={styles.bar}>

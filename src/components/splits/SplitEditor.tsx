@@ -20,7 +20,7 @@ interface SplitRow {
 function toSplitRows(splits: TransactionSplit[]): SplitRow[] {
   return splits.map((s) => ({
     categoryId: s.categoryId,
-    amount: formatCurrency(s.amount).replace('$', ''),
+    amount: (s.amount / 100).toFixed(2),
     description: s.description,
   }));
 }
@@ -38,7 +38,7 @@ export function SplitEditor({ transactionId, parentAmount, categories, onSaved }
         setExisting(true);
       } else {
         setRows([
-          { categoryId: '', amount: formatCurrency(parentAmount).replace('$', ''), description: '' },
+          { categoryId: '', amount: (parentAmount / 100).toFixed(2), description: '' },
         ]);
       }
     }).catch(() => {});

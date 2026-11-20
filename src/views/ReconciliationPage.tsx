@@ -3,14 +3,16 @@ import { Account } from '../types';
 import { accountsApi } from '../api/accounts';
 import { ReconciliationWizard } from '../components/reconciliation/ReconciliationWizard';
 import { Tooltip } from '../components/ui/Tooltip';
+import { useToast } from '../components/ui/Toast';
 import styles from './ReconciliationPage.module.css';
 
 export function ReconciliationPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
-    accountsApi.getAll().then(setAccounts);
+    accountsApi.getAll().then(setAccounts).catch((err) => toast(String(err), 'error'));
   }, []);
 
   if (selectedAccount) {

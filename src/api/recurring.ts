@@ -9,7 +9,6 @@ import {
 
 export const recurringApi = {
   getAll: () => invoke<RecurringTransaction[]>('get_all_recurring', {}, []),
-  getOne: (id: string) => invoke<RecurringTransaction>('get_recurring', { id }),
   create: (input: CreateRecurringInput) => invoke<RecurringTransaction>('create_recurring', { input }),
   update: (id: string, input: UpdateRecurringInput) => invoke<RecurringTransaction>('update_recurring', { id, input }),
   delete: (id: string) => invoke<void>('delete_recurring', { id }),

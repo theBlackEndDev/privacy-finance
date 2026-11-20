@@ -13,6 +13,9 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.KEYCHAIN_PASSWORD != '' }}
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_ISSUER != '' && secrets.APPLE_API_KEY_P8 != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -71,7 +74,27 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libwebkit2gtk-4.1-dev
+            libwebkit2gtk-4.1-dev \
+            cmake \
+            libclang-dev
+
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        run: |
+          # libclang comes with the Xcode Command Line Tools, which GitHub macOS runners preinstall.
+          command -v cmake >/dev/null || brew install cmake
+          cmake --version
+
+      - name: Install Windows build tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install cmake llvm -y --no-progress
+          echo "C:\Program Files\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # openssl-src rejects Git Bash's MSYS perl; use the runner's Strawberry Perl.
+          echo "OPENSSL_SRC_PERL=C:\Strawberry\perl\bin\perl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install JS dependencies
         run: npm ci
@@ -135,7 +158,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Import Apple signing certificate
-        if: runner.os == 'macOS' && secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.KEYCHAIN_PASSWORD != ''
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -152,7 +175,7 @@ jobs:
           security find-identity -v -p codesigning build.keychain
 
       - name: Write App Store Connect API key file
-        if: runner.os == 'macOS' && secrets.APPLE_API_KEY != '' && secrets.APPLE_API_ISSUER != '' && secrets.APPLE_API_KEY_P8 != ''
+        if: runner.os == 'macOS' && env.HAS_APPLE_API_KEY == 'true'
         shell: bash
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -175,6 +198,10 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
+          # Unset Apple variables whose secret is missing, so Tauri builds unsigned instead of failing.
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_TEAM_ID APPLE_ID APPLE_PASSWORD APPLE_PROVIDER_SHORT_NAME APPLE_API_KEY APPLE_API_ISSUER; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
           if [ -n "${{ matrix.tauri_args }}" ]; then
             npm exec tauri -- build ${{ matrix.tauri_args }}
           else
@@ -188,8 +215,7 @@ jobs:
             echo "## ${RUNNER_OS} artifact summary"
             echo ""
             echo "Expected output: ${{ matrix.release_notes }}"
-            echo "Artifact glob: \
-`${{ matrix.artifact_glob }}`"
+            echo "Artifact glob: \`${{ matrix.artifact_glob }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload bundle artifacts

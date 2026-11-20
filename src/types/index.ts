@@ -45,14 +45,6 @@ export interface Category {
   updatedAt: string;
 }
 
-export interface CategoryGroup {
-  id: string;
-  name: string;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CreateCategoryInput {
   name: string;
   type: Category['type'];
@@ -204,16 +196,6 @@ export interface ImportResult {
   errors: ImportRowError[];
 }
 
-export interface ImportBatch {
-  id: string;
-  filename: string;
-  fileHash: string;
-  accountId: string;
-  profileId: string | null;
-  rowCount: number;
-  createdAt: string;
-}
-
 export interface ImportProfile {
   id: string;
   name: string;
@@ -290,11 +272,6 @@ export interface SearchResult extends Transaction {
   snippet: string;
 }
 
-export interface SearchSuggestion {
-  text: string;
-  field: string;
-}
-
 // ── Export + Backup ──────────────────────────────────────────────
 
 export type ExportFormat = 'csv' | 'json' | 'full-json';
@@ -333,8 +310,9 @@ export interface BudgetCategoryRow {
   categoryColor: string;
   budgeted: number;  // cents
   spent: number;     // cents
-  available: number; // cents (budgeted - spent)
+  available: number; // cents (budgeted + rolloverAmount - spent)
   rollover: boolean;
+  rolloverAmount: number; // cents carried in from the previous month
   groupId?: string;
   groupName?: string;
   targetAmount?: number | null;
@@ -579,12 +557,33 @@ export interface BudgetStatusItem { categoryName: string; color: string; budgete
 export interface TransactionListItem { id: string; date: string; payee: string; amount: number; kind: string; categoryName?: string; }
 export interface AccountSummaryItem { name: string; accountType: string; balance: number; }
 
+export type AnswerSource = 'template' | 'modelRouter' | 'none';
+
+export interface DatePeriod { startDate: string; endDate: string; label: string; }
+export interface ExtractedEntities {
+  categoryId: string | null;
+  categoryName: string | null;
+  accountId: string | null;
+  accountName: string | null;
+  datePeriod: DatePeriod | null;
+  comparisonPeriod: DatePeriod | null;
+  amountThreshold: number | null;
+  amountOperator: string | null;
+  merchant: string | null;
+  wantsPercentage: boolean;
+}
+export interface IntentMatch { intent: SearchIntent; confidence: number; entities: ExtractedEntities; }
+export interface RouterProposal { interpretation: string; intentMatch: IntentMatch; }
+
 export interface AISearchResult {
   matched: boolean;
   intent: SearchIntent | null;
   cardType: CardType | null;
   cardData: CardData | null;
   textAnswer: string | null;
+  source: AnswerSource;
+  interpretation: string | null;
+  proposal: RouterProposal | null;
   suggestions: string[];
   queryTimeMs: number;
 }

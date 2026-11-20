@@ -115,4 +115,66 @@ mod tests {
         );
         assert!(result.is_err(), "foreign key violation must be rejected");
     }
+
+    #[test]
+    fn fix_transfer_signs_repairs_old_rows() {
+        let conn = in_memory_db();
+        conn.execute(
+            "INSERT INTO accounts (id, name, type, created_at, updated_at)
+             VALUES ('extra-acct', 'Extra', 'checking', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        )
+        .unwrap();
+        let ids: Vec<String> = {
+            let mut stmt = conn
+                .prepare("SELECT id FROM accounts ORDER BY sort_order, id LIMIT 4")
+                .unwrap();
+            stmt.query_map([], |r| r.get(0)).unwrap().map(|r| r.unwrap()).collect()
+        };
+        let (a, b, c, d) = (&ids[0], &ids[1], &ids[2], &ids[3]);
+        let now = "2026-01-01T00:00:00Z";
+
+        let insert = |id: &str, acct: &str, amount: i64, payee: &str, group: &str| {
+            conn.execute(
+                "INSERT INTO transactions (id, account_id, date, amount, kind, payee, description, is_cleared, transfer_group_id, created_at, updated_at)
+                 VALUES (?1,?2,'2026-01-15',?3,'transfer',?4,'',0,?5,?6,?6)",
+                rusqlite::params![id, acct, amount, payee, group, now],
+            )
+            .unwrap();
+        };
+        // Bad manual pair: both positive, outgoing leg marked by payee.
+        insert("m-from", a, 5000, "Transfer to account", "g-manual");
+        insert("m-to", b, 5000, "Transfer from account", "g-manual");
+        // Bad recurring pair: both positive, outgoing leg is the recurring row's account.
+        conn.execute(
+            "INSERT INTO recurring_transactions (id, account_id, payee, description, amount, kind, transfer_to_account_id, frequency, start_date, next_date, created_at, updated_at)
+             VALUES ('r1', ?1, 'Savings', '', 2500, 'transfer', ?2, 'monthly', '2026-01-15', '2026-02-15', ?3, ?3)",
+            rusqlite::params![c, d, now],
+        )
+        .unwrap();
+        // Insert the incoming leg first so row order cannot decide the outcome.
+        insert("r-to", d, 2500, "Savings", "g-rec");
+        insert("r-from", c, 2500, "Savings", "g-rec");
+        // Already-correct pair must stay untouched.
+        insert("ok-from", a, -700, "Transfer to account", "g-ok");
+        insert("ok-to", b, 700, "Transfer from account", "g-ok");
+
+        let amount = |id: &str| -> i64 {
+            conn.query_row("SELECT amount FROM transactions WHERE id = ?1", [id], |r| r.get(0))
+                .unwrap()
+        };
+        let check = |label: &str| {
+            assert_eq!(amount("m-from"), -5000, "{label}: manual outgoing");
+            assert_eq!(amount("m-to"), 5000, "{label}: manual incoming");
+            assert_eq!(amount("r-from"), -2500, "{label}: recurring outgoing");
+            assert_eq!(amount("r-to"), 2500, "{label}: recurring incoming");
+            assert_eq!(amount("ok-from"), -700, "{label}: correct outgoing");
+            assert_eq!(amount("ok-to"), 700, "{label}: correct incoming");
+        };
+
+        run_migrations(&conn).unwrap();
+        check("first run");
+        run_migrations(&conn).unwrap();
+        check("second run");
+    }
 }

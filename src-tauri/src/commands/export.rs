@@ -1,7 +1,15 @@
 use std::io::Write;
 use tauri::State;
 use crate::db::DbState;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
+
+/// Validate that a path does not contain directory traversal sequences.
+fn validate_path(path: &str) -> AppResult<()> {
+    if path.contains("..") {
+        return Err(AppError::Validation("Path must not contain '..' traversal".into()));
+    }
+    Ok(())
+}
 
 // ── Export filters ──────────────────────────────────────────────────
 
@@ -21,8 +29,17 @@ pub fn export_transactions_csv(
     filters: ExportFilters,
     state: State<DbState>,
 ) -> AppResult<u64> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
-    let (where_clause, params) = build_filter_clause(&filters);
+    export_transactions_csv_inner(&conn, &path, &filters)
+}
+
+fn export_transactions_csv_inner(
+    conn: &rusqlite::Connection,
+    path: &str,
+    filters: &ExportFilters,
+) -> AppResult<u64> {
+    let (where_clause, params) = build_filter_clause(filters);
 
     let sql = format!(
         "SELECT t.date, a.name AS account_name, t.payee, t.description,
@@ -55,7 +72,7 @@ pub fn export_transactions_csv(
         ))
     })?;
 
-    let file = std::fs::File::create(&path)?;
+    let file = std::fs::File::create(path)?;
     let mut wtr = csv::Writer::from_writer(file);
     wtr.write_record(["Date", "Account", "Payee", "Description", "Category", "Amount", "Kind", "Cleared"])?;
 
@@ -63,7 +80,16 @@ pub fn export_transactions_csv(
     for row in rows {
         let (date, account, payee, desc, category, amount, kind, cleared) = row?;
         let amount_str = format_amount(amount);
-        wtr.write_record([&date, &account, &payee, &desc, &category, &amount_str, &kind, &cleared])?;
+        wtr.write_record([
+            sanitize_csv_cell(&date).as_ref(),
+            sanitize_csv_cell(&account).as_ref(),
+            sanitize_csv_cell(&payee).as_ref(),
+            sanitize_csv_cell(&desc).as_ref(),
+            sanitize_csv_cell(&category).as_ref(),
+            &amount_str,
+            &kind,
+            &cleared,
+        ])?;
         count += 1;
     }
     wtr.flush()?;
@@ -78,13 +104,22 @@ pub fn export_transactions_json(
     filters: ExportFilters,
     state: State<DbState>,
 ) -> AppResult<u64> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
-    let (where_clause, params) = build_filter_clause(&filters);
+    export_transactions_json_inner(&conn, &path, &filters)
+}
+
+fn export_transactions_json_inner(
+    conn: &rusqlite::Connection,
+    path: &str,
+    filters: &ExportFilters,
+) -> AppResult<u64> {
+    let (where_clause, params) = build_filter_clause(filters);
 
     let sql = format!(
         "SELECT t.id, t.account_id, t.date, t.amount, t.kind,
                 t.category_id, t.payee, t.description, t.is_cleared,
-                t.transfer_group_id, t.import_batch_id,
+                t.is_split, t.transfer_group_id, t.import_batch_id,
                 t.created_at, t.updated_at
          FROM transactions t
          {where_clause}
@@ -108,14 +143,15 @@ pub fn export_transactions_json(
             "payee": row.get::<_, String>(6)?,
             "description": row.get::<_, String>(7)?,
             "isCleared": row.get::<_, i64>(8)? != 0,
-            "transferGroupId": row.get::<_, Option<String>>(9)?,
-            "importBatchId": row.get::<_, Option<String>>(10)?,
-            "createdAt": row.get::<_, String>(11)?,
-            "updatedAt": row.get::<_, String>(12)?,
+            "isSplit": row.get::<_, i64>(9)? != 0,
+            "transferGroupId": row.get::<_, Option<String>>(10)?,
+            "importBatchId": row.get::<_, Option<String>>(11)?,
+            "createdAt": row.get::<_, String>(12)?,
+            "updatedAt": row.get::<_, String>(13)?,
         }))
     })?;
 
-    let file = std::fs::File::create(&path)?;
+    let file = std::fs::File::create(path)?;
     let mut wtr = std::io::BufWriter::new(file);
     wtr.write_all(b"[\n")?;
     let mut count: u64 = 0;
@@ -138,8 +174,16 @@ pub fn export_all_data_json(
     path: String,
     state: State<DbState>,
 ) -> AppResult<()> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
-    let file = std::fs::File::create(&path)?;
+    export_all_data_json_inner(&conn, &path)
+}
+
+fn export_all_data_json_inner(
+    conn: &rusqlite::Connection,
+    path: &str,
+) -> AppResult<()> {
+    let file = std::fs::File::create(path)?;
     let mut wtr = std::io::BufWriter::new(file);
 
     write!(wtr, "{{\n  \"exportedAt\": \"{}\",\n", chrono::Utc::now().to_rfc3339())?;
@@ -147,13 +191,24 @@ pub fn export_all_data_json(
     let tables: &[(&str, &str)] = &[
         ("accounts", "SELECT * FROM accounts ORDER BY sort_order"),
         ("categories", "SELECT * FROM categories ORDER BY sort_order"),
+        ("category_groups", "SELECT * FROM category_groups ORDER BY sort_order"),
         ("transactions", "SELECT * FROM transactions ORDER BY date DESC"),
-        ("recurringTransactions", "SELECT * FROM recurring_transactions ORDER BY created_at"),
+        ("transaction_splits", "SELECT * FROM transaction_splits ORDER BY created_at"),
+        ("tags", "SELECT * FROM tags ORDER BY name"),
+        ("transaction_tags", "SELECT * FROM transaction_tags ORDER BY transaction_id, tag_id"),
+        ("budgets", "SELECT * FROM budgets ORDER BY year DESC, month DESC"),
+        ("budget_items", "SELECT * FROM budget_items ORDER BY created_at"),
+        ("recurring_transactions", "SELECT * FROM recurring_transactions ORDER BY created_at"),
+        ("categorization_rules", "SELECT * FROM categorization_rules ORDER BY priority, created_at"),
+        ("reconciliations", "SELECT * FROM reconciliations ORDER BY statement_date DESC, created_at"),
+        ("reconciliation_items", "SELECT * FROM reconciliation_items ORDER BY reconciliation_id, transaction_id"),
+        ("exchange_rates", "SELECT * FROM exchange_rates ORDER BY date DESC, created_at"),
+        ("settings", "SELECT * FROM settings ORDER BY key"),
     ];
 
     for (i, (key, sql)) in tables.iter().enumerate() {
         write!(wtr, "  \"{}\": ", key)?;
-        stream_table_json(&conn, sql, &mut wtr)?;
+        stream_table_json(conn, sql, &mut wtr)?;
         if i < tables.len() - 1 {
             wtr.write_all(b",\n")?;
         } else {
@@ -197,6 +252,14 @@ fn build_filter_clause(filters: &ExportFilters) -> (String, Vec<String>) {
 fn format_amount(cents: i64) -> String {
     let dollars = cents as f64 / 100.0;
     format!("{:.2}", dollars)
+}
+
+fn sanitize_csv_cell(s: &str) -> std::borrow::Cow<'_, str> {
+    if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        std::borrow::Cow::Owned(format!("'{s}"))
+    } else {
+        std::borrow::Cow::Borrowed(s)
+    }
 }
 
 fn row_to_json(
@@ -435,5 +498,107 @@ mod tests {
         assert_eq!(format_amount(0), "0.00");
         assert_eq!(format_amount(100), "1.00");
         assert_eq!(format_amount(-2550), "-25.50");
+    }
+
+    #[test]
+    fn csv_export_neutralizes_formulas() {
+        let conn = setup_db();
+        let account_id = get_account_id(&conn);
+        insert_test_tx(&conn, &account_id, "2026-01-15", "=1+1", -2550);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("formula_export.csv");
+        let filters = ExportFilters {
+            date_from: None,
+            date_to: None,
+            account_id: None,
+        };
+
+        export_transactions_csv_inner(&conn, path.to_str().unwrap(), &filters).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let formula_line = content
+            .lines()
+            .find(|l| l.contains("=1+1"))
+            .expect("Expected exported CSV to contain the formula payee row");
+
+        assert!(
+            formula_line.contains(",'=1+1,"),
+            "Payee '=1+1' should be prefixed with a single quote: {formula_line}"
+        );
+        assert!(
+            formula_line.contains(",-25.50,"),
+            "Amount '-25.50' should remain unquoted: {formula_line}"
+        );
+        assert!(
+            !formula_line.contains("'-25.50") && !formula_line.contains("\"-25.50\""),
+            "Amount '-25.50' must not be single- or double-quoted: {formula_line}"
+        );
+    }
+
+    #[test]
+    fn json_export_includes_all_tables() {
+        let conn = setup_db();
+        let dir = tempfile::tempdir().unwrap();
+
+        let all_path = dir.path().join("all_data.json");
+        export_all_data_json_inner(&conn, all_path.to_str().unwrap()).unwrap();
+
+        let content = std::fs::read_to_string(&all_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let obj = parsed.as_object().expect("Full export should be a JSON object");
+
+        let d7_keys = [
+            "accounts",
+            "categories",
+            "category_groups",
+            "transactions",
+            "transaction_splits",
+            "tags",
+            "transaction_tags",
+            "budgets",
+            "budget_items",
+            "recurring_transactions",
+            "categorization_rules",
+            "reconciliations",
+            "reconciliation_items",
+            "exchange_rates",
+            "settings",
+        ];
+
+        for key in d7_keys {
+            let val = obj
+                .get(key)
+                .unwrap_or_else(|| panic!("Expected D7 key '{key}' in full JSON export"));
+            assert!(
+                val.is_array(),
+                "Expected D7 key '{key}' to be a JSON array, got: {val}"
+            );
+        }
+
+        for non_empty_key in ["accounts", "categories", "category_groups", "transactions"] {
+            assert!(
+                !obj[non_empty_key].as_array().unwrap().is_empty(),
+                "Expected seeded table '{non_empty_key}' to be non-empty"
+            );
+        }
+
+        let tx_path = dir.path().join("transactions.json");
+        let filters = ExportFilters {
+            date_from: None,
+            date_to: None,
+            account_id: None,
+        };
+        export_transactions_json_inner(&conn, tx_path.to_str().unwrap(), &filters).unwrap();
+        let tx_content = std::fs::read_to_string(&tx_path).unwrap();
+        let tx_arr: Vec<serde_json::Value> = serde_json::from_str(&tx_content).unwrap();
+        assert!(!tx_arr.is_empty(), "Expected exported transactions on seed_test_data");
+        for tx in &tx_arr {
+            assert_eq!(
+                tx.get("isSplit").and_then(|v| v.as_bool()),
+                Some(false),
+                "Expected isSplit boolean on exported transaction: {tx}"
+            );
+        }
     }
 }

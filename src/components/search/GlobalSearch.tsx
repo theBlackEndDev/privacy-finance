@@ -15,12 +15,19 @@ const AMOUNT_PREFIX: Record<string, string> = {
   transfer: '',
 };
 
-function sanitizeSnippet(html: string): string {
-  const div = document.createElement('div');
-  div.textContent = html;
-  return div.innerHTML
-    .replace(/&lt;mark&gt;/g, '<mark>')
-    .replace(/&lt;\/mark&gt;/g, '</mark>');
+function HighlightedText({ text }: { text: string }) {
+  const parts = text.split(/(<mark>.*?<\/mark>)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const match = part.match(/^<mark>(.*)<\/mark>$/);
+        if (match) {
+          return <mark key={i}>{match[1]}</mark>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 const LISTBOX_ID = 'global-search-results';
@@ -33,7 +40,7 @@ export function GlobalSearch() {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mode, setMode] = useState<'keyword' | 'ai'>('keyword');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { result: aiResult, loading: aiLoading, search: aiDoSearch, clear: aiClear } = useAISearch();
+  const { result: aiResult, loading: aiLoading, error: aiError, search: aiDoSearch, confirm: aiConfirm, decline: aiDecline, clear: aiClear } = useAISearch();
 
   const debouncedQuery = useDebounce(query, 250);
 
@@ -161,10 +168,15 @@ export function GlobalSearch() {
       {isOpen && (
         <div className={`${styles.dropdown} ${showAI ? styles.dropdownWide : ''}`} id={LISTBOX_ID} data-testid="search-results">
           {showAI && aiResult && (
-            <AISearchResults result={aiResult} loading={aiLoading} />
+            <AISearchResults result={aiResult} loading={aiLoading} onConfirm={aiConfirm} onDecline={aiDecline} />
           )}
           {showAI && aiLoading && !aiResult && (
             <div className={styles.empty}>Searching...</div>
+          )}
+          {mode === 'ai' && aiError && !aiLoading && (
+            <div className={styles.empty} role="alert" data-testid="search-error">
+              Search failed: {aiError}
+            </div>
           )}
           {showKeyword && (
             <div role="listbox" aria-label="Search results">
@@ -180,10 +192,9 @@ export function GlobalSearch() {
                 >
                   <div className={styles.itemLeft}>
                     <span className={styles.payee}>{r.payee || 'No payee'}</span>
-                    <span
-                      className={styles.snippet}
-                      dangerouslySetInnerHTML={{ __html: sanitizeSnippet(r.snippet) }}
-                    />
+                    <span className={styles.snippet}>
+                      <HighlightedText text={r.snippet} />
+                    </span>
                   </div>
                   <div className={styles.meta}>
                     <span className={styles.amount}>

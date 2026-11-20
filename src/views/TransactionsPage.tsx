@@ -22,8 +22,8 @@ function TransactionsInner() {
 
   // Sync sidebar account selection into filters (merge, don't replace)
   useEffect(() => {
-    setFilters({ ...filters, page: 0, accountId: activeAccountId ?? undefined });
-  }, [activeAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
+    setFilters(prev => ({ ...prev, page: 0, accountId: activeAccountId ?? undefined }));
+  }, [activeAccountId, setFilters]);
 
   // Wrap setFilters to sync account changes back to AppContext
   const handleFiltersChange = useCallback((newFilters: TransactionFilters) => {

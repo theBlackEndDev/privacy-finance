@@ -1,6 +1,6 @@
 use std::fs;
 use std::collections::HashMap;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use encoding_rs::Encoding;
 use sha2::{Digest, Sha256};
 use tauri::State;
@@ -10,37 +10,22 @@ use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::timestamps::now_utc;
 use crate::models::import::{
-    ColumnMapping, CsvPreview, ImportBatch, ImportInput, ImportProfile, ImportResult,
+    ColumnMapping, CsvPreview, ImportInput, ImportProfile, ImportResult,
     ImportRowError,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/// Strip UTF-8 / UTF-16 BOM bytes from raw bytes.
-fn strip_bom(bytes: &[u8]) -> &[u8] {
-    if bytes.starts_with(b"\xEF\xBB\xBF") {
-        return &bytes[3..]; // UTF-8 BOM
-    }
-    if bytes.starts_with(b"\xFF\xFE") || bytes.starts_with(b"\xFE\xFF") {
-        return &bytes[2..]; // UTF-16 BOM
-    }
-    bytes
-}
-
-/// Decode raw bytes to String, trying UTF-8 first then encoding_rs detection.
+/// Decode raw bytes to String, checking BOM first then UTF-8 then Windows-1252.
 fn decode_bytes(raw: &[u8]) -> String {
-    // Fast path: valid UTF-8
+    if let Some((enc, bom_len)) = Encoding::for_bom(raw) {
+        let (cow, _) = enc.decode_without_bom_handling(&raw[bom_len..]);
+        return cow.into_owned();
+    }
     if let Ok(s) = std::str::from_utf8(raw) {
         return s.to_string();
     }
-    // Use encoding_rs detector (windows-1252, latin-1, etc.)
-    let (enc, _bom, _confident) = Encoding::for_bom(raw)
-        .map(|(e, _)| (e, false, true))
-        .unwrap_or_else(|| {
-            // Default fallback: windows-1252 handles most Western bank exports
-            (encoding_rs::WINDOWS_1252, false, false)
-        });
-    let (cow, _had_errors) = enc.decode_without_bom_handling(raw);
+    let (cow, _) = encoding_rs::WINDOWS_1252.decode_without_bom_handling(raw);
     cow.into_owned()
 }
 
@@ -61,51 +46,130 @@ fn detect_delimiter(first_line: &str) -> u8 {
 /// SHA-256 hash exposed for testing.
 #[cfg(test)]
 pub fn row_hash_pub(account_id: &str, date: &str, amount: i64, payee: &str, description: &str) -> String {
-    row_hash(account_id, date, amount, payee, description)
+    row_hash(account_id, date, amount, payee, description, 0)
+}
+
+fn strip_currency(s: &str) -> (&str, bool) {
+    const CURRENCIES: [&str; 7] = ["USD", "EUR", "GBP", "$", "€", "£", "¥"];
+    for cur in CURRENCIES {
+        if let Some(rest) = s.strip_prefix(cur) {
+            return (rest.trim(), true);
+        }
+        if let Some(rest) = s.strip_suffix(cur) {
+            return (rest.trim(), true);
+        }
+    }
+    (s, false)
+}
+
+fn strip_sign(s: &str) -> (&str, bool, bool) {
+    if s.starts_with('(') && s.ends_with(')') {
+        return (s[1..s.len() - 1].trim(), true, true);
+    }
+    if let Some(rest) = s.strip_prefix('-') {
+        return (rest.trim(), true, true);
+    }
+    if let Some(rest) = s.strip_suffix('-') {
+        return (rest.trim(), true, true);
+    }
+    if let Some(rest) = s.strip_prefix('+') {
+        return (rest.trim(), false, true);
+    }
+    (s, false, false)
 }
 
 /// Parse an amount string in various formats → integer cents.
 /// Handles: "$1,234.56", "(123.45)", "-123.45", "1.234,56" (European), "1234"
-pub fn parse_amount(s: &str) -> Result<i64, String> {
-    let s = s.trim();
-    // Detect parentheses as negative
-    let (negative, s) = if s.starts_with('(') && s.ends_with(')') {
-        (true, &s[1..s.len() - 1])
+pub fn parse_amount(raw: &str) -> Result<i64, String> {
+    let mapped = raw.replace('\u{2212}', "-");
+    let s = mapped.trim();
+
+    let (s, cur_stripped) = strip_currency(s);
+    let (s, mut negative, sign_stripped) = strip_sign(s);
+    let s = if !cur_stripped {
+        let (s, _) = strip_currency(s);
+        s
     } else {
-        (false, s)
+        s
+    };
+    let s = if !sign_stripped {
+        let (s, neg2, _) = strip_sign(s);
+        negative = negative || neg2;
+        s
+    } else {
+        s
     };
 
-    // Detect leading minus before stripping symbols
-    let has_leading_minus = s.trim_start().starts_with('-');
+    if s.is_empty()
+        || !s.chars().any(|c| c.is_ascii_digit())
+        || !s.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ',')
+    {
+        return Err(format!("Cannot parse amount: {}", raw));
+    }
 
-    // Strip currency symbols, spaces, and sign — keep digits, dot, comma
-    let s: String = s
-        .chars()
-        .filter(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
-        .collect();
-
-    let was_negative = negative || has_leading_minus;
-
-    // Detect European format: "1.234,56" → the last separator is comma
     let normalized = if s.contains(',') && s.contains('.') {
-        // whichever comes last is the decimal separator
         let last_comma = s.rfind(',').unwrap_or(0);
         let last_dot = s.rfind('.').unwrap_or(0);
         if last_comma > last_dot {
-            // European: remove dots (thousands), replace comma with dot
-            s.replace('.', "").replace(',', ".")
+            // European: dots are thousands separators, single trailing comma is decimal
+            let comma_parts: Vec<&str> = s.split(',').collect();
+            if comma_parts.len() != 2 || !(1..=2).contains(&comma_parts[1].len()) {
+                return Err(format!("Cannot parse amount: {}", raw));
+            }
+            let dot_parts: Vec<&str> = comma_parts[0].split('.').collect();
+            if dot_parts.len() < 2
+                || !(1..=3).contains(&dot_parts[0].len())
+                || !dot_parts[1..].iter().all(|p| p.len() == 3)
+            {
+                return Err(format!("Cannot parse amount: {}", raw));
+            }
+            format!("{}.{}", dot_parts.join(""), comma_parts[1])
         } else {
-            // US: remove commas (thousands)
-            s.replace(',', "")
+            // US: commas are thousands separators, single trailing dot is decimal
+            let dot_parts: Vec<&str> = s.split('.').collect();
+            if dot_parts.len() != 2 || !(1..=2).contains(&dot_parts[1].len()) {
+                return Err(format!("Cannot parse amount: {}", raw));
+            }
+            let comma_parts: Vec<&str> = dot_parts[0].split(',').collect();
+            if comma_parts.len() < 2
+                || !(1..=3).contains(&comma_parts[0].len())
+                || !comma_parts[1..].iter().all(|p| p.len() == 3)
+            {
+                return Err(format!("Cannot parse amount: {}", raw));
+            }
+            format!("{}.{}", comma_parts.join(""), dot_parts[1])
         }
     } else if s.contains(',') {
-        // Only commas — could be European decimal or US thousands
-        // Heuristic: if exactly one comma and ≤2 digits after → decimal
-        let parts: Vec<&str> = s.splitn(2, ',').collect();
-        if parts.len() == 2 && parts[1].len() <= 2 {
-            s.replace(',', ".")
+        let parts: Vec<&str> = s.split(',').collect();
+        // A leading "0" or empty integer part is always a decimal ("0,125", ",50").
+        if parts.len() == 2
+            && !parts[1].is_empty()
+            && ((1..=2).contains(&parts[1].len()) || parts[0].is_empty() || parts[0] == "0")
+        {
+            format!("{}.{}", parts[0], parts[1])
+        } else if parts.len() >= 2
+            && (1..=3).contains(&parts[0].len())
+            && parts[1..].iter().all(|p| p.len() == 3)
+        {
+            parts.join("")
         } else {
-            s.replace(',', "")
+            return Err(format!("Cannot parse amount: {}", raw));
+        }
+    } else if s.contains('.') {
+        let parts: Vec<&str> = s.split('.').collect();
+        // A leading "0" or empty integer part is always a decimal ("0.125", ".50").
+        if parts.len() == 2
+            && !parts[1].is_empty()
+            && ((1..=2).contains(&parts[1].len()) || parts[0].is_empty() || parts[0] == "0")
+        {
+            format!("0{}", s)
+        } else if parts.len() >= 2
+            && (1..=3).contains(&parts[0].len())
+            && parts[1..].iter().all(|p| p.len() == 3)
+        {
+            parts.join("")
+        } else {
+            return Err(format!("Cannot parse amount: {}", raw));
         }
     } else {
         s.to_string()
@@ -113,28 +177,39 @@ pub fn parse_amount(s: &str) -> Result<i64, String> {
 
     let amount: f64 = normalized
         .parse()
-        .map_err(|_| format!("Cannot parse amount: {}", s))?;
+        .map_err(|_| format!("Cannot parse amount: {}", raw))?;
 
     let cents = (amount * 100.0).round() as i64;
-    if was_negative || negative {
+    if negative {
         Ok(-cents)
     } else {
         Ok(cents)
     }
 }
 
-/// SHA-256 hash of account_id + row fields for deduplication.
-fn row_hash(account_id: &str, date: &str, amount: i64, payee: &str, description: &str) -> String {
+/// SHA-256 hash of account_id + length-prefixed row fields + per-file occurrence index for deduplication.
+fn row_hash(
+    account_id: &str,
+    date: &str,
+    amount: i64,
+    payee: &str,
+    description: &str,
+    occurrence: usize,
+) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(account_id.as_bytes());
-    hasher.update(b"|");
-    hasher.update(date.as_bytes());
-    hasher.update(b"|");
-    hasher.update(amount.to_string().as_bytes());
-    hasher.update(b"|");
-    hasher.update(payee.as_bytes());
-    hasher.update(b"|");
-    hasher.update(description.as_bytes());
+    let amount_str = amount.to_string();
+    let occ_str = occurrence.to_string();
+    for field in [
+        account_id,
+        date,
+        amount_str.as_str(),
+        payee,
+        description,
+        occ_str.as_str(),
+    ] {
+        hasher.update(&(field.len() as u64).to_le_bytes());
+        hasher.update(field.as_bytes());
+    }
     format!("{:x}", hasher.finalize())
 }
 
@@ -145,14 +220,37 @@ fn file_hash(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+fn swapped_day_month_format(fmt: &str) -> Option<&'static str> {
+    match fmt {
+        "%m/%d/%Y" => Some("%d/%m/%Y"),
+        "%d/%m/%Y" => Some("%m/%d/%Y"),
+        "%m-%d-%Y" => Some("%d-%m-%Y"),
+        "%d-%m-%Y" => Some("%m-%d-%Y"),
+        _ => None,
+    }
+}
+
+fn parse_date_checked(date_str: &str, fmt: &str) -> Result<NaiveDate, String> {
+    let d = NaiveDate::parse_from_str(date_str, fmt)
+        .map_err(|_| format!("Cannot parse date '{}' with format '{}'", date_str, fmt))?;
+    if d.year() < 1900 || d.year() > 2100 {
+        return Err(format!(
+            "Date '{}' has year {} with format '{}': 2-digit vs 4-digit year mismatch",
+            date_str,
+            d.year(),
+            fmt
+        ));
+    }
+    Ok(d)
+}
+
 // ── Commands ──────────────────────────────────────────────────────────────────
 
 /// Read first 10 rows of a CSV file; return headers + preview rows + detected delimiter.
 #[tauri::command]
 pub fn preview_csv(file_path: String) -> AppResult<CsvPreview> {
     let raw = fs::read(&file_path).map_err(AppError::Io)?;
-    let stripped = strip_bom(&raw);
-    let text = decode_bytes(stripped);
+    let text = decode_bytes(&raw);
 
     let first_line = text.lines().next().unwrap_or("");
     let delimiter = detect_delimiter(first_line);
@@ -185,10 +283,14 @@ pub fn preview_csv(file_path: String) -> AppResult<CsvPreview> {
 /// Full CSV import: parse, map columns, dedupe, batch-insert.
 #[tauri::command]
 pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<ImportResult> {
+    let conn = state.write_conn.lock().unwrap();
+    import_csv_inner(&conn, input)
+}
+
+pub(crate) fn import_csv_inner(conn: &rusqlite::Connection, input: ImportInput) -> AppResult<ImportResult> {
     let raw = fs::read(&input.file_path).map_err(AppError::Io)?;
     let fhash = file_hash(&raw);
-    let stripped = strip_bom(&raw);
-    let text = decode_bytes(stripped);
+    let text = decode_bytes(&raw);
 
     let first_line = text.lines().next().unwrap_or("");
     let delimiter = detect_delimiter(first_line);
@@ -245,11 +347,16 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
     }
 
     let mut valid_rows: Vec<Row> = Vec::new();
+    let mut seen_counts: HashMap<(String, i64, String, String), usize> = HashMap::new();
+    let swapped_fmt = swapped_day_month_format(&input.date_format);
+    let mut any_chosen_date_failed = false;
+    let mut all_swapped_dates_ok = true;
 
     for (row_idx, result) in rdr.records().enumerate() {
         let record = match result {
             Ok(r) => r,
             Err(e) => {
+                all_swapped_dates_ok = false;
                 errors.push(ImportRowError {
                     row: row_idx + 2,
                     message: e.to_string(),
@@ -275,16 +382,23 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
 
         // --- Date ---
         let date_str = get("date");
+        if let Some(swapped) = swapped_fmt {
+            if date_str.is_empty() || parse_date_checked(date_str, swapped).is_err() {
+                all_swapped_dates_ok = false;
+            }
+        }
         if date_str.is_empty() {
+            any_chosen_date_failed = true;
             errors.push(ImportRowError { row: row_idx + 2, message: "Missing date".into() });
             continue;
         }
-        let date = match NaiveDate::parse_from_str(date_str, &input.date_format) {
+        let date = match parse_date_checked(date_str, &input.date_format) {
             Ok(d) => d.format("%Y-%m-%d").to_string(),
-            Err(_) => {
+            Err(msg) => {
+                any_chosen_date_failed = true;
                 errors.push(ImportRowError {
                     row: row_idx + 2,
-                    message: format!("Cannot parse date '{}' with format '{}'", date_str, input.date_format),
+                    message: msg,
                 });
                 continue;
             }
@@ -324,7 +438,19 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
 
         let payee = get("payee").to_string();
         let description = get("description").to_string();
-        let hash = row_hash(&input.account_id, &date, amount, &payee, &description);
+        let count = seen_counts
+            .entry((date.clone(), amount, payee.clone(), description.clone()))
+            .or_insert(0);
+        let occurrence = *count;
+        *count += 1;
+        let hash = row_hash(
+            &input.account_id,
+            &date,
+            amount,
+            &payee,
+            &description,
+            occurrence,
+        );
 
         valid_rows.push(Row {
             id: Uuid::new_v4().to_string(),
@@ -336,27 +462,30 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
         });
     }
 
+    if let Some(swapped) = swapped_fmt {
+        if any_chosen_date_failed && all_swapped_dates_ok {
+            return Err(AppError::Validation(format!(
+                "Date format mismatch: dates match '{}' instead of '{}' (day and month swapped)",
+                swapped, input.date_format
+            )));
+        }
+    }
+
     // Insert all valid rows in a single DB transaction
     {
-        let conn = state.write_conn.lock().unwrap();
-        conn.execute_batch("BEGIN")?;
-
-        // Create batch record
-        conn.execute(
-            "INSERT INTO import_batches (id, filename, file_hash, account_id, profile_id, row_count, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)",
-            rusqlite::params![batch_id, filename, fhash, input.account_id, input.profile_id, now],
-        )?;
+        let tx = conn.unchecked_transaction()?;
+        tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
 
         for row in &valid_rows {
+            // Amounts are stored positive; kind carries the direction.
             let kind = if row.amount >= 0 { "income" } else { "expense" };
-            let result = conn.execute(
+            let result = tx.execute(
                 "INSERT OR IGNORE INTO transactions
                  (id, account_id, date, amount, kind, payee, description,
                   is_cleared, import_batch_id, import_row_hash, created_at, updated_at)
                  VALUES (?1,?2,?3,?4,?5,?6,?7,1,?8,?9,?10,?10)",
                 rusqlite::params![
-                    row.id, input.account_id, row.date, row.amount, kind,
+                    row.id, input.account_id, row.date, row.amount.abs(), kind,
                     row.payee, row.description, batch_id, row.hash, now
                 ],
             )?;
@@ -368,20 +497,28 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
             }
         }
 
-        // Update batch row_count
-        conn.execute(
-            "UPDATE import_batches SET row_count = ?1 WHERE id = ?2",
-            rusqlite::params![imported as i64, batch_id],
-        )?;
+        if imported > 0 {
+            tx.execute(
+                "INSERT INTO import_batches (id, filename, file_hash, account_id, profile_id, row_count, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    batch_id,
+                    filename,
+                    fhash,
+                    input.account_id,
+                    input.profile_id,
+                    imported as i64,
+                    now
+                ],
+            )?;
+        }
 
-        conn.execute_batch("COMMIT")?;
+        tx.commit()?;
     }
 
     // Auto-categorize newly imported uncategorized transactions
-    // Done outside the write_conn lock scope above to release it sooner
     if !imported_ids.is_empty() {
-        let conn = state.write_conn.lock().unwrap();
-        let _ = super::rules::apply_rules_to_transactions(&conn, &imported_ids);
+        let _ = super::rules::apply_rules_to_transactions(conn, &imported_ids);
     }
 
     Ok(ImportResult {
@@ -396,41 +533,17 @@ pub fn import_csv(input: ImportInput, state: State<'_, DbState>) -> AppResult<Im
 #[tauri::command]
 pub fn rollback_import(batch_id: String, state: State<'_, DbState>) -> AppResult<()> {
     let conn = state.write_conn.lock().unwrap();
-    conn.execute_batch("BEGIN")?;
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "DELETE FROM transactions WHERE import_batch_id = ?1",
         rusqlite::params![batch_id],
     )?;
-    conn.execute(
+    tx.execute(
         "DELETE FROM import_batches WHERE id = ?1",
         rusqlite::params![batch_id],
     )?;
-    conn.execute_batch("COMMIT")?;
+    tx.commit()?;
     Ok(())
-}
-
-/// List all import batches (most recent first).
-#[tauri::command]
-pub fn get_import_batches(state: State<'_, DbState>) -> AppResult<Vec<ImportBatch>> {
-    let conn = state.read_conn.lock().unwrap();
-    let mut stmt = conn.prepare(
-        "SELECT id, filename, file_hash, account_id, profile_id, row_count, created_at
-         FROM import_batches ORDER BY created_at DESC",
-    )?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(ImportBatch {
-                id: row.get(0)?,
-                filename: row.get(1)?,
-                file_hash: row.get(2)?,
-                account_id: row.get(3)?,
-                profile_id: row.get(4)?,
-                row_count: row.get(5)?,
-                created_at: row.get(6)?,
-            })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(rows)
 }
 
 /// Return all saved import profiles.
@@ -483,18 +596,4 @@ pub fn save_import_profile(
         }),
     )?;
     Ok(profile)
-}
-
-/// Delete a saved import profile by id.
-#[tauri::command]
-pub fn delete_import_profile(id: String, state: State<'_, DbState>) -> AppResult<()> {
-    let conn = state.write_conn.lock().unwrap();
-    let rows = conn.execute(
-        "DELETE FROM import_profiles WHERE id = ?1",
-        rusqlite::params![id],
-    )?;
-    if rows == 0 {
-        return Err(AppError::NotFound(format!("Import profile {}", id)));
-    }
-    Ok(())
 }

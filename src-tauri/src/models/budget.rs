@@ -22,6 +22,7 @@ pub struct BudgetCategoryRow {
     pub spent: i64,
     pub available: i64,
     pub rollover: bool,
+    pub rollover_amount: i64,
     pub group_id: Option<String>,
     pub group_name: Option<String>,
     pub target_amount: Option<i64>,

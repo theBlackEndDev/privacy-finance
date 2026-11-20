@@ -3,6 +3,7 @@ import { Account, Category, CreateTransactionInput } from '../../types';
 import { transactionsApi } from '../../api/transactions';
 import { parseCurrency } from '../../utils/formatCurrency';
 import { todayISO } from '../../utils/formatDate';
+import { useToast } from '../ui/Toast';
 import { Button } from '../ui/Button';
 import styles from './TransactionForm.module.css';
 
@@ -24,9 +25,11 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
   const [amount, setAmount] = useState('');
   const [kind, setKind] = useState<Kind>('expense');
   const [saving, setSaving] = useState(false);
+  const [amountError, setAmountError] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const dateRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   // Expose date input for Ctrl+N focus
   useEffect(() => {
@@ -51,12 +54,15 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!accountId || !amount) return;
+    const cents = parseCurrency(amount);
+    if (cents <= 0) { setAmountError('Amount must be greater than 0'); return; }
+    setAmountError('');
     setSaving(true);
     try {
       const input: CreateTransactionInput = {
         accountId,
         date,
-        amount: parseCurrency(amount),
+        amount: cents,
         kind,
         payee,
         categoryId: categoryId || null,
@@ -65,6 +71,8 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
       setPayee(''); setAmount(''); setCategoryId(''); setDate(todayISO());
       dateRef.current?.focus();
       onSaved();
+    } catch (err) {
+      toast(String(err), 'error');
     } finally {
       setSaving(false);
     }
@@ -159,9 +167,11 @@ export function TransactionForm({ accounts, categories, defaultAccountId, onSave
           value={amount}
           style={{ width: 90 }}
           data-testid="tx-amount-input"
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => { setAmount(e.target.value); setAmountError(''); }}
           aria-required="true"
+          aria-invalid={amountError ? 'true' : undefined}
         />
+        {amountError && <span role="alert" style={{ color: 'var(--color-expense)', fontSize: 12 }}>{amountError}</span>}
       </div>
 
       <Button type="submit" disabled={saving} size="sm" style={{ marginBottom: 1 }} data-testid="tx-submit-btn">

@@ -12,23 +12,11 @@ import { ExchangeRateSettings } from '../settings/ExchangeRateSettings';
 import { EncryptionSettings } from '../encryption/EncryptionSettings';
 import { AboutDialog } from '../ui/AboutDialog';
 import { AISearchSettings } from '../settings/AISearchSettings';
+import { SHORTCUTS } from '../ui/KeyboardShortcutHelp';
 
 interface Props {
   onClose: () => void;
 }
-
-const KEYBOARD_SHORTCUTS = [
-  ['Ctrl+1', 'Dashboard'],
-  ['Ctrl+2', 'Accounts'],
-  ['Ctrl+3', 'Transactions'],
-  ['Ctrl+4', 'Categories'],
-  ['Ctrl+5', 'Import'],
-  ['Ctrl+7', 'Budgets'],
-  ['Ctrl+B', 'Budgets (alt)'],
-  ['Ctrl+N', 'Focus new transaction'],
-  ['Ctrl+F', 'Focus search'],
-  ['Escape', 'Close modal'],
-];
 
 export function SettingsModal({ onClose }: Props) {
   const [currencySymbol, setCurrencySymbol] = useState('$');
@@ -44,8 +32,8 @@ export function SettingsModal({ onClose }: Props) {
   const { theme, setTheme } = useApp();
 
   useEffect(() => {
-    settingsApi.get('currency_symbol').then(v => { if (v) setCurrencySymbol(v); });
-    settingsApi.get('date_format').then(v => { if (v) setDateFormat(v); });
+    settingsApi.get('currency_symbol').then(v => { if (v) setCurrencySymbol(v); }).catch(e => toast(String(e), 'error'));
+    settingsApi.get('date_format').then(v => { if (v) setDateFormat(v); }).catch(e => toast(String(e), 'error'));
   }, []);
 
   async function handleSave() {
@@ -55,6 +43,7 @@ export function SettingsModal({ onClose }: Props) {
       await settingsApi.set('date_format', dateFormat);
       toast('Settings saved');
       onClose();
+      window.location.reload();
     } catch (e) {
       toast(String(e), 'error');
     } finally {
@@ -221,6 +210,7 @@ export function SettingsModal({ onClose }: Props) {
                       toast('Backup restored — please restart the app');
                       setConfirmRestore(null);
                       setBackupInfo(null);
+                      window.location.reload();
                     } catch (e) {
                       toast(String(e), 'error');
                     } finally {
@@ -245,7 +235,7 @@ export function SettingsModal({ onClose }: Props) {
         <div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 500 }}>Keyboard Shortcuts</div>
           <div style={{ border: '1px solid var(--border-color)', borderRadius: 6, overflow: 'hidden' }}>
-            {KEYBOARD_SHORTCUTS.map(([key, label]) => (
+            {SHORTCUTS.map(([key, label]) => (
               <div key={key} style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -297,7 +287,7 @@ export function SettingsModal({ onClose }: Props) {
                 Are you sure?
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-                This will permanently delete all accounts, transactions, categories, budgets, agents, and settings. Default categories will be re-created. This cannot be undone.
+                This will permanently delete all accounts, transactions, categories, budgets, and settings. Default categories will be re-created. This cannot be undone.
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button variant="ghost" size="sm" onClick={() => setDeleteStep(0)}>Cancel</Button>
@@ -333,6 +323,7 @@ export function SettingsModal({ onClose }: Props) {
                       toast('All data deleted. Please restart the app.');
                       setDeleteStep(0);
                       onClose();
+                      window.location.reload();
                     } catch (e) {
                       toast(String(e), 'error');
                     } finally {

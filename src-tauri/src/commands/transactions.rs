@@ -87,10 +87,19 @@ pub fn update_transaction(
     state: State<DbState>,
 ) -> AppResult<Transaction> {
     let conn = state.write_conn.lock().unwrap();
+    update_transaction_inner(&conn, id, input)
+}
+
+pub(crate) fn update_transaction_inner(
+    conn: &rusqlite::Connection,
+    id: String,
+    input: UpdateTransactionInput,
+) -> AppResult<Transaction> {
     let now = now_utc();
 
     let current = conn.query_row(
-        "SELECT date, amount, kind, category_id, payee, description, is_cleared
+        "SELECT date, amount, kind, category_id, payee, description, is_cleared,
+                transfer_group_id, is_split
          FROM transactions WHERE id = ?1",
         [&id],
         |row| {
@@ -102,11 +111,21 @@ pub fn update_transaction(
                 row.get::<_, String>(4)?,
                 row.get::<_, String>(5)?,
                 row.get::<_, i64>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, i64>(8)?,
             ))
         },
     )
     .map_err(|_| AppError::NotFound(format!("transaction {id}")))?;
 
+    if current.8 != 0 && input.amount.is_some_and(|a| a != current.1) {
+        return Err(AppError::Validation(
+            "Cannot change the amount of a split transaction; delete its splits first".to_string(),
+        ));
+    }
+
+    let date_changed = input.date.is_some();
+    let amount_changed = input.amount.is_some();
     let date = input.date.unwrap_or(current.0);
     let amount = input.amount.unwrap_or(current.1);
     let kind = input.kind.unwrap_or(current.2);
@@ -114,24 +133,62 @@ pub fn update_transaction(
     let payee = input.payee.unwrap_or(current.4);
     let description = input.description.unwrap_or(current.5);
     let is_cleared = input.is_cleared.map(|b| b as i64).unwrap_or(current.6);
+    let transfer_group_id = current.7;
 
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute(
         "UPDATE transactions SET date=?1, amount=?2, kind=?3, category_id=?4,
          payee=?5, description=?6, is_cleared=?7, updated_at=?8 WHERE id=?9",
         rusqlite::params![date, amount, kind, category_id, payee, description, is_cleared, now, id],
     )?;
 
-    drop(conn);
-    get_transaction(id, state)
+    // Keep the peer leg of a transfer in step: same date, opposite amount.
+    if let Some(group_id) = transfer_group_id {
+        if date_changed {
+            tx.execute(
+                "UPDATE transactions SET date=?1, updated_at=?2
+                 WHERE transfer_group_id=?3 AND id != ?4",
+                rusqlite::params![date, now, group_id, id],
+            )?;
+        }
+        if amount_changed {
+            tx.execute(
+                "UPDATE transactions SET amount=?1, updated_at=?2
+                 WHERE transfer_group_id=?3 AND id != ?4",
+                rusqlite::params![-amount, now, group_id, id],
+            )?;
+        }
+    }
+
+    tx.commit()?;
+
+    let sql = format!("{SELECT} WHERE t.id = ?1");
+    conn.query_row(&sql, [&id], row_to_transaction)
+        .map_err(|_| AppError::NotFound(format!("transaction {id}")))
 }
 
 #[tauri::command]
 pub fn delete_transaction(id: String, state: State<DbState>) -> AppResult<()> {
     let conn = state.write_conn.lock().unwrap();
-    let rows = conn.execute("DELETE FROM transactions WHERE id = ?1", [&id])?;
-    if rows == 0 {
-        return Err(AppError::NotFound(format!("transaction {id}")));
-    }
+    delete_transaction_inner(&conn, &id)
+}
+
+pub(crate) fn delete_transaction_inner(conn: &rusqlite::Connection, id: &str) -> AppResult<()> {
+    let tx = conn.unchecked_transaction()?;
+    let group_id: Option<String> = tx
+        .query_row(
+            "SELECT transfer_group_id FROM transactions WHERE id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .map_err(|_| AppError::NotFound(format!("transaction {id}")))?;
+
+    match group_id {
+        Some(g) => tx.execute("DELETE FROM transactions WHERE transfer_group_id = ?1", [&g])?,
+        None => tx.execute("DELETE FROM transactions WHERE id = ?1", [id])?,
+    };
+    tx.commit()?;
     Ok(())
 }
 
@@ -275,6 +332,13 @@ pub fn create_transfer(
     state: State<DbState>,
 ) -> AppResult<(Transaction, Transaction)> {
     let conn = state.write_conn.lock().unwrap();
+    create_transfer_inner(&conn, input)
+}
+
+pub(crate) fn create_transfer_inner(
+    conn: &rusqlite::Connection,
+    input: CreateTransferInput,
+) -> AppResult<(Transaction, Transaction)> {
     let now = now_utc();
     let group_id = Uuid::new_v4().to_string();
     let from_id = Uuid::new_v4().to_string();
@@ -285,8 +349,11 @@ pub fn create_transfer(
     if input.from_account_id == input.to_account_id {
         return Err(AppError::Validation("Transfer accounts must be different".to_string()));
     }
+    if input.amount <= 0 {
+        return Err(AppError::Validation("Transfer amount must be greater than zero".to_string()));
+    }
 
-    conn.execute("BEGIN", [])?;
+    let tx = conn.unchecked_transaction()?;
 
     let insert = "INSERT INTO transactions
         (id, account_id, date, amount, kind, payee, description,
@@ -296,28 +363,24 @@ pub fn create_transfer(
     let from_payee = format!("Transfer to account");
     let to_payee = format!("Transfer from account");
 
-    match conn.execute(
+    tx.execute(
         insert,
-        rusqlite::params![from_id, input.from_account_id, input.date, input.amount,
+        rusqlite::params![from_id, input.from_account_id, input.date, -input.amount.abs(),
             from_payee, description, group_id, now, now],
-    ) {
-        Ok(_) => {}
-        Err(e) => { let _ = conn.execute("ROLLBACK", []); return Err(AppError::Db(e)); }
-    }
+    )?;
 
-    match conn.execute(
+    tx.execute(
         insert,
-        rusqlite::params![to_id, input.to_account_id, input.date, input.amount,
+        rusqlite::params![to_id, input.to_account_id, input.date, input.amount.abs(),
             to_payee, description, group_id, now, now],
-    ) {
-        Ok(_) => {}
-        Err(e) => { let _ = conn.execute("ROLLBACK", []); return Err(AppError::Db(e)); }
-    }
+    )?;
 
-    conn.execute("COMMIT", [])?;
-    drop(conn);
+    tx.commit()?;
 
-    let from_txn = get_transaction(from_id, state.clone())?;
-    let to_txn = get_transaction(to_id, state)?;
-    Ok((from_txn, to_txn))
+    let sql = format!("{SELECT} WHERE t.id = ?1");
+    let fetch = |id: &str| {
+        conn.query_row(&sql, [id], row_to_transaction)
+            .map_err(|_| AppError::NotFound(format!("transaction {id}")))
+    };
+    Ok((fetch(&from_id)?, fetch(&to_id)?))
 }

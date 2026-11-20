@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // ── Intents ───────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SearchIntent {
     SpendingTotal,
@@ -34,7 +34,7 @@ pub enum CardType {
 
 // ── Entities ──────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DatePeriod {
     pub start_date: String,
@@ -42,7 +42,7 @@ pub struct DatePeriod {
     pub label: String,
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractedEntities {
     pub category_id: Option<String>,
@@ -57,7 +57,7 @@ pub struct ExtractedEntities {
     pub wants_percentage: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IntentMatch {
     pub intent: SearchIntent,
@@ -156,6 +156,23 @@ pub struct AccountItem {
 
 // ── Top-level result ──────────────────────────────────────────────
 
+/// Where an answer came from.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum AnswerSource {
+    Template,
+    ModelRouter,
+    None,
+}
+
+/// A router mapping awaiting the user's confirmation; nothing is run until they accept.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouterProposal {
+    pub interpretation: String,
+    pub intent_match: IntentMatch,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AISearchResult {
@@ -164,6 +181,11 @@ pub struct AISearchResult {
     pub card_type: Option<CardType>,
     pub card_data: Option<CardData>,
     pub text_answer: Option<String>,
+    pub source: AnswerSource,
+    /// Plain-English line saying how the question was understood; None when unanswered.
+    pub interpretation: Option<String>,
+    /// Set when the model router mapped the question; the UI asks before showing an answer.
+    pub proposal: Option<RouterProposal>,
     pub suggestions: Vec<String>,
     pub query_time_ms: u64,
 }
@@ -176,6 +198,9 @@ impl AISearchResult {
             card_type: None,
             card_data: None,
             text_answer: None,
+            source: AnswerSource::None,
+            interpretation: None,
+            proposal: None,
             suggestions: vec![
                 "How much did I spend on [category]?".to_string(),
                 "Show me transactions over $[amount]".to_string(),

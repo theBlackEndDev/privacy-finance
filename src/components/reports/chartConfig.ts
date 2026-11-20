@@ -1,3 +1,5 @@
+import { getCurrencySymbol } from '../../utils/formatCurrency';
+
 export const TICK_STYLE = { fill: 'var(--text-muted)', fontSize: 11 } as const;
 
 export const TOOLTIP_STYLE = {
@@ -7,5 +9,5 @@ export const TOOLTIP_STYLE = {
 } as const;
 
 export function dollarTickFormatter(v: number): string {
-  return `$${(v / 100).toFixed(0)}`;
+  return `${getCurrencySymbol()}${(v / 100).toFixed(0)}`;
 }

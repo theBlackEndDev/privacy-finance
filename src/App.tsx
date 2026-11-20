@@ -15,6 +15,7 @@ import { ReportsPage } from './views/ReportsPage';
 import { ReconciliationPage } from './views/ReconciliationPage';
 
 import { ToastProvider } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { RecurringDueModal } from './components/recurring/RecurringDueModal';
 import { KeyboardShortcutHelp } from './components/ui/KeyboardShortcutHelp';
@@ -28,6 +29,10 @@ import { recurringApi } from './api/recurring';
 import { DueRecurringItem } from './types';
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from './components/ui/Toast';
+import { setCurrencySymbol } from './utils/formatCurrency';
+import { setDateFormat, DateFormat } from './utils/formatDate';
+
+const DATE_FORMATS: DateFormat[] = ['MMM D', 'MMM D, YYYY', 'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'];
 
 function AppShell() {
   const { currentView, navigate } = useApp();
@@ -50,7 +55,7 @@ function AppShell() {
     settingsApi.get('onboarding_complete').then(val => {
       setOnboarding(val !== 'true' ? 'visible' : 'hidden');
     }).catch(() => setOnboarding('hidden'));
-  }, [accountsLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountsLoading, accounts.length]);
 
   async function handleOnboardingComplete() {
     setOnboarding('hidden');
@@ -73,6 +78,7 @@ function AppShell() {
     setGenerating(true);
     try {
       await recurringApi.generateAll();
+      await refreshAccounts();
       setShowDueModal(false);
       setDueItems([]);
     } catch (err) {
@@ -84,18 +90,18 @@ function AppShell() {
 
   const view = (() => {
     switch (currentView) {
-      case 'accounts':        return <AccountsPage />;
-      case 'account-detail':  return <AccountDetailPage />;
-      case 'categories':      return <CategoriesPage />;
-      case 'dashboard':    return <DashboardPage />;
-      case 'transactions': return <TransactionsPage />;
-      case 'import':       return <ImportPage />;
-      case 'recurring':    return <RecurringPage />;
-      case 'budgets':      return <BudgetsPage />;
-      case 'rules':        return <RulesPage />;
-      case 'reports':      return <ReportsPage />;
-      case 'reconciliation': return <ReconciliationPage />;
-
+      case 'accounts':        return <ErrorBoundary><AccountsPage /></ErrorBoundary>;
+      case 'account-detail':  return <ErrorBoundary><AccountDetailPage /></ErrorBoundary>;
+      case 'categories':      return <ErrorBoundary><CategoriesPage /></ErrorBoundary>;
+      case 'dashboard':    return <ErrorBoundary><DashboardPage /></ErrorBoundary>;
+      case 'transactions': return <ErrorBoundary><TransactionsPage /></ErrorBoundary>;
+      case 'import':       return <ErrorBoundary><ImportPage /></ErrorBoundary>;
+      case 'recurring':    return <ErrorBoundary><RecurringPage /></ErrorBoundary>;
+      case 'budgets':      return <ErrorBoundary><BudgetsPage /></ErrorBoundary>;
+      case 'rules':        return <ErrorBoundary><RulesPage /></ErrorBoundary>;
+      case 'reports':      return <ErrorBoundary><ReportsPage /></ErrorBoundary>;
+      case 'reconciliation': return <ErrorBoundary><ReconciliationPage /></ErrorBoundary>;
+      default: return <ErrorBoundary><DashboardPage /></ErrorBoundary>;
     }
   })();
 
@@ -125,12 +131,28 @@ function AppShell() {
 
 export default function App() {
   const [locked, setLocked] = useState<boolean | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     encryptionApi.checkStatus().then(status => {
       setLocked(status.isEncrypted);
     }).catch(() => setLocked(false));
   }, []);
+
+  useEffect(() => {
+    if (locked !== false) return;
+    let cancelled = false;
+    Promise.all([
+      settingsApi.get('currency_symbol').catch(() => null),
+      settingsApi.get('date_format').catch(() => null),
+    ]).then(([symbol, format]) => {
+      if (cancelled) return;
+      if (symbol) setCurrencySymbol(symbol);
+      if (format && (DATE_FORMATS as string[]).includes(format)) setDateFormat(format as DateFormat);
+      setSettingsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [locked]);
 
   if (locked === null) {
     return null; // Loading encryption status
@@ -142,6 +164,10 @@ export default function App() {
         <UnlockScreen onUnlocked={() => setLocked(false)} />
       </ToastProvider>
     );
+  }
+
+  if (!settingsLoaded) {
+    return null; // Loading settings that affect formatting
   }
 
   return (

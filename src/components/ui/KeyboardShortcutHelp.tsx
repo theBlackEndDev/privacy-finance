@@ -5,7 +5,7 @@ interface Props {
   onClose: () => void;
 }
 
-const SHORTCUTS = [
+export const SHORTCUTS = [
   ['Ctrl+1', 'Dashboard'],
   ['Ctrl+2', 'Accounts'],
   ['Ctrl+3', 'Transactions'],

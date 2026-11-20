@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Category, CreateCategoryInput, UpdateCategoryInput } from '../types';
 import { categoriesApi } from '../api/categories';
+import { useCategories } from '../context/CategoryContext';
 import { useConfirmDelete } from '../hooks/useConfirmDelete';
 import { CategoryList } from '../components/categories/CategoryList';
 import { CategoryForm } from '../components/categories/CategoryForm';
@@ -9,22 +10,10 @@ import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 
 export function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { categories, loading, refresh: load } = useCategories();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Category | undefined>();
   const toast = useToast();
-
-  const load = useCallback(async () => {
-    try {
-      const data = await categoriesApi.getAll();
-      setCategories(data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   async function handleSave(input: CreateCategoryInput | UpdateCategoryInput) {
     if (editing) {
@@ -39,9 +28,13 @@ export function CategoriesPage() {
 
   const deleteFlow = useConfirmDelete<Category>({
     onConfirm: async (category) => {
-      await categoriesApi.delete(category.id);
-      await load();
-      toast('Category deleted');
+      try {
+        await categoriesApi.delete(category.id);
+        await load();
+        toast('Category deleted');
+      } catch (err) {
+        toast(String(err), 'error');
+      }
     },
   });
 

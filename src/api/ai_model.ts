@@ -13,7 +13,4 @@ export const aiModelApi = {
     installed: false, modelName: '', modelPath: null, modelSizeBytes: null, ready: false,
   }),
   download: () => invoke<void>('ai_model_download'),
-  start: () => invoke<void>('ai_model_start'),
-  stop: () => invoke<void>('ai_model_stop'),
-  health: () => invoke<boolean>('ai_model_health', {}, false),
 };

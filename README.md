@@ -1,63 +1,133 @@
-# PrivacyFinance
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.png">
+    <img alt="PrivacyFinance" src="docs/assets/logo-light.png" width="160">
+  </picture>
+</p>
 
-A modern, privacy-first personal finance tracker for desktop. All data stays local — no accounts, no cloud, no subscriptions.
+<p align="center">
+  <strong>A personal finance manager that keeps your data on your own computer.</strong>
+</p>
 
-Built with Tauri 2.x, React 19, TypeScript, and SQLite.
+<p align="center">
+  <a href="#license"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat"></a>
+  <img alt="Platforms: macOS, Linux, Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat">
+  <img alt="Built with Tauri" src="https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?style=flat&logo=tauri&logoColor=white">
+</p>
+
+<p align="center">
+  <a href="#try-it">Quickstart</a> •
+  <a href="#features">Features</a> •
+  <a href="#ai-search">AI search</a> •
+  <a href="#privacy">Privacy</a> •
+  <a href="#support">Support</a> •
+  <a href="https://privacyfinance.app">Website</a>
+</p>
+
+<p align="center">
+  <img alt="PrivacyFinance dashboard" src="docs/assets/screenshot-dashboard.png" width="720">
+</p>
+
+PrivacyFinance tracks your accounts, transactions, budgets and reports in one desktop app. Your data is
+stored in a SQLite database on your computer. There are no accounts to create and no subscriptions. The
+app is free.
+
+The only optional network use is a one-time AI Search model download, which you start yourself. See
+[Privacy](#privacy).
+
+> **Status:** early. Distribution is build-from-source only for now. See [Build from source](#build-from-source).
 
 ---
 
-## Privacy Statement
+## Try it
 
-PrivacyFinance is built on three principles:
+Build the app from source and run it. It opens with sample data, so you can explore before you enter
+anything of your own.
 
-- **Privacy-first** — no telemetry, no analytics, no network calls. Your financial data never leaves your machine.
-- **Offline-only** — works without an internet connection. No cloud sync, no accounts required.
-- **No subscriptions** — free and open source. No premium tiers, no feature gates.
+```bash
+git clone https://github.com/theBlackEndDev/privacy-finance.git
+cd privacy-finance
+npm install
+npm run tauri dev
+```
+
+The first run compiles the Rust backend and takes a few minutes. Later runs are faster. The sample data
+is only a starting point: [reset the database](#reset-the-data) when you want a clean start.
 
 ---
 
 ## Features
 
-- **100% local** — your financial data never leaves your machine
-- **Accounts** — checking, savings, credit card, cash, investment with multi-currency support
-- **Transactions** — income, expenses, and transfers between accounts with split support
-- **Categories** — color-coded with 15 defaults, fully customizable
-- **Dashboard** — monthly summary cards, spending pie chart, trend chart, account balances
-- **CSV Import** — 5-step wizard with column mapping, deduplication, and one-click rollback
-- **Budgeting** — monthly envelope budgets per category with rollover support
-- **Reports** — income/expense trends, category spending, cash flow, net worth, tag and payee analysis
-- **Recurring Transactions** — scheduled entries with auto-posting and frequency control
-- **Categorization Rules** — auto-categorize transactions by payee, description, or amount patterns
-- **Tags** — flexible tagging system for cross-cutting organization
-- **Split Transactions** — divide a single transaction across multiple categories
-- **Reconciliation** — statement reconciliation workflow with balance verification
-- **Database Encryption** — optional SQLCipher encryption at rest with password protection
-- **Export & Backup** — CSV, JSON, and full data export; one-click backup and restore
-- **Full-text Search** — FTS5-powered search across payees and descriptions
-- **Keyboard shortcuts** — Ctrl+1-9 navigation, Ctrl+N new transaction, Ctrl+F search, Ctrl+? help
-- **Accessibility** — ARIA landmarks, focus management, skip links, screen reader support
-- **Dark/Light theme** — high-contrast themes with tabular number formatting
-- **Import profiles** — save and reuse CSV column mappings per bank
+- **Accounts.** Checking, savings, credit card, cash and investment accounts, with multiple currencies.
+- **Transactions.** Income, expenses and transfers between accounts, with splits across categories.
+- **Categories and tags.** Color-coded categories with 15 defaults, plus free-form tags for cross-cutting groups.
+- **Dashboard.** Monthly summary cards, a spending pie chart, a trend chart and account balances.
+- **Budgets.** Monthly budgets per category, with rollover and undo/redo.
+- **Reports.** Income and expense trends, category spending, cash flow, net worth, and tag and payee analysis.
+- **CSV import.** A five-step wizard with column mapping, duplicate detection and one-click rollback. Save a
+  mapping as an import profile for each bank.
+- **Rules.** Categorize transactions automatically by payee, description or amount.
+- **Recurring transactions.** Scheduled entries with automatic posting and control over the frequency.
+- **Reconciliation.** Check an account statement against the balance in the app.
+- **Export and backup.** CSV, JSON and full data export, with one-click backup and restore.
+- **Search.** Full-text search across payees and descriptions, plus [AI Search](#ai-search) for questions.
+- **Optional encryption.** The database can be encrypted at rest with SQLCipher and a password.
+- **Themes and accessibility.** Light and dark themes, ARIA landmarks, focus management, skip links and
+  keyboard shortcuts (see [Keyboard shortcuts](#keyboard-shortcuts)).
 
 ---
 
-## Tech Stack
+## AI Search
 
-| Layer | Technology |
-|-------|------------|
-| Desktop shell | Tauri 2.x |
-| Frontend | React 19 + TypeScript + Vite 7 |
-| Backend | Rust |
-| Database | SQLite via rusqlite + SQLCipher (bundled, no install needed) |
-| Charts | Recharts |
-| CSV parsing | PapaParse (preview) + Rust csv crate (import) |
-| Styling | CSS Modules + CSS custom properties |
+AI Search answers questions such as "how much did I spend on dining last month?" It works in three steps.
+The first two run on your computer, and the app never sends the question anywhere.
+
+1. **Templates (instant).** The app matches your question against 12 built-in intents, such as spending
+   totals, spending by category, budget status, net worth and top merchants. A matching intent runs a fixed,
+   known query. This step needs no model and no download.
+2. **Payee fallback (instant).** If no template matches but your question names a payee, the app searches
+   the payee names in your transactions and shows the matches.
+3. **Local model (optional, 2 to 5 seconds).** If you installed the AI model, a small language model
+   writes one SQL `SELECT` query for your question. The app then checks the SQL before it runs. It rejects
+   anything that is not a single `SELECT` or `WITH` statement, and any keyword that changes data, such as
+   `DROP`, `DELETE`, `INSERT`, `UPDATE`, `ATTACH` or `PRAGMA`. Results are capped at 100 rows.
+
+If the model is not installed, the app suggests installing AI Search in Settings. The app works fully
+without it.
+
+### Installing the AI model
+
+AI Search is off until you install it. Open **Settings** and choose **Install AI Search** in the AI Search section. This downloads
+two files, and nothing is downloaded before you choose to:
+
+- the `llama-server` program, from the latest [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases) on GitHub
+- the Qwen2.5-Coder 1.5B model file (about 1 GB, Q4_K_M quantization), from [Hugging Face](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF)
+
+The model file is checked against a SHA-256 checksum after the download. A file that does not match is
+deleted. Once installed, the model runs on your machine. It listens only on `127.0.0.1` and uses the CPU.
 
 ---
 
-## Installation
+## Privacy
 
-### Prerequisites by Platform
+- **No telemetry.** The app does not collect usage data, crash reports or analytics.
+- **No accounts.** You never sign in, and there is no cloud sync.
+- **Your financial data stays on your computer.** Transactions, balances and the database never leave it.
+- **One optional download.** The AI model download described above is the only network request the app
+  makes on purpose, and it happens only if you install AI Search.
+- **Fonts load from Google Fonts.** The app's stylesheet imports the Inter and JetBrains Mono fonts from
+  `fonts.googleapis.com` when it starts. This sends your IP address to Google, and it is a request the app
+  makes without asking. The app works without it, but the text uses fallback fonts. Bundling the fonts into
+  the app would remove this request. Until then, treat it as a network request.
+
+---
+
+## Build from source
+
+PrivacyFinance is not yet published as an installer. To run a release build, build it yourself.
+
+### Prerequisites by platform
 
 <details>
 <summary><strong>macOS</strong></summary>
@@ -158,35 +228,19 @@ npm --version
 
 </details>
 
----
-
-## Running in Development
-
-### macOS / Linux
+### Run in development
 
 ```bash
-# Clone the repo
-git clone <repo-url>
+git clone https://github.com/theBlackEndDev/privacy-finance.git
 cd privacy-finance
-
-# Install frontend dependencies
 npm install
-
-# Start the app (compiles Rust + launches desktop window)
-npm run tauri dev
+npm run tauri dev       # compiles the Rust backend and opens the desktop window
 ```
 
-### Pulling a feature branch locally
+`npm run tauri dev` opens the native desktop app. `npm run dev` only serves the frontend in a browser,
+which is useful for UI work but does not run the Rust backend.
 
-```bash
-git fetch origin
-git checkout feat/branding-demo-screenshots
-git pull
-```
-
-### Clean rebuild (macOS / Linux)
-
-If the app UI is not reflecting recent changes, do a clean rebuild:
+If the UI does not show your latest changes, do a clean rebuild:
 
 ```bash
 rm -rf dist
@@ -194,38 +248,36 @@ npm install
 npm run tauri dev
 ```
 
-### Browser preview only (macOS / Linux)
-
-Useful for quick frontend review. This does **not** replace the native Tauri app:
-
-```bash
-npm run build
-npm run preview
-```
-
-First run takes 2–5 minutes to compile the Rust backend. Subsequent runs are faster.
-
-> **Note:** `npm run tauri dev` opens the real native desktop app. `npm run preview` is only for browser/frontend review.
-
----
-
-## Building for Production
+### Build a release
 
 ```bash
 npm run tauri build
 ```
 
-Produces a platform-native installer in `src-tauri/target/release/bundle/`:
+This writes a platform installer to `src-tauri/target/release/bundle/`:
 
-| Platform | Output |
-|----------|--------|
-| macOS | `.dmg` + `.app` |
-| Linux | `.deb` + `.AppImage` |
-| Windows | `.msi` + `.exe` |
+| Platform | Output         |
+| -------- | -------------- |
+| macOS    | `.dmg` + `.app` |
+| Linux    | `.deb` + `.AppImage` |
+| Windows  | `.msi` + `.exe` |
 
 ---
 
-## Project Structure
+## Tech stack
+
+| Layer          | Technology                                              |
+| -------------- | ------------------------------------------------------- |
+| Desktop shell  | Tauri 2                                                 |
+| Frontend       | React 19, TypeScript, Vite 7                            |
+| Backend        | Rust                                                    |
+| Database       | SQLite via rusqlite, with SQLCipher (bundled)           |
+| Charts         | Recharts                                                |
+| CSV            | PapaParse (preview) and the Rust `csv` crate (import)   |
+| Styling        | CSS Modules and CSS custom properties                   |
+
+<details>
+<summary><strong>Project structure</strong></summary>
 
 ```
 src/                        # React + TypeScript frontend
@@ -245,181 +297,91 @@ src/                        # React + TypeScript frontend
 └── views/                  # Page-level components
 
 src-tauri/src/              # Rust backend
-├── commands/               # Tauri command handlers
+├── commands/               # Tauri command handlers (including ai_search.rs)
 ├── db/                     # SQLite connection, migrations, seed data
+├── helpers/                # AI Search pieces, timestamp utilities
 ├── models/                 # Rust structs (serde Serialize/Deserialize)
-├── helpers/                # Timestamp utilities
 ├── error.rs                # AppError enum
 └── lib.rs                  # App setup + command registration
 ```
 
+</details>
+
 ---
 
-## Database
+## Your data
 
-SQLite database stored at:
+### Where the database is
+
+The database is one SQLite file. The app creates it on first launch.
 
 | Platform | Path |
-|----------|------|
-| macOS | `~/Library/Application Support/com.privacyfinance.app/privacyfinance.db` |
-| Linux | `~/.local/share/com.privacyfinance.app/privacyfinance.db` |
-| Windows | `%APPDATA%\com.privacyfinance.app\privacyfinance.db` |
+| -------- | ---- |
+| macOS    | `~/Library/Application Support/com.privacyfinance.app/privacyfinance.db` |
+| Linux    | `~/.local/share/com.privacyfinance.app/privacyfinance.db` |
+| Windows  | `%APPDATA%\com.privacyfinance.app\privacyfinance.db` |
 
-### Schema
+<details>
+<summary><strong>Schema and design notes</strong></summary>
 
-Tables: `accounts`, `categories`, `transactions`, `import_batches`, `import_profiles`, `settings`, `recurring_transactions`, `budgets`, `budget_items`, `categorization_rules`, `tags`, `transaction_tags`, `transaction_splits`, `reconciliations`, `reconciliation_items`, `exchange_rates`, `transactions_fts`.
+Tables: `accounts`, `categories`, `transactions`, `import_batches`, `import_profiles`, `settings`,
+`recurring_transactions`, `budgets`, `budget_items`, `categorization_rules`, `tags`, `transaction_tags`,
+`transaction_splits`, `reconciliations`, `reconciliation_items`, `exchange_rates`, and the `transactions_fts`
+full-text index.
 
-Key design decisions:
-- Amounts stored as **integer cents** (no floating point)
-- All amounts stored as **positive values** — the `kind` field (`income`/`expense`/`transfer`) determines sign
-- Timestamps as UTC RFC3339 strings
-- WAL mode enabled for concurrent read/write
-- Foreign keys enforced
+- Amounts are stored as integer cents. There is no floating-point money.
+- Amounts are stored as positive values. The `kind` field (`income`, `expense` or `transfer`) sets the sign.
+- Timestamps are UTC RFC 3339 strings.
+- WAL mode is on, and foreign keys are enforced.
 
-### Resetting / Seed Data
+</details>
 
-On first launch, the app seeds:
-- 3 accounts (Primary Checking, High-Yield Savings, Visa Rewards Card)
-- 15 categories (4 income, 11 expense)
-- 3 months of realistic sample transactions
+### Reset the data
 
-To reset back to seed data:
-1. fully close the app
-2. delete the SQLite database file for your platform
-3. reopen the app
+On first launch the app creates three sample accounts, 15 categories and three months of sample
+transactions. To return to that state, close the app and delete the database file. The app recreates it
+on the next launch.
 
-Platform-specific commands:
+<details>
+<summary><strong>Platform commands</strong></summary>
 
-#### macOS
+**macOS**
 ```bash
 rm -f ~/Library/Application\ Support/com.privacyfinance.app/privacyfinance.db
 ```
 
-#### Linux
+**Linux**
 ```bash
 rm -f ~/.local/share/com.privacyfinance.app/privacyfinance.db
 ```
 
-#### Windows (PowerShell)
+**Windows (PowerShell)**
 ```powershell
 Remove-Item "$env:APPDATA\com.privacyfinance.app\privacyfinance.db" -Force
 ```
 
-#### Windows (Command Prompt)
+**Windows (Command Prompt)**
 ```cmd
 del /f "%APPDATA%\com.privacyfinance.app\privacyfinance.db"
 ```
 
-If the file does not exist yet, the command will simply do nothing. On next launch, the app will recreate the database and re-seed the default sample data.
+If the file does not exist, the command does nothing.
 
-### Reset app data directory
+To also remove local settings and the AI model, delete the whole app data directory. This is stronger than
+deleting only the database file.
 
-If you want to wipe both the database **and** local settings/state:
+**macOS:** `rm -rf ~/Library/Application\ Support/com.privacyfinance.app`
+**Linux:** `rm -rf ~/.local/share/com.privacyfinance.app`
+**Windows (PowerShell):** `Remove-Item "$env:APPDATA\com.privacyfinance.app" -Recurse -Force`
 
-#### macOS
-```bash
-rm -rf ~/Library/Application\ Support/com.privacyfinance.app
-```
-
-#### Linux
-```bash
-rm -rf ~/.local/share/com.privacyfinance.app
-```
-
-#### Windows (PowerShell)
-```powershell
-Remove-Item "$env:APPDATA\com.privacyfinance.app" -Recurse -Force
-```
-
-This is more aggressive than deleting just `privacyfinance.db`.
+</details>
 
 ---
 
-## Running Tests
-
-### Unit Tests (Rust)
-
-```bash
-cd src-tauri
-cargo test
-```
-
-113 tests covering migrations, account/category/transaction CRUD, transfers, dashboard aggregation, CSV import, encryption, and edge cases.
-
-### E2E Tests (WebdriverIO + Tauri)
-
-End-to-end tests use [WebdriverIO](https://webdriver.io/) with [tauri-webdriver](https://github.com/Choochmeque/tauri-webdriver) — a cross-platform W3C WebDriver for Tauri apps. Works on macOS, Linux, and Windows.
-
-#### Prerequisites
-
-1. **Install npm dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Install the `tauri-webdriver` CLI** (one-time setup):
-   ```bash
-   cargo install tauri-webdriver --locked
-   ```
-   This installs the `tauri-webdriver` binary which acts as the WebDriver server.
-
-3. **Rust toolchain** must be installed (see Installation section above).
-
-#### Running E2E Tests
-
-**Full build + test (recommended first time):**
-```bash
-npm run test:e2e
-```
-This builds the frontend, compiles the Tauri app with the `e2e` feature flag (which embeds the WebDriver plugin), then runs all 14 test specs.
-
-**Run tests only (skip build):**
-```bash
-npm run test:e2e:only
-```
-Use this when the app binary is already compiled. Fastest way to re-run tests.
-
-#### How It Works
-
-1. `npm run test:e2e:build` compiles the app with `--features e2e`, which includes `tauri-plugin-webdriver` — this embeds a W3C WebDriver server (port 4445) inside the app.
-2. WebdriverIO's `beforeSession` hook spawns `tauri-webdriver` on port 4444, which acts as a proxy.
-3. `tauri-webdriver` launches the app binary, discovers the plugin's port, and bridges WebDriver commands to the embedded server.
-4. Tests interact with the app via standard WebDriver protocol.
-5. `afterSession` kills the driver process.
-
-#### What the E2E Tests Cover
-
-| Spec File | Tests |
-|-----------|-------|
-| `navigation` | Sidebar navigation to all views, keyboard shortcuts |
-| `onboarding` | First-run wizard, account creation, dashboard redirect |
-| `accounts` | Create, edit, delete accounts, detail view |
-| `transactions` | Create expense/income, edit, delete, filter by category/date, transfers |
-| `categories` | Create expense/income categories, edit, delete |
-| `search` | Keyword search, AI natural language search |
-| `budgets` | Set budget amounts, copy from previous month, progress bar |
-| `recurring` | Create recurring transactions, generate due items, toggle active |
-| `rules` | Create categorization rules, test matches, apply to uncategorized |
-| `tags` | Create and assign tags, remove tags |
-| `import-export` | CSV import wizard steps, CSV export |
-| `reports` | Income/expense, category spending, net worth reports |
-| `settings` | Currency symbol change, theme toggle |
-| `reconciliation` | Start account reconciliation |
-
-#### Troubleshooting
-
-- **`wdio: command not found`** — Run `npm install` first. The `wdio` binary comes from the `@wdio/cli` dev dependency.
-- **`tauri-webdriver: command not found`** — Run `cargo install tauri-webdriver --locked`.
-- **App doesn't launch** — Make sure the app has been built with `npm run test:e2e:build` first. The `--features e2e` flag is required to embed the WebDriver plugin.
-- **Tests time out** — The default timeout is 60 seconds per test. Check that the release binary exists at `src-tauri/target/release/`.
-- **Fresh state needed** — Tests automatically reset the database before running. For manual reset, delete the database file (see Database section above).
-
----
-
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 | Shortcut | Action |
-|----------|--------|
+| -------- | ------ |
 | `Ctrl+1` | Dashboard |
 | `Ctrl+2` | Accounts |
 | `Ctrl+3` | Transactions |
@@ -429,14 +391,84 @@ Use this when the app binary is already compiled. Fastest way to re-run tests.
 | `Ctrl+7` | Budgets |
 | `Ctrl+8` | Rules |
 | `Ctrl+9` | Reports |
-| `Ctrl+B` | Budgets (alt) |
-| `Ctrl+N` | Focus transaction entry |
+| `Ctrl+B` | Budgets (alternate) |
+| `Ctrl+N` | Focus the new-transaction form |
 | `Ctrl+F` | Focus search |
-| `Ctrl+?` | Keyboard shortcut help |
-| `Escape` | Close modal / clear search |
+| `Ctrl+?` | Show this list |
+| `Esc` | Close a dialog or clear search |
+
+On macOS these shortcuts use the Command key (`⌘`) as well as `Ctrl`.
+
+---
+
+## Tests
+
+### Rust unit tests
+
+```bash
+cd src-tauri
+cargo test
+```
+
+The suite has 156 `#[test]` functions in 19 files. Counted with
+`grep -r "#\[test\]" src-tauri/src src-tauri/tests`. They cover migrations, CRUD for accounts, categories
+and transactions, transfers, dashboard totals, CSV import, encryption, reports, rules, and the AI Search
+templates and SQL validator.
+
+### Frontend unit tests (Vitest)
+
+```bash
+npm test
+```
+
+Five test files with 25 test cases, for hooks and formatting utilities.
+
+### End-to-end tests (WebdriverIO and Tauri)
+
+End-to-end tests drive the real desktop app through [WebdriverIO](https://webdriver.io/) and
+[tauri-webdriver](https://github.com/Choochmeque/tauri-webdriver). The suite has 18 spec files with 92
+test cases, in `e2e/specs/`. Counted with `grep -cE "^\s*it\(" e2e/specs/*.ts`.
+
+Prerequisites: run `npm install`, then install the WebDriver CLI once with
+`cargo install tauri-webdriver --locked`.
+
+```bash
+npm run test:e2e        # build the app with the e2e feature, then run all specs
+npm run test:e2e:only   # run the specs against an already-built app
+```
+
+The build step embeds a WebDriver server in the app on port 4445. `tauri-webdriver` listens on 4444 and
+forwards commands to it. Each spec starts from a reset database.
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+- **`wdio: command not found`.** Run `npm install`. The `wdio` binary comes from `@wdio/cli`.
+- **`tauri-webdriver: command not found`.** Run `cargo install tauri-webdriver --locked`.
+- **The app does not launch.** Build it first with `npm run test:e2e:build`. The `e2e` feature is required.
+- **Tests time out.** The default timeout is 60 seconds per test. Check that the binary exists under
+  `src-tauri/target/`.
+
+</details>
+
+---
+
+## Support
+
+PrivacyFinance is free, and there is no paid tier.
+
+- **Donate.** If the app is useful to you, you can support its development on
+  [Buy Me a Coffee](https://buymeacoffee.com/theblackenddev).
+- **Paid setup help.** For a custom install, help with setup, or changes for your environment, email
+  [hello@privacyfinance.app](mailto:hello@privacyfinance.app).
+- **Website.** [privacyfinance.app](https://privacyfinance.app)
 
 ---
 
 ## License
 
-MIT
+PrivacyFinance is licensed under the GNU General Public License v3.0 (GPL-3.0). In plain terms, you can use,
+study, change and share the code. If you distribute a modified version, you must also share its source
+code under the same license.
+
+See [LICENSE](LICENSE) for the full text.

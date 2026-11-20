@@ -46,7 +46,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    transactionsApi.getAll({ dateFrom: `${month}-01`, dateTo: lastDayOfMonth(month), pageSize: 10, page: 1 })
+    transactionsApi.getAll({ dateFrom: `${month}-01`, dateTo: lastDayOfMonth(month), pageSize: 10, page: 0 })
       .then(p => { if (!cancelled) setRecent(p.items); })
       .catch(() => { if (!cancelled) setRecent([]); });
     return () => { cancelled = true; };

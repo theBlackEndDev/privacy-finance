@@ -47,8 +47,8 @@ export function CategoryForm({ category, onSave, onClose }: CategoryFormProps) {
         />
 
         <div>
-          <label className={styles.selectLabel}>Type</label>
-          <select className={styles.select} value={type} data-testid="cat-type-select" onChange={(e) => setType(e.target.value as 'income' | 'expense')}>
+          <label htmlFor="cat-type" className={styles.selectLabel}>Type</label>
+          <select id="cat-type" className={styles.select} value={type} data-testid="cat-type-select" onChange={(e) => setType(e.target.value as 'income' | 'expense')}>
             <option value="expense">Expense</option>
             <option value="income">Income</option>
           </select>

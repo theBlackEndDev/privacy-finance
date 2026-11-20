@@ -52,3 +52,68 @@
   color: var(--text-muted);
   text-align: right;
 }
+
+.proposal {
+  padding: 12px 14px;
+}
+
+.proposalText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.proposalActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.proposalConfirm,
+.proposalDecline {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.proposalConfirm {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.interpretation {
+  padding: 8px 14px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.betaBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.betaBadge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-primary);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.betaText {
+  line-height: 1.3;
+}

@@ -1,5 +1,6 @@
 use serde::Serialize;
 use tauri::State;
+use crate::db::migrations::run_migrations;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 
@@ -17,6 +18,14 @@ pub struct BackupInfo {
     pub date_range_to: Option<String>,
 }
 
+/// Validate that a path does not contain directory traversal sequences.
+fn validate_path(path: &str) -> AppResult<()> {
+    if path.contains("..") {
+        return Err(AppError::Validation("Path must not contain '..' traversal".into()));
+    }
+    Ok(())
+}
+
 // ── create_backup ───────────────────────────────────────────────────
 
 #[tauri::command]
@@ -24,6 +33,7 @@ pub fn create_backup(
     path: String,
     state: State<DbState>,
 ) -> AppResult<()> {
+    validate_path(&path)?;
     let conn = state.read_conn.lock().unwrap();
 
     // Verify source integrity before backup
@@ -51,6 +61,7 @@ pub fn restore_backup(
     path: String,
     state: State<DbState>,
 ) -> AppResult<()> {
+    validate_path(&path)?;
     // First validate the backup file
     let src = rusqlite::Connection::open(&path)?;
     let integrity: String = src.query_row(
@@ -68,6 +79,10 @@ pub fn restore_backup(
     // Use backup API to copy from backup source into the live write connection
     let backup = rusqlite::backup::Backup::new(&src, &mut *write_conn)?;
     backup.run_to_completion(100, std::time::Duration::from_millis(10), None)?;
+    drop(backup);
+
+    // The backup may predate the current schema
+    run_migrations(&write_conn)?;
 
     Ok(())
 }
@@ -76,6 +91,7 @@ pub fn restore_backup(
 
 #[tauri::command]
 pub fn get_backup_info(path: String) -> AppResult<BackupInfo> {
+    validate_path(&path)?;
     let metadata = std::fs::metadata(&path)?;
     let file_size_bytes = metadata.len();
 

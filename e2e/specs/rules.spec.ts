@@ -92,8 +92,9 @@ describe('Rules', () => {
         await browser.pause(2000);
       }
     }
-    // Test results may or may not show matches depending on data
-    expect(true).toBe(true);
+    // Verify test button interaction completed and page is still functional
+    const ruleRows = await $$(sel.ruleRow);
+    expect(ruleRows.length).toBeGreaterThan(0);
   });
 
   it('applies rules to uncategorized transactions', async () => {
@@ -111,7 +112,8 @@ describe('Rules', () => {
         }
       }
     }
-    // Apply may or may not categorize anything — either outcome is acceptable
-    expect(true).toBe(true);
+    // Verify the rules page is still functional after apply attempt
+    const ruleRows = await $$(sel.ruleRow);
+    expect(ruleRows.length).toBeGreaterThan(0);
   });
 });

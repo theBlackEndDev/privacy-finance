@@ -1,17 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportBatch {
-    pub id: String,
-    pub filename: String,
-    pub file_hash: String,
-    pub account_id: String,
-    pub profile_id: Option<String>,
-    pub row_count: i64,
-    pub created_at: String,
-}
-
 /// One CSV column -> one transaction field mapping entry.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]

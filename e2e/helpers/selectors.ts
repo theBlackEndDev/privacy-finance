@@ -17,6 +17,7 @@ export function byTestIdPrefix(prefix: string) {
 export const sel = {
   // Layout
   sidebar: byTestId('sidebar'),
+  sidebarAccounts: '[class*="accountsSection"]',
   mainContent: byTestId('main-content'),
   header: byTestId('header'),
 
@@ -165,6 +166,12 @@ export const sel = {
   reconBalanceInput: byTestId('recon-balance-input'),
   reconDateInput: byTestId('recon-date-input'),
 
+  // Reconciliation wizard (step 2+)
+  reconDiffValue: '[class*="diffValue"]',
+  reconCompleteBtn: 'button*=Complete Reconciliation',
+  reconCancelBtn: 'button*=Cancel',
+  reconDoneBtn: 'button*=Done',
+
   // Transfer
   transferFromAccount: byTestId('transfer-from-account'),
   transferToAccount: byTestId('transfer-to-account'),
@@ -174,7 +181,8 @@ export const sel = {
   // Dashboard
   dashboardSummary: byTestId('dashboard-summary'),
   dashboardIncomeCard: byTestId('dashboard-income-card'),
-  dashboardExpenseCard: byTestId('dashboard-expense-card'),
+  dashboardExpenseCard: byTestId('dashboard-expenses-card'),
+  dashboardNetCard: byTestId('dashboard-net-card'),
   dashboardChart: byTestId('dashboard-chart'),
   dashboardRecentTx: byTestId('dashboard-recent-tx'),
 } as const;

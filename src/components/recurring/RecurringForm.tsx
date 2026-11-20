@@ -3,6 +3,7 @@ import { CreateRecurringInput, RecurringTransaction, Frequency } from '../../typ
 import { useAccounts } from '../../context/AccountContext';
 import { useCategories } from '../../context/CategoryContext';
 import { Button } from '../ui/Button';
+import { todayISO } from '../../utils/formatDate';
 import styles from './RecurringForm.module.css';
 
 const FREQUENCIES: { value: Frequency; label: string }[] = [
@@ -32,7 +33,7 @@ export function RecurringForm({ initial, onSubmit, onCancel }: RecurringFormProp
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
   const [transferToAccountId, setTransferToAccountId] = useState(initial?.transferToAccountId ?? '');
   const [frequency, setFrequency] = useState<Frequency>(initial?.frequency ?? 'monthly');
-  const [startDate, setStartDate] = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(initial?.startDate ?? todayISO());
   const [endDate, setEndDate] = useState(initial?.endDate ?? '');
   const [autoPost, setAutoPost] = useState(initial?.autoPost ?? false);
 

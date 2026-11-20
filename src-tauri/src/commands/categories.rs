@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::db::DbState;
 use crate::error::{AppError, AppResult};
 use crate::helpers::timestamps::now_utc;
-use crate::models::category::{Category, CategoryGroup, CreateCategoryInput, UpdateCategoryInput};
+use crate::models::category::{Category, CreateCategoryInput, UpdateCategoryInput};
 
 #[tauri::command]
 pub fn get_categories(state: State<DbState>) -> AppResult<Vec<Category>> {
@@ -140,38 +140,3 @@ pub fn delete_category(id: String, state: State<DbState>) -> AppResult<()> {
     Ok(())
 }
 
-// ── Category Groups ─────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub fn list_category_groups(state: State<DbState>) -> AppResult<Vec<CategoryGroup>> {
-    let conn = state.read_conn.lock().unwrap();
-    let mut stmt = conn.prepare(
-        "SELECT id, name, sort_order, created_at, updated_at FROM category_groups ORDER BY sort_order ASC, name ASC"
-    )?;
-    let groups = stmt.query_map([], |row| {
-        Ok(CategoryGroup {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            sort_order: row.get(2)?,
-            created_at: row.get(3)?,
-            updated_at: row.get(4)?,
-        })
-    })?
-    .collect::<Result<Vec<_>, _>>()?;
-    Ok(groups)
-}
-
-#[tauri::command]
-pub fn create_category_group(name: String, sort_order: Option<i64>, state: State<DbState>) -> AppResult<CategoryGroup> {
-    let conn = state.write_conn.lock().unwrap();
-    let id = Uuid::new_v4().to_string();
-    let now = now_utc();
-    let sort = sort_order.unwrap_or(0);
-
-    conn.execute(
-        "INSERT INTO category_groups (id, name, sort_order, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
-        rusqlite::params![id, name, sort, now],
-    )?;
-
-    Ok(CategoryGroup { id, name, sort_order: sort, created_at: now.clone(), updated_at: now })
-}

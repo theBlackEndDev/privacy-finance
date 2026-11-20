@@ -1,10 +1,11 @@
 import { TransactionListCardData } from '../../../types';
+import { formatCurrency } from '../../../utils/formatCurrency';
 import styles from './Cards.module.css';
 
 export function TransactionListCard({ data }: { data: TransactionListCardData }) {
   const fmt = (cents: number) => {
-    const sign = cents < 0 ? '-' : cents > 0 ? '+' : '';
-    return sign + '$' + (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const sign = cents > 0 ? '+' : '';
+    return sign + formatCurrency(cents);
   };
   return (
     <div className={styles.card}>
@@ -22,7 +23,7 @@ export function TransactionListCard({ data }: { data: TransactionListCardData })
         ))}
       </div>
       <div className={styles.txFooter}>
-        {data.count} transactions — Total: ${(Math.abs(data.total) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        {data.count} transactions — Total: {formatCurrency(Math.abs(data.total))}
       </div>
     </div>
   );

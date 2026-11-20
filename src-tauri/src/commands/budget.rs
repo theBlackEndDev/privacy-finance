@@ -17,6 +17,22 @@ fn month_like_pattern(year: i32, month: i32) -> String {
     format!("{:04}-{:02}%", year, month)
 }
 
+/// Split-aware spent per category for one month (`?1` = date LIKE pattern):
+/// non-split expenses by parent category UNION ALL split rows by split category.
+const SPENT_BY_CATEGORY_SQL: &str =
+    "SELECT category_id, SUM(amount) AS spent
+     FROM (
+         SELECT t.category_id, t.amount
+         FROM transactions t
+         WHERE t.kind = 'expense' AND t.date LIKE ?1 AND t.is_split = 0
+         UNION ALL
+         SELECT ts.category_id, ts.amount
+         FROM transactions t
+         JOIN transaction_splits ts ON ts.transaction_id = t.id
+         WHERE t.kind = 'expense' AND t.date LIKE ?1 AND t.is_split = 1
+     )
+     GROUP BY category_id";
+
 fn row_to_budget(row: &rusqlite::Row) -> rusqlite::Result<Budget> {
     Ok(Budget {
         id: row.get(0)?,
@@ -60,16 +76,19 @@ pub fn create_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppRes
     }
 
     let conn = state.write_conn.lock().unwrap();
+    let tx = conn.unchecked_transaction()?;
     let now = now_utc();
     let budget_id = uuid::Uuid::new_v4().to_string();
 
-    conn.execute(
+    tx.execute(
         "INSERT INTO budgets (id, year, month, notes, created_at, updated_at)
          VALUES (?1, ?2, ?3, '', ?4, ?4)",
         rusqlite::params![budget_id, year, month, now],
     )?;
 
-    seed_budget_items(&conn, &budget_id, &now)?;
+    seed_budget_items(&tx, &budget_id, &now)?;
+
+    tx.commit()?;
 
     Ok(Budget {
         id: budget_id,
@@ -86,7 +105,10 @@ pub fn create_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppRes
 #[tauri::command]
 pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult<Option<BudgetWithItems>> {
     let conn = state.read_conn.lock().unwrap();
+    get_budget_inner(&conn, year, month)
+}
 
+fn get_budget_inner(conn: &rusqlite::Connection, year: i32, month: i32) -> AppResult<Option<BudgetWithItems>> {
     let budget: Option<Budget> = conn
         .query_row(
             "SELECT id, year, month, notes, created_at, updated_at
@@ -101,7 +123,7 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
         None => return Ok(None),
     };
 
-    let mut stmt = conn.prepare(
+    let mut stmt = conn.prepare(&format!(
         "SELECT
             bi.id,
             bi.category_id,
@@ -112,24 +134,21 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
             COALESCE(t_sum.spent, 0) AS spent,
             c.group_id,
             cg.name,
-            bi.target_amount
+            bi.target_amount,
+            bi.rollover_amount
          FROM budget_items bi
          JOIN categories c ON c.id = bi.category_id
          LEFT JOIN category_groups cg ON c.group_id = cg.id
-         LEFT JOIN (
-             SELECT category_id, SUM(amount) AS spent
-             FROM transactions
-             WHERE kind = 'expense' AND date LIKE ?1
-             GROUP BY category_id
-         ) t_sum ON t_sum.category_id = bi.category_id
+         LEFT JOIN ({SPENT_BY_CATEGORY_SQL}) t_sum ON t_sum.category_id = bi.category_id
          WHERE bi.budget_id = ?2
-         ORDER BY COALESCE(cg.sort_order, 999), c.sort_order",
-    )?;
+         ORDER BY COALESCE(cg.sort_order, 999), c.sort_order"
+    ))?;
 
     let items: Vec<BudgetCategoryRow> = stmt
         .query_map(rusqlite::params![month_like_pattern(year, month), budget.id], |row| {
             let budgeted: i64 = row.get(4)?;
             let spent: i64 = row.get(6)?;
+            let rollover_amount: i64 = row.get(10)?;
             Ok(BudgetCategoryRow {
                 item_id: row.get(0)?,
                 category_id: row.get(1)?,
@@ -137,8 +156,9 @@ pub fn get_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResult
                 category_color: row.get(3)?,
                 budgeted,
                 spent,
-                available: budgeted - spent,
+                available: budgeted + rollover_amount - spent,
                 rollover: row.get::<_, i64>(5)? != 0,
+                rollover_amount,
                 group_id: row.get(7)?,
                 group_name: row.get(8)?,
                 target_amount: row.get(9)?,
@@ -213,7 +233,12 @@ pub fn get_category_activity(
     let pattern = month_like_pattern(year, month);
 
     let sql = format!(
-        "{SELECT} WHERE t.category_id = ?1 AND t.date LIKE ?2 ORDER BY t.date DESC, t.created_at DESC"
+        "{SELECT} WHERE t.date LIKE ?2
+           AND ((t.is_split = 0 AND t.category_id = ?1)
+                OR (t.is_split = 1 AND EXISTS (
+                    SELECT 1 FROM transaction_splits ts
+                    WHERE ts.transaction_id = t.id AND ts.category_id = ?1)))
+         ORDER BY t.date DESC, t.created_at DESC"
     );
     let mut stmt = conn.prepare(&sql)?;
 
@@ -231,9 +256,10 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
     let (prev_year, prev_month) = prev_year_month(year, month);
 
     let conn = state.write_conn.lock().unwrap();
+    let tx = conn.unchecked_transaction()?;
 
     // Get previous month's budget
-    let prev_budget_id: Option<String> = conn
+    let prev_budget_id: Option<String> = tx
         .query_row(
             "SELECT id FROM budgets WHERE year = ?1 AND month = ?2",
             rusqlite::params![prev_year, prev_month],
@@ -249,7 +275,7 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
     let now = now_utc();
 
     // Check if current month budget exists, create if not
-    let existing_id: Option<String> = conn
+    let existing_id: Option<String> = tx
         .query_row(
             "SELECT id FROM budgets WHERE year = ?1 AND month = ?2",
             rusqlite::params![year, month],
@@ -261,20 +287,20 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
         Some(id) => id,
         None => {
             let id = uuid::Uuid::new_v4().to_string();
-            conn.execute(
+            tx.execute(
                 "INSERT INTO budgets (id, year, month, notes, created_at, updated_at)
                  VALUES (?1, ?2, ?3, '', ?4, ?4)",
                 rusqlite::params![id, year, month, now],
             )?;
 
-            seed_budget_items(&conn, &id, &now)?;
+            seed_budget_items(&tx, &id, &now)?;
 
             id
         }
     };
 
     // Copy allocations from previous month in a single UPDATE...FROM
-    conn.execute(
+    tx.execute(
         "UPDATE budget_items SET
             budgeted = src.budgeted,
             rollover = src.rollover,
@@ -289,11 +315,13 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
         rusqlite::params![now, prev_budget_id, budget_id],
     )?;
 
-    let budget = conn.query_row(
+    let budget = tx.query_row(
         "SELECT id, year, month, notes, created_at, updated_at FROM budgets WHERE id = ?1",
         [&budget_id],
         row_to_budget,
     )?;
+
+    tx.commit()?;
 
     Ok(budget)
 }
@@ -302,12 +330,28 @@ pub fn copy_budget(year: i32, month: i32, state: State<'_, DbState>) -> AppResul
 #[tauri::command]
 pub fn get_budget_summary(year: i32, month: i32, state: State<'_, DbState>) -> AppResult<BudgetSummary> {
     let conn = state.read_conn.lock().unwrap();
+    get_budget_summary_inner(&conn, year, month)
+}
+
+fn get_budget_summary_inner(conn: &rusqlite::Connection, year: i32, month: i32) -> AppResult<BudgetSummary> {
     let like_pattern = month_like_pattern(year, month);
 
     // Total budgeted
     let total_budgeted: i64 = conn
         .query_row(
             "SELECT COALESCE(SUM(bi.budgeted), 0)
+             FROM budget_items bi
+             JOIN budgets b ON b.id = bi.budget_id
+             WHERE b.year = ?1 AND b.month = ?2",
+            rusqlite::params![year, month],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Total rollover carried into this month (matches get_budget's per-row available)
+    let total_rollover: i64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(bi.rollover_amount), 0)
              FROM budget_items bi
              JOIN budgets b ON b.id = bi.budget_id
              WHERE b.year = ?1 AND b.month = ?2",
@@ -339,20 +383,27 @@ pub fn get_budget_summary(year: i32, month: i32, state: State<'_, DbState>) -> A
     Ok(BudgetSummary {
         total_budgeted,
         total_spent,
-        total_available: total_budgeted - total_spent,
+        total_available: total_budgeted + total_rollover - total_spent,
         total_income,
         to_be_budgeted: total_income - total_budgeted,
     })
 }
 
 /// Calculate rollover from previous month.
-/// For each category with rollover=1 in the previous month, carry forward (budgeted - spent).
-/// Adds the rollover amount to the current month's budgeted value.
+/// For each category with rollover=1 in the previous month, carry forward the previous
+/// month's available (budgeted + rollover_amount - spent).
+/// Sets (never adds to) the current month's `rollover_amount`, so calling it twice is safe.
 #[tauri::command]
 pub fn calculate_rollover(year: i32, month: i32, state: State<'_, DbState>) -> AppResult<i32> {
-    let (prev_year, prev_month) = prev_year_month(year, month);
-
     let conn = state.write_conn.lock().unwrap();
+    let tx = conn.unchecked_transaction()?;
+    let count = apply_rollover(&tx, year, month)?;
+    tx.commit()?;
+    Ok(count)
+}
+
+fn apply_rollover(conn: &rusqlite::Connection, year: i32, month: i32) -> AppResult<i32> {
+    let (prev_year, prev_month) = prev_year_month(year, month);
     let now = now_utc();
 
     // Get previous month's budget items with rollover enabled
@@ -378,33 +429,35 @@ pub fn calculate_rollover(year: i32, month: i32, state: State<'_, DbState>) -> A
         )
         .map_err(|_| AppError::Validation("Current month budget must exist before calculating rollover".into()))?;
 
-    let mut stmt = conn.prepare(
-        "SELECT bi.category_id, bi.budgeted,
+    let mut stmt = conn.prepare(&format!(
+        "SELECT bi.category_id, bi.budgeted + bi.rollover_amount,
                 COALESCE(t_sum.spent, 0) AS spent
          FROM budget_items bi
-         LEFT JOIN (
-             SELECT category_id, SUM(amount) AS spent
-             FROM transactions
-             WHERE kind = 'expense' AND date LIKE ?1
-             GROUP BY category_id
-         ) t_sum ON t_sum.category_id = bi.category_id
-         WHERE bi.budget_id = ?2 AND bi.rollover = 1",
-    )?;
+         LEFT JOIN ({SPENT_BY_CATEGORY_SQL}) t_sum ON t_sum.category_id = bi.category_id
+         WHERE bi.budget_id = ?2 AND bi.rollover = 1"
+    ))?;
 
     let rollovers: Vec<(String, i64)> = stmt
         .query_map(rusqlite::params![month_like_pattern(prev_year, prev_month), prev_budget_id], |row| {
-            let budgeted: i64 = row.get(1)?;
+            let available_before: i64 = row.get(1)?;
             let spent: i64 = row.get(2)?;
-            let rollover_amount = budgeted - spent; // positive = surplus, negative = overspent
+            let rollover_amount = available_before - spent; // positive = surplus, negative = overspent
             Ok((row.get::<_, String>(0)?, rollover_amount))
         })?
         .collect::<Result<_, _>>()?;
 
+    // Clear stale values first so categories no longer rolling over drop back to 0.
+    conn.execute(
+        "UPDATE budget_items SET rollover_amount = 0, updated_at = ?1
+         WHERE budget_id = ?2 AND rollover_amount != 0",
+        rusqlite::params![now, cur_budget_id],
+    )?;
+
     let mut count = 0;
     for (cat_id, rollover_amount) in &rollovers {
-        // Add rollover to current month's budgeted amount
+        // Set (not add) the current month's rollover amount
         let updated = conn.execute(
-            "UPDATE budget_items SET budgeted = budgeted + ?1, updated_at = ?2
+            "UPDATE budget_items SET rollover_amount = ?1, updated_at = ?2
              WHERE budget_id = ?3 AND category_id = ?4",
             rusqlite::params![rollover_amount, now, cur_budget_id, cat_id],
         )?;
@@ -444,6 +497,44 @@ mod tests {
             "SELECT id FROM accounts LIMIT 1", [], |row| row.get(0),
         ).unwrap();
         (food_id, transport_id, salary_id, account_id)
+    }
+
+    #[test]
+    fn budget_summary_includes_rollover() {
+        let conn = setup_db();
+        let (food_id, transport_id, _, account_id) = get_seeded_ids(&conn);
+        let now = "2026-06-01T00:00:00Z";
+
+        let budget_id = uuid::Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO budgets (id, year, month, notes, created_at, updated_at)
+             VALUES (?1, 2026, 6, '', ?2, ?2)",
+            params![budget_id, now],
+        ).unwrap();
+        // food: 50000 budgeted + 20000 rollover; transport: 30000 budgeted - 5000 rollover
+        for (cat, budgeted, rollover) in [(&food_id, 50000, 20000), (&transport_id, 30000, -5000)] {
+            conn.execute(
+                "INSERT INTO budget_items (id, budget_id, category_id, budgeted, rollover, rollover_amount, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?6)",
+                params![uuid::Uuid::new_v4().to_string(), budget_id, cat, budgeted, rollover, now],
+            ).unwrap();
+        }
+        for (cat, amount) in [(&food_id, 15000), (&transport_id, 4000)] {
+            conn.execute(
+                "INSERT INTO transactions (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, created_at, updated_at)
+                 VALUES (?1, ?2, '2026-06-05', ?3, 'expense', ?4, 'Shop', '', 1, ?5, ?5)",
+                params![uuid::Uuid::new_v4().to_string(), account_id, amount, cat, now],
+            ).unwrap();
+        }
+
+        let items = super::get_budget_inner(&conn, 2026, 6).unwrap().unwrap().items;
+        let summary = super::get_budget_summary_inner(&conn, 2026, 6).unwrap();
+
+        let row_available: i64 = items.iter().map(|i| i.available).sum();
+        assert_eq!(row_available, 50000 + 20000 - 15000 + 30000 - 5000 - 4000);
+        assert_eq!(summary.total_available, row_available);
+        assert_eq!(summary.total_budgeted, 80000);
+        assert_eq!(summary.total_spent, 19000);
     }
 
     #[test]
@@ -804,5 +895,86 @@ mod tests {
 
         let to_be_budgeted = total_income - total_budgeted;
         assert_eq!(to_be_budgeted, 230000); // $3000 - $700 = $2300
+    }
+
+    #[test]
+    fn rollover_twice_is_idempotent() {
+        let conn = setup_db();
+        let (food_id, _, _, account_id) = get_seeded_ids(&conn);
+        let now = "2026-06-01T00:00:00Z";
+
+        // June: $500 budgeted, rollover on, $300 spent -> $200 surplus
+        let jun_id = uuid::Uuid::new_v4().to_string();
+        let jul_id = uuid::Uuid::new_v4().to_string();
+        for (id, month, rollover) in [(&jun_id, 6, 1), (&jul_id, 7, 0)] {
+            conn.execute(
+                "INSERT INTO budgets (id, year, month, notes, created_at, updated_at)
+                 VALUES (?1, 2026, ?2, '', ?3, ?3)",
+                params![id, month, now],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO budget_items (id, budget_id, category_id, budgeted, rollover, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, 50000, ?4, ?5, ?5)",
+                params![uuid::Uuid::new_v4().to_string(), id, food_id, rollover, now],
+            ).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO transactions (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, created_at, updated_at)
+             VALUES (?1, ?2, '2026-06-15', 30000, 'expense', ?3, 'Grocery', '', 1, ?4, ?4)",
+            params![uuid::Uuid::new_v4().to_string(), account_id, food_id, now],
+        ).unwrap();
+
+        let read = || -> (i64, i64) {
+            conn.query_row(
+                "SELECT budgeted, rollover_amount FROM budget_items WHERE budget_id = ?1 AND category_id = ?2",
+                params![jul_id, food_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            ).unwrap()
+        };
+
+        assert_eq!(super::apply_rollover(&conn, 2026, 7).unwrap(), 1);
+        assert_eq!(read(), (50000, 20000));
+        assert_eq!(super::apply_rollover(&conn, 2026, 7).unwrap(), 1);
+        assert_eq!(read(), (50000, 20000));
+    }
+
+    #[test]
+    fn budget_spent_includes_splits() {
+        let conn = setup_db();
+        let (food_id, transport_id, _, account_id) = get_seeded_ids(&conn);
+        let now = "2026-06-01T00:00:00Z";
+
+        // Plain $50 food expense
+        conn.execute(
+            "INSERT INTO transactions (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, created_at, updated_at)
+             VALUES (?1, ?2, '2026-06-03', 5000, 'expense', ?3, 'Grocery', '', 1, ?4, ?4)",
+            params![uuid::Uuid::new_v4().to_string(), account_id, food_id, now],
+        ).unwrap();
+
+        // Split $100 expense (parent categorised as food): $70 food + $30 transport
+        let split_txn = uuid::Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO transactions (id, account_id, date, amount, kind, category_id, payee, description, is_cleared, is_split, created_at, updated_at)
+             VALUES (?1, ?2, '2026-06-10', 10000, 'expense', ?3, 'Mart', '', 1, 1, ?4, ?4)",
+            params![split_txn, account_id, food_id, now],
+        ).unwrap();
+        for (cat, amount) in [(&food_id, 7000), (&transport_id, 3000)] {
+            conn.execute(
+                "INSERT INTO transaction_splits (id, transaction_id, category_id, amount, description, created_at)
+                 VALUES (?1, ?2, ?3, ?4, '', ?5)",
+                params![uuid::Uuid::new_v4().to_string(), split_txn, cat, amount, now],
+            ).unwrap();
+        }
+
+        let mut stmt = conn.prepare(super::SPENT_BY_CATEGORY_SQL).unwrap();
+        let spent: std::collections::HashMap<String, i64> = stmt
+            .query_map(params!["2026-06%"], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+
+        // Parent amount of the split txn must not be double counted under food.
+        assert_eq!(spent.get(&food_id), Some(&12000));
+        assert_eq!(spent.get(&transport_id), Some(&3000));
     }
 }

@@ -14,7 +14,7 @@ export function AccountBalances({ balances }: Props) {
   return (
     <div>
       {balances.map(b => (
-        <div key={b.accountId} className={styles.row}>
+        <div key={b.accountId} className={styles.row} data-testid={`dashboard-balance-${b.accountId}`}>
           <div>
             <div className={styles.name}>{b.accountName}</div>
             <div className={styles.type}>

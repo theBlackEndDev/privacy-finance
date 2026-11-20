@@ -30,13 +30,18 @@ export function resetDatabase() {
  * so every spec starts from a ready state with sidebar visible.
  */
 export async function waitForAppReady() {
-  // Wait for either sidebar or onboarding wizard to appear
+  // Wait for the wizard, or for the sidebar *with* its accounts list. The sidebar
+  // renders before the app has decided whether to show onboarding (it needs the
+  // accounts + onboarding_complete round trips), so a bare sidebar on a blank DB
+  // does not yet mean "no wizard".
   await browser.waitUntil(async () => {
-    const sidebar = await $(sel.sidebar);
     const wizard = await $(sel.onboardingWizard);
+    if (await wizard.isDisplayed().catch(() => false)) return true;
+    const sidebar = await $(sel.sidebar);
+    const accounts = await $(sel.sidebarAccounts);
     return (await sidebar.isDisplayed().catch(() => false))
-        || (await wizard.isDisplayed().catch(() => false));
-  }, { timeout: 30000, timeoutMsg: 'Neither sidebar nor onboarding wizard appeared' });
+        && (await accounts.isDisplayed().catch(() => false));
+  }, { timeout: 30000, timeoutMsg: 'Neither sidebar with accounts nor onboarding wizard appeared' });
 
   // If onboarding wizard is showing, complete or skip it
   const wizard = await $(sel.onboardingWizard);

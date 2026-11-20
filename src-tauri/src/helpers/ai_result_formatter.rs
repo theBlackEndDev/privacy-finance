@@ -344,3 +344,204 @@ fn format_dollars(cents: i64) -> String {
         format!("${:.2}", dollars)
     }
 }
+
+/// Plain-English line saying what the answer's SQL actually computes, built from the
+/// `IntentMatch`. Mirrors `ai_sql_builder::build_query`, including which slots it ignores.
+pub fn describe_intent(im: &IntentMatch) -> String {
+    let e = &im.entities;
+    let period = e.date_period.as_ref().map(|dp| period_phrase(&dp.label));
+    let with_period = |base: String| match &period {
+        Some(p) => format!("{base}, {p}"),
+        None => base,
+    };
+
+    match im.intent {
+        SearchIntent::SpendingTotal | SearchIntent::SpendingByCategory | SearchIntent::CategoryDetail => {
+            match &e.category_name {
+                Some(cat) => with_period(format!("Spending in {cat}")),
+                None => with_period("Total spending".to_string()),
+            }
+        }
+        SearchIntent::SpendingComparison => {
+            let current = period.clone().unwrap_or_else(|| "this month".to_string());
+            let previous = e.comparison_period.as_ref()
+                .map(|cp| period_phrase(&cp.label))
+                .unwrap_or_else(|| "last month".to_string());
+            format!("Spending, {current} vs {previous}")
+        }
+        SearchIntent::IncomeTotal => with_period("Income".to_string()),
+        SearchIntent::BalanceCheck => "Current balance of every account".to_string(),
+        SearchIntent::NetWorth => "Net worth across all accounts".to_string(),
+        SearchIntent::BudgetStatus => {
+            let month = e.date_period.as_ref()
+                .and_then(|dp| dp.start_date.get(..7))
+                .map(|m| m.to_string());
+            match month {
+                Some(m) => format!("Budget status for {m}"),
+                None => "Budget status for this month".to_string(),
+            }
+        }
+        SearchIntent::TransactionSearch => {
+            let mut s = String::from("Transactions");
+            if let Some(m) = &e.merchant {
+                s.push_str(&format!(" at {m}"));
+            }
+            if let Some(cat) = &e.category_name {
+                s.push_str(&format!(" in {cat}"));
+            }
+            if let Some(t) = e.amount_threshold {
+                let op = if e.amount_operator.as_deref() == Some("under") { "under" } else { "over" };
+                s.push_str(&format!(" {op} {}", whole_dollars(t)));
+            }
+            with_period(s)
+        }
+        // Without a category the builder groups spending by category; with one it lists payees.
+        SearchIntent::TopMerchants => match &e.category_name {
+            None => with_period("Top spending categories".to_string()),
+            Some(_) => with_period("Top payees by spending".to_string()),
+        },
+        SearchIntent::TopExpenses => with_period("Largest expenses".to_string()),
+        SearchIntent::RecurringCheck => "Active recurring transactions".to_string(),
+    }
+}
+
+/// "Last month" reads as "last month" mid-sentence; "Q1 2026" and "March 2026" stay as they are.
+fn period_phrase(label: &str) -> String {
+    let lower_first = ["This ", "Last ", "Today", "Yesterday"]
+        .iter()
+        .any(|p| label.starts_with(p));
+    if lower_first {
+        let mut chars = label.chars();
+        match chars.next() {
+            Some(c) => c.to_lowercase().collect::<String>() + chars.as_str(),
+            None => String::new(),
+        }
+    } else {
+        label.to_string()
+    }
+}
+
+fn whole_dollars(cents: i64) -> String {
+    if cents % 100 == 0 {
+        format!("${}", cents / 100)
+    } else {
+        format!("${:.2}", cents as f64 / 100.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn im(intent: SearchIntent, f: impl FnOnce(&mut ExtractedEntities)) -> IntentMatch {
+        let mut entities = ExtractedEntities::default();
+        f(&mut entities);
+        IntentMatch { intent, confidence: 0.8, entities }
+    }
+
+    fn period(label: &str, start: &str) -> Option<DatePeriod> {
+        Some(DatePeriod { start_date: start.to_string(), end_date: start.to_string(), label: label.to_string() })
+    }
+
+    #[test]
+    fn describe_spending_total() {
+        assert_eq!(describe_intent(&im(SearchIntent::SpendingTotal, |_| {})), "Total spending");
+        let m = im(SearchIntent::SpendingTotal, |e| e.date_period = period("This year", "2026-01-01"));
+        assert_eq!(describe_intent(&m), "Total spending, this year");
+        let m = im(SearchIntent::SpendingTotal, |e| e.category_name = Some("Food".into()));
+        assert_eq!(describe_intent(&m), "Spending in Food");
+    }
+
+    #[test]
+    fn describe_spending_by_category() {
+        let m = im(SearchIntent::SpendingByCategory, |e| {
+            e.category_name = Some("Food".into());
+            e.date_period = period("Last month", "2026-02-01");
+        });
+        assert_eq!(describe_intent(&m), "Spending in Food, last month");
+    }
+
+    #[test]
+    fn describe_category_detail() {
+        let m = im(SearchIntent::CategoryDetail, |e| {
+            e.category_name = Some("Dining".into());
+            e.date_period = period("Q1 2026", "2026-01-01");
+        });
+        assert_eq!(describe_intent(&m), "Spending in Dining, Q1 2026");
+        assert_eq!(describe_intent(&im(SearchIntent::CategoryDetail, |_| {})), "Total spending");
+    }
+
+    #[test]
+    fn describe_spending_comparison() {
+        assert_eq!(describe_intent(&im(SearchIntent::SpendingComparison, |_| {})), "Spending, this month vs last month");
+        let m = im(SearchIntent::SpendingComparison, |e| {
+            e.date_period = period("March 2026", "2026-03-01");
+            e.comparison_period = period("February 2026", "2026-02-01");
+        });
+        assert_eq!(describe_intent(&m), "Spending, March 2026 vs February 2026");
+    }
+
+    #[test]
+    fn describe_income_total() {
+        assert_eq!(describe_intent(&im(SearchIntent::IncomeTotal, |_| {})), "Income");
+        let m = im(SearchIntent::IncomeTotal, |e| e.date_period = period("Last 30 days", "2026-03-01"));
+        assert_eq!(describe_intent(&m), "Income, last 30 days");
+    }
+
+    #[test]
+    fn describe_balance_check() {
+        // The builder ignores any account filter, so the text must not mention one.
+        let m = im(SearchIntent::BalanceCheck, |e| e.account_name = Some("Checking".into()));
+        assert_eq!(describe_intent(&m), "Current balance of every account");
+    }
+
+    #[test]
+    fn describe_budget_status() {
+        assert_eq!(describe_intent(&im(SearchIntent::BudgetStatus, |_| {})), "Budget status for this month");
+        let m = im(SearchIntent::BudgetStatus, |e| e.date_period = period("Last month", "2026-02-01"));
+        assert_eq!(describe_intent(&m), "Budget status for 2026-02");
+    }
+
+    #[test]
+    fn describe_transaction_search() {
+        let m = im(SearchIntent::TransactionSearch, |e| {
+            e.merchant = Some("Starbucks".into());
+            e.amount_threshold = Some(2000);
+            e.amount_operator = Some("over".into());
+        });
+        assert_eq!(describe_intent(&m), "Transactions at Starbucks over $20");
+
+        let m = im(SearchIntent::TransactionSearch, |e| {
+            e.category_name = Some("Food".into());
+            e.amount_threshold = Some(1550);
+            e.amount_operator = Some("under".into());
+            e.date_period = period("Yesterday", "2026-03-30");
+        });
+        assert_eq!(describe_intent(&m), "Transactions in Food under $15.50, yesterday");
+        assert_eq!(describe_intent(&im(SearchIntent::TransactionSearch, |_| {})), "Transactions");
+    }
+
+    #[test]
+    fn describe_top_merchants() {
+        let m = im(SearchIntent::TopMerchants, |e| e.date_period = period("This month", "2026-03-01"));
+        assert_eq!(describe_intent(&m), "Top spending categories, this month");
+        let m = im(SearchIntent::TopMerchants, |e| e.category_name = Some("Food".into()));
+        assert_eq!(describe_intent(&m), "Top payees by spending");
+    }
+
+    #[test]
+    fn describe_top_expenses() {
+        let m = im(SearchIntent::TopExpenses, |e| e.date_period = period("This week", "2026-03-23"));
+        assert_eq!(describe_intent(&m), "Largest expenses, this week");
+    }
+
+    #[test]
+    fn describe_recurring_check() {
+        assert_eq!(describe_intent(&im(SearchIntent::RecurringCheck, |_| {})), "Active recurring transactions");
+    }
+
+    #[test]
+    fn describe_net_worth() {
+        assert_eq!(describe_intent(&im(SearchIntent::NetWorth, |_| {})), "Net worth across all accounts");
+    }
+}

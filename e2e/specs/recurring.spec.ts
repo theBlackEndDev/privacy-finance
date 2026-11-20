@@ -84,7 +84,8 @@ describe('Recurring Transactions', () => {
       await generateBtn.click();
       await browser.pause(1000);
     }
-    // If generate button is not visible, there are no due items -- that is acceptable
-    expect(true).toBe(true);
+    // Verify the recurring page is still functional after generate attempt
+    const rows = await $$(sel.recurringRow);
+    expect(rows.length).toBeGreaterThan(0);
   });
 });

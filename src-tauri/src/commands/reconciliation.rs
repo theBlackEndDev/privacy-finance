@@ -49,7 +49,7 @@ fn calc_cleared_balance(
                  ELSE -t.amount END
         ), 0) FROM reconciliation_items ri
          JOIN transactions t ON ri.transaction_id = t.id
-         WHERE ri.reconciliation_id = ?1 AND ri.is_reconciled = 1",
+         WHERE ri.reconciliation_id = ?1 AND ri.is_reconciled = 1 AND t.is_cleared = 0",
         rusqlite::params![reconciliation_id, account_id],
         |row| row.get(0),
     )?;
@@ -114,17 +114,18 @@ pub fn start_reconciliation(
     input: StartReconciliationInput,
 ) -> AppResult<ReconciliationSummary> {
     let conn = db.write_conn.lock().unwrap();
+    let tx = conn.unchecked_transaction()?;
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_utc();
 
-    conn.execute(
+    tx.execute(
         "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
          VALUES (?1, ?2, ?3, ?4, 'pending', ?5)",
         rusqlite::params![id, input.account_id, input.statement_date, input.statement_balance, now],
     )?;
 
     // Bulk-insert unreconciled transactions for this account up to statement date
-    conn.execute(
+    tx.execute(
         "INSERT INTO reconciliation_items (reconciliation_id, transaction_id, is_reconciled)
          SELECT ?1, id, 0 FROM transactions
          WHERE account_id = ?2 AND date <= ?3 AND is_cleared = 0
@@ -132,7 +133,9 @@ pub fn start_reconciliation(
         rusqlite::params![id, input.account_id, input.statement_date],
     )?;
 
-    load_summary(&conn, &id)
+    let summary = load_summary(&tx, &id)?;
+    tx.commit()?;
+    Ok(summary)
 }
 
 #[tauri::command]
@@ -154,21 +157,19 @@ pub fn toggle_reconciliation_item(
 }
 
 #[tauri::command]
-pub fn get_reconciliation_diff(
-    db: State<DbState>,
-    reconciliation_id: String,
-) -> AppResult<ReconciliationSummary> {
-    let conn = db.read_conn.lock().unwrap();
-    load_summary(&conn, &reconciliation_id)
-}
-
-#[tauri::command]
 pub fn complete_reconciliation(
     db: State<DbState>,
     reconciliation_id: String,
 ) -> AppResult<Reconciliation> {
     let conn = db.write_conn.lock().unwrap();
-    let summary = load_summary(&conn, &reconciliation_id)?;
+    let tx = conn.unchecked_transaction()?;
+    let summary = load_summary(&tx, &reconciliation_id)?;
+
+    if summary.reconciliation.status != "pending" {
+        return Err(crate::error::AppError::Validation(
+            format!("Cannot complete: reconciliation is {}", summary.reconciliation.status),
+        ));
+    }
 
     if summary.difference != 0 {
         return Err(crate::error::AppError::Validation(
@@ -177,7 +178,7 @@ pub fn complete_reconciliation(
     }
 
     // Mark reconciled transactions as cleared
-    conn.execute(
+    tx.execute(
         "UPDATE transactions SET is_cleared = 1
          WHERE id IN (
              SELECT transaction_id FROM reconciliation_items
@@ -187,10 +188,11 @@ pub fn complete_reconciliation(
     )?;
 
     // Mark reconciliation as completed
-    conn.execute(
+    tx.execute(
         "UPDATE reconciliations SET status = 'completed' WHERE id = ?1",
         [&reconciliation_id],
     )?;
+    tx.commit()?;
 
     let mut recon = summary.reconciliation;
     recon.status = "completed".to_string();
@@ -203,15 +205,17 @@ pub fn cancel_reconciliation(
     reconciliation_id: String,
 ) -> AppResult<()> {
     let conn = db.write_conn.lock().unwrap();
+    let tx = conn.unchecked_transaction()?;
 
-    conn.execute(
+    tx.execute(
         "DELETE FROM reconciliation_items WHERE reconciliation_id = ?1",
         [&reconciliation_id],
     )?;
-    conn.execute(
+    tx.execute(
         "UPDATE reconciliations SET status = 'cancelled' WHERE id = ?1",
         [&reconciliation_id],
     )?;
+    tx.commit()?;
 
     Ok(())
 }
@@ -410,5 +414,31 @@ mod tests {
             "SELECT status FROM reconciliations WHERE id = ?1", [&recon_id], |row| row.get(0)
         ).unwrap();
         assert_eq!(status, "cancelled");
+    }
+
+    #[test]
+    fn cleared_item_not_double_counted() {
+        let conn = setup_db();
+        let acct = get_test_account(&conn);
+        let tx_id = insert_test_tx(&conn, &acct, "2026-03-01", 5000, "income", false);
+
+        let recon_id = uuid::Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO reconciliations (id, account_id, statement_date, statement_balance, status, created_at)
+             VALUES (?1, ?2, '2026-03-31', 0, 'pending', ?3)",
+            rusqlite::params![recon_id, acct, now_utc()],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO reconciliation_items (reconciliation_id, transaction_id, is_reconciled) VALUES (?1, ?2, 1)",
+            rusqlite::params![recon_id, tx_id],
+        ).unwrap();
+
+        let before = calc_cleared_balance(&conn, &acct, "2026-03-31", &recon_id).unwrap();
+
+        // After completion the tx is is_cleared = 1 while its item row remains reconciled.
+        conn.execute("UPDATE transactions SET is_cleared = 1 WHERE id = ?1", [&tx_id]).unwrap();
+        let after = calc_cleared_balance(&conn, &acct, "2026-03-31", &recon_id).unwrap();
+
+        assert_eq!(before, after, "A cleared, reconciled item must be counted once");
     }
 }

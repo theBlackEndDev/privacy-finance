@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PayeeSpendingRow } from '../../types';
 import { reportsApi } from '../../api/reports';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { useToast } from '../ui/Toast';
 import styles from './PayeeSpendingReport.module.css';
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 
 export function PayeeSpendingReport({ startDate, endDate, onData }: Props) {
   const [data, setData] = useState<PayeeSpendingRow[]>([]);
+  const toast = useToast();
 
   useEffect(() => {
     if (!startDate || !endDate) return;
@@ -20,9 +22,12 @@ export function PayeeSpendingReport({ startDate, endDate, onData }: Props) {
       if (cancelled) return;
       setData(d);
       onData?.(d);
+    }).catch((err) => {
+      if (cancelled) return;
+      toast(String(err), 'error');
     });
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [startDate, endDate, onData, toast]);
 
   if (data.length === 0) return <div className={styles.empty}>No payee spending data</div>;
 
