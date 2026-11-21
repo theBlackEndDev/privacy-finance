@@ -1,11 +1,10 @@
 import { Modal } from './Modal';
 import styles from './AboutDialog.module.css';
+import { version as APP_VERSION } from '../../../package.json';
 
 interface Props {
   onClose: () => void;
 }
-
-const APP_VERSION = '1.0.0';
 
 export function AboutDialog({ onClose }: Props) {
   return (
