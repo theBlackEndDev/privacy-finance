@@ -22,25 +22,31 @@ jobs:
         include:
           - os: macos-latest
             artifact_name: privacyfinance-macos-apple-silicon
-            artifact_glob: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/**
+            artifact_glob: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             release_notes: macOS beta build for Apple Silicon (.app/.dmg target)
             rust_targets: aarch64-apple-darwin
             tauri_args: --target aarch64-apple-darwin
           - os: macos-latest
             artifact_name: privacyfinance-macos-intel
-            artifact_glob: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/**
+            artifact_glob: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
             release_notes: macOS beta build for Intel Macs (.app/.dmg target)
             rust_targets: x86_64-apple-darwin
             tauri_args: --target x86_64-apple-darwin
           - os: windows-latest
             artifact_name: privacyfinance-windows
-            artifact_glob: src-tauri/target/release/bundle/**
+            # Installers only; the bundle dirs also hold staging files.
+            artifact_glob: |
+              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/release/bundle/nsis/*-setup.exe
             release_notes: Windows build output
             rust_targets: ''
             tauri_args: ''
           - os: ubuntu-22.04
             artifact_name: privacyfinance-linux
-            artifact_glob: src-tauri/target/release/bundle/**
+            artifact_glob: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/rpm/*.rpm
+              src-tauri/target/release/bundle/appimage/*.AppImage
             release_notes: Linux build output
             rust_targets: ''
             tauri_args: ''
